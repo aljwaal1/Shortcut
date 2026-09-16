@@ -14,6 +14,11 @@ object ToolRouter {
         ToolId.BATTERY_CHARGER -> Intent(context, BatterySetupActivity::class.java)
         ToolId.NFC_TRIGGER -> Intent(context, NfcSetupActivity::class.java)
         ToolId.APP_OPEN_ROUTINE -> Intent(context, AppUsageActivity::class.java)
+        ToolId.MERGE_IMAGES,
+        ToolId.IMAGES_TO_PDF,
+        ToolId.GIF_CREATE,
+        ToolId.IMAGE_RESIZE_COMPRESS -> Intent(context, ImageBatchActivity::class.java)
+            .putExtra(ImageBatchActivity.EXTRA_TOOL, tool.name)
         ToolId.IMAGE_CROP -> Intent(context, ImageCropActivity::class.java)
         ToolId.IMAGE_TO_JPEG -> Intent(context, JpegConvertActivity::class.java)
         ToolId.MULTI_URL_TO_PDF -> Intent(context, MultiUrlPdfActivity::class.java)
