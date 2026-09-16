@@ -43,8 +43,12 @@ class ScheduledMessageReceiver : BroadcastReceiver() {
         }.onFailure { failureReason = it.message ?: it.javaClass.simpleName }
             .getOrDefault(false)
 
+        val resultName = when (message.platform) {
+            MessagePlatform.TELEGRAM -> "${message.name} — Telegram message prepared; tap Send"
+            MessagePlatform.WHATSAPP -> "${message.name} — WhatsApp message prepared; tap Send"
+        }
         TaskExecutionReporter(context).report(
-            if (launched) TaskExecutionResult.success(message.name, startedAt)
+            if (launched) TaskExecutionResult.success(resultName, startedAt)
             else TaskExecutionResult.failure(message.name, failureReason ?: "Could not open messaging app", startedAt),
         )
 
