@@ -53,6 +53,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.res.stringResource
@@ -164,7 +165,6 @@ private fun OnboardingScreen(onDone: () -> Unit) {
         R.string.onboarding_title_3 to R.string.onboarding_body_3,
     )
     var page by remember { mutableIntStateOf(0) }
-
     Column(
         modifier = Modifier.fillMaxSize().padding(24.dp),
         verticalArrangement = Arrangement.Center,
@@ -195,7 +195,6 @@ private fun MainShell(
     onOpenPermissions: () -> Unit,
 ) {
     var selected by remember { mutableStateOf(MainTab.HOME) }
-
     Scaffold(
         bottomBar = {
             NavigationBar {
@@ -336,8 +335,9 @@ private fun TemplatesScreen(
 @Composable
 private fun HistoryScreen(padding: PaddingValues) {
     val context = LocalContext.current
+    val configuration = LocalConfiguration.current
     val result = TaskExecutionReporter(context.applicationContext).last()
-    val ar = context.resources.configuration.locales[0].language == "ar"
+    val ar = configuration.locales[0].language == "ar"
     LazyColumn(
         modifier = Modifier.fillMaxSize().padding(padding),
         contentPadding = PaddingValues(20.dp),
