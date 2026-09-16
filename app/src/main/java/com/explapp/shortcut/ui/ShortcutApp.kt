@@ -2,6 +2,7 @@ package com.explapp.shortcut.ui
 
 import android.Manifest
 import android.app.AlarmManager
+import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
@@ -31,6 +32,7 @@ import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.Language
 import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.FloatingActionButton
@@ -62,6 +64,8 @@ import androidx.core.os.LocaleListCompat
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import com.explapp.shortcut.R
+import com.explapp.shortcut.advanced.AdvancedAutomationStore
+import com.explapp.shortcut.advanced.ShortcutAutomationAccessibilityService
 import com.explapp.shortcut.data.MessageStore
 import com.explapp.shortcut.data.ShortcutStore
 import com.explapp.shortcut.domain.MessagePlatform
@@ -88,6 +92,7 @@ fun ShortcutApp() {
     val scheduler = remember(context) { AndroidAlarmScheduler(context.applicationContext) }
     val messageStore = remember(context) { MessageStore(context.applicationContext) }
     val messageScheduler = remember(context) { AndroidMessageScheduler(context.applicationContext) }
+    val advancedStore = remember(context) { AdvancedAutomationStore(context.applicationContext) }
     val shortcuts = remember {
         mutableStateListOf<ScheduledAppShortcut>().apply { addAll(store.load()) }
     }
@@ -100,6 +105,8 @@ fun ShortcutApp() {
     var showBuilder by remember { mutableStateOf(false) }
     var showMessageBuilder by remember { mutableStateOf<MessagePlatform?>(null) }
     var showPermissions by remember { mutableStateOf(false) }
+    var showAdvancedDisclosure by remember { mutableStateOf(false) }
+    var unlockTemplateEnabled by remember { mutableStateOf(advancedStore.unlockWifiMapsEnabled) }
 
     LaunchedEffect(Unit) {
         shortcuts.forEach(scheduler::schedule)
@@ -143,8 +150,17 @@ fun ShortcutApp() {
         else -> MainShell(
             shortcuts = shortcuts,
             messages = messages,
+            unlockTemplateEnabled = unlockTemplateEnabled,
             onCreateShortcut = { showBuilder = true },
             onCreateMessage = { showMessageBuilder = it },
+            onToggleUnlockTemplate = {
+                if (unlockTemplateEnabled) {
+                    advancedStore.unlockWifiMapsEnabled = false
+                    unlockTemplateEnabled = false
+                } else {
+                    showAdvancedDisclosure = true
+                }
+            },
             onDeleteShortcut = { shortcut ->
                 scheduler.cancel(shortcut)
                 val updated = ShortcutCollection.remove(shortcuts, shortcut)
@@ -158,6 +174,33 @@ fun ShortcutApp() {
                 messageStore.save(messages)
             },
             onOpenPermissions = { showPermissions = true },
+        )
+    }
+
+    if (showAdvancedDisclosure) {
+        AlertDialog(
+            onDismissRequest = { showAdvancedDisclosure = false },
+            title = { Text(stringResource(R.string.advanced_disclosure_title)) },
+            text = { Text(stringResource(R.string.advanced_disclosure_body)) },
+            dismissButton = {
+                TextButton(onClick = { showAdvancedDisclosure = false }) {
+                    Text(stringResource(R.string.cancel))
+                }
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        advancedStore.unlockWifiMapsEnabled = true
+                        unlockTemplateEnabled = true
+                        showAdvancedDisclosure = false
+                        runCatching {
+                            context.startActivity(Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS))
+                        }
+                    },
+                ) {
+                    Text(stringResource(R.string.agree_and_open_settings))
+                }
+            },
         )
     }
 }
@@ -199,8 +242,10 @@ private fun OnboardingScreen(onDone: () -> Unit) {
 private fun MainShell(
     shortcuts: List<ScheduledAppShortcut>,
     messages: List<ScheduledMessage>,
+    unlockTemplateEnabled: Boolean,
     onCreateShortcut: () -> Unit,
     onCreateMessage: (MessagePlatform) -> Unit,
+    onToggleUnlockTemplate: () -> Unit,
     onDeleteShortcut: (ScheduledAppShortcut) -> Unit,
     onDeleteMessage: (ScheduledMessage) -> Unit,
     onOpenPermissions: () -> Unit,
@@ -237,7 +282,13 @@ private fun MainShell(
                 onDeleteShortcut = onDeleteShortcut,
                 onDeleteMessage = onDeleteMessage,
             )
-            MainTab.TEMPLATES -> TemplatesScreen(padding, onCreateShortcut, onCreateMessage)
+            MainTab.TEMPLATES -> TemplatesScreen(
+                padding = padding,
+                unlockTemplateEnabled = unlockTemplateEnabled,
+                onCreateShortcut = onCreateShortcut,
+                onCreateMessage = onCreateMessage,
+                onToggleUnlockTemplate = onToggleUnlockTemplate,
+            )
             MainTab.HISTORY -> HistoryScreen(padding)
             MainTab.SETTINGS -> SettingsScreen(padding, onOpenPermissions)
         }
@@ -350,8 +401,10 @@ private fun DashboardCard(label: Int, value: String) {
 @Composable
 private fun TemplatesScreen(
     padding: PaddingValues,
+    unlockTemplateEnabled: Boolean,
     onCreateShortcut: () -> Unit,
     onCreateMessage: (MessagePlatform) -> Unit,
+    onToggleUnlockTemplate: () -> Unit,
 ) {
     val templates = listOf(
         R.string.template_open_app,
@@ -370,9 +423,8 @@ private fun TemplatesScreen(
         item { Text(stringResource(R.string.ready_templates), style = MaterialTheme.typography.headlineMedium) }
         items(templates) { title ->
             Card(modifier = Modifier.fillMaxWidth()) {
-                Column(Modifier.padding(18.dp)) {
+                Column(Modifier.padding(18.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     Text(stringResource(title), style = MaterialTheme.typography.titleMedium)
-                    Spacer(Modifier.height(8.dp))
                     when (title) {
                         R.string.template_open_app -> Button(onClick = onCreateShortcut) {
                             Text(stringResource(R.string.create_shortcut))
@@ -382,6 +434,19 @@ private fun TemplatesScreen(
                         }
                         R.string.template_telegram -> Button(onClick = { onCreateMessage(MessagePlatform.TELEGRAM) }) {
                             Text(stringResource(R.string.template_telegram))
+                        }
+                        R.string.template_unlock_maps -> {
+                            Text(stringResource(R.string.unlock_template_note), style = MaterialTheme.typography.bodySmall)
+                            if (unlockTemplateEnabled) {
+                                Text(stringResource(R.string.template_enabled), style = MaterialTheme.typography.labelLarge)
+                            }
+                            Button(onClick = onToggleUnlockTemplate) {
+                                Text(
+                                    stringResource(
+                                        if (unlockTemplateEnabled) R.string.disable_template else R.string.enable_template,
+                                    ),
+                                )
+                            }
                         }
                         else -> Text(stringResource(R.string.coming_soon), style = MaterialTheme.typography.bodySmall)
                     }
@@ -474,6 +539,9 @@ private fun PermissionsScreen(onBack: () -> Unit) {
     val exactAlarmGranted = remember(refreshKey) {
         Build.VERSION.SDK_INT < Build.VERSION_CODES.S || alarmManager.canScheduleExactAlarms()
     }
+    val accessibilityGranted = remember(refreshKey) {
+        isAdvancedAccessibilityEnabled(context)
+    }
 
     LazyColumn(
         modifier = Modifier.fillMaxSize(),
@@ -516,6 +584,18 @@ private fun PermissionsScreen(onBack: () -> Unit) {
                 } else null,
             )
         }
+        item {
+            PermissionCard(
+                title = stringResource(R.string.accessibility_permission),
+                description = stringResource(R.string.accessibility_permission_desc),
+                granted = accessibilityGranted,
+                action = if (!accessibilityGranted) {
+                    {
+                        runCatching { context.startActivity(Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS)) }
+                    }
+                } else null,
+            )
+        }
     }
 }
 
@@ -539,6 +619,15 @@ private fun PermissionCard(
             }
         }
     }
+}
+
+private fun isAdvancedAccessibilityEnabled(context: Context): Boolean {
+    val component = ComponentName(context, ShortcutAutomationAccessibilityService::class.java).flattenToString()
+    val enabled = Settings.Secure.getString(
+        context.contentResolver,
+        Settings.Secure.ENABLED_ACCESSIBILITY_SERVICES,
+    ).orEmpty()
+    return enabled.split(':').any { it.equals(component, ignoreCase = true) }
 }
 
 private fun setAppLocale(tag: String) {
