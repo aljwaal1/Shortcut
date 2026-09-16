@@ -1,5 +1,10 @@
 package com.explapp.shortcut.ui
 
+import android.Manifest
+import android.content.pm.PackageManager
+import android.os.Build
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -22,9 +27,11 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
+import androidx.core.content.ContextCompat
 import com.explapp.shortcut.R
 import com.explapp.shortcut.domain.MessagePlatform
 import com.explapp.shortcut.domain.RepeatOption
@@ -36,6 +43,7 @@ fun CreateMessageScreen(
     onCancel: () -> Unit,
     onSave: (ScheduledMessage) -> Unit,
 ) {
+    val context = LocalContext.current
     var name by remember { mutableStateOf("") }
     var platform by remember { mutableStateOf(initialPlatform) }
     var recipient by remember { mutableStateOf("") }
@@ -43,6 +51,14 @@ fun CreateMessageScreen(
     var hour by remember { mutableStateOf("8") }
     var minute by remember { mutableStateOf("00") }
     var repeat by remember { mutableStateOf(RepeatOption.ONCE) }
+    var pendingSave by remember { mutableStateOf<ScheduledMessage?>(null) }
+
+    val notificationPermissionLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.RequestPermission(),
+    ) {
+        pendingSave?.let(onSave)
+        pendingSave = null
+    }
 
     val defaultName = when (platform) {
         MessagePlatform.WHATSAPP -> stringResource(R.string.template_whatsapp)
@@ -57,6 +73,17 @@ fun CreateMessageScreen(
         minute = minute.toIntOrNull() ?: -1,
         repeat = repeat,
     )
+
+    fun saveWithNeededPermission() {
+        val needsNotificationPermission = Build.VERSION.SDK_INT >= 33 &&
+            ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED
+        if (needsNotificationPermission) {
+            pendingSave = model
+            notificationPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
+        } else {
+            onSave(model)
+        }
+    }
 
     LazyColumn(
         modifier = Modifier.fillMaxSize().padding(20.dp),
@@ -166,7 +193,7 @@ fun CreateMessageScreen(
                     Text(stringResource(R.string.cancel))
                 }
                 Button(
-                    onClick = { onSave(model) },
+                    onClick = ::saveWithNeededPermission,
                     enabled = model.isValid(),
                     modifier = Modifier.weight(1f),
                 ) {
