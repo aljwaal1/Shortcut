@@ -17,23 +17,27 @@ object ScreenCaptureHelper {
             onResult(null)
             return
         }
+
         val manager = activity.getSystemService(MediaProjectionManager::class.java)
-        val projection = manager.getMediaProjection(resultCode, data)
+        val projection = requireNotNull(manager.getMediaProjection(resultCode, data))
         val metrics = activity.resources.displayMetrics
         val width = metrics.widthPixels
         val height = metrics.heightPixels
         val density = metrics.densityDpi
         val reader = ImageReader.newInstance(width, height, PixelFormat.RGBA_8888, 2)
-        val display = projection.createVirtualDisplay(
-            "ShortcutScreenshot",
-            width,
-            height,
-            density,
-            DisplayManager.VIRTUAL_DISPLAY_FLAG_AUTO_MIRROR,
-            reader.surface,
-            null,
-            null,
+        val display = requireNotNull(
+            projection.createVirtualDisplay(
+                "ShortcutScreenshot",
+                width,
+                height,
+                density,
+                DisplayManager.VIRTUAL_DISPLAY_FLAG_AUTO_MIRROR,
+                reader.surface,
+                null,
+                null,
+            ),
         )
+
         var finished = false
         reader.setOnImageAvailableListener({ imageReader ->
             if (finished) return@setOnImageAvailableListener
