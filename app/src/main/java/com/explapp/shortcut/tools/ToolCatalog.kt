@@ -55,8 +55,8 @@ object ToolCatalog {
         ShortcutTool(ToolId.PDF_TEXT, ToolSection.PDF_FILES, "Extract text from PDF", "استخراج النص من PDF"),
         ShortcutTool(ToolId.ZIP_FILES, ToolSection.PDF_FILES, "Create ZIP", "إنشاء ZIP"),
         ShortcutTool(ToolId.UNZIP_FILES, ToolSection.PDF_FILES, "Unzip files", "فك ZIP"),
-        ShortcutTool(ToolId.URL_TO_PDF, ToolSection.PDF_FILES, "Web page / URL to PDF", "حفظ صفحة أو رابط كـ PDF"),
-        ShortcutTool(ToolId.MULTI_URL_TO_PDF, ToolSection.PDF_FILES, "Multiple URLs to PDFs", "عدة روابط إلى PDFs"),
+        ShortcutTool(ToolId.URL_TO_PDF, ToolSection.PDF_FILES, "Open URL for Print → PDF", "فتح الرابط للطباعة ← PDF"),
+        ShortcutTool(ToolId.MULTI_URL_TO_PDF, ToolSection.PDF_FILES, "Open URLs for Print → PDFs", "فتح الروابط للطباعة ← PDFs"),
 
         ShortcutTool(ToolId.QR_CREATE, ToolSection.QUICK, "Create QR code", "إنشاء QR Code"),
         ShortcutTool(ToolId.CLIPBOARD, ToolSection.QUICK, "Clipboard tools", "أدوات الحافظة"),
