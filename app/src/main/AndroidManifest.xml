@@ -3,11 +3,20 @@
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
     <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM" />
+    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
+    <uses-permission android:name="android.permission.READ_MEDIA_IMAGES" />
+    <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" android:maxSdkVersion="32" />
+    <uses-permission android:name="android.permission.NFC" />
+    <uses-feature android:name="android.hardware.nfc" android:required="false" />
 
     <queries>
         <intent>
             <action android:name="android.intent.action.MAIN" />
             <category android:name="android.intent.category.LAUNCHER" />
+        </intent>
+        <intent>
+            <action android:name="android.intent.action.VIEW" />
+            <data android:scheme="geo" />
         </intent>
     </queries>
 
@@ -21,23 +30,13 @@
             android:name="androidx.appcompat.app.AppLocalesMetadataHolderService"
             android:enabled="false"
             android:exported="false">
-            <meta-data
-                android:name="autoStoreLocales"
-                android:value="true" />
+            <meta-data android:name="autoStoreLocales" android:value="true" />
         </service>
 
-        <!-- Standard build intentionally does NOT register an AccessibilityService.
-             This keeps sideloaded installs away from Android restricted-settings warnings.
-             Advanced automation can be shipped separately with explicit disclosure/consent. -->
+        <!-- Standard build intentionally does NOT register an AccessibilityService. -->
 
-        <receiver
-            android:name=".scheduler.ScheduledAppLaunchReceiver"
-            android:exported="false" />
-
-        <receiver
-            android:name=".scheduler.ScheduledMessageReceiver"
-            android:exported="false" />
-
+        <receiver android:name=".scheduler.ScheduledAppLaunchReceiver" android:exported="false" />
+        <receiver android:name=".scheduler.ScheduledMessageReceiver" android:exported="false" />
         <receiver
             android:name=".scheduler.RestoreSchedulesReceiver"
             android:enabled="true"
@@ -47,6 +46,10 @@
                 <action android:name="android.intent.action.MY_PACKAGE_REPLACED" />
             </intent-filter>
         </receiver>
+
+        <activity
+            android:name=".tools.ToolActivity"
+            android:exported="false" />
 
         <activity
             android:name=".MainActivity"
