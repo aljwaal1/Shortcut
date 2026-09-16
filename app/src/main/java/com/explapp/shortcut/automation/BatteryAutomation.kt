@@ -11,7 +11,6 @@ import android.content.IntentFilter
 import android.os.BatteryManager
 import android.os.Build
 import androidx.core.app.NotificationCompat
-import com.explapp.shortcut.R
 
 private const val PREFS = "battery_automation"
 private const val KEY_ENABLED = "enabled"
@@ -96,13 +95,21 @@ class BatteryCheckReceiver : BroadcastReceiver() {
 class ChargerEventReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent) {
         val store = BatteryAutomationStore(context)
-        if (!store.enabled || !store.chargerNotifications) return
         when (intent.action) {
-            Intent.ACTION_POWER_CONNECTED -> notify(context, "Charger connected", "Charging started")
-            Intent.ACTION_POWER_DISCONNECTED -> notify(context, "Charger disconnected", "Charging stopped")
             Intent.ACTION_BOOT_COMPLETED, Intent.ACTION_MY_PACKAGE_REPLACED -> {
+                if (!store.enabled) return
                 store.previousLevel = currentBatteryLevel(context)
                 BatteryAutomationScheduler.schedule(context)
+            }
+            Intent.ACTION_POWER_CONNECTED -> {
+                if (store.enabled && store.chargerNotifications) {
+                    notify(context, "Charger connected", "Charging started")
+                }
+            }
+            Intent.ACTION_POWER_DISCONNECTED -> {
+                if (store.enabled && store.chargerNotifications) {
+                    notify(context, "Charger disconnected", "Charging stopped")
+                }
             }
         }
     }
