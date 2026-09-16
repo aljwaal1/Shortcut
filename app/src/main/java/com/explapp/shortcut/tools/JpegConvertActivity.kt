@@ -1,0 +1,163 @@
+package com.explapp.shortcut.tools
+
+import android.app.AlertDialog
+import android.content.ContentValues
+import android.graphics.Bitmap
+import android.graphics.BitmapFactory
+import android.graphics.Matrix
+import android.net.Uri
+import android.os.Build
+import android.os.Bundle
+import android.provider.MediaStore
+import android.widget.Toast
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.appcompat.app.AppCompatActivity
+import androidx.exifinterface.media.ExifInterface
+import java.io.InputStream
+import kotlin.math.max
+
+class JpegConvertActivity : AppCompatActivity() {
+    private var keepMetadata = false
+
+    private val picker = registerForActivityResult(ActivityResultContracts.GetContent()) { uri ->
+        if (uri == null) {
+            finish()
+            return@registerForActivityResult
+        }
+        convert(uri)
+    }
+
+    override fun onCreate(savedInstanceState: Bundle?) {
+        super.onCreate(savedInstanceState)
+        AlertDialog.Builder(this)
+            .setTitle(local("JPEG metadata", "بيانات JPEG"))
+            .setMessage(local(
+                "Choose whether to keep common camera/date/location metadata or remove it for more privacy.",
+                "اختر الاحتفاظ ببيانات الكاميرا والتاريخ والموقع الشائعة أو حذفها لخصوصية أكبر.",
+            ))
+            .setPositiveButton(local("Remove metadata", "حذف البيانات")) { _, _ ->
+                keepMetadata = false
+                picker.launch("image/*")
+            }
+            .setNeutralButton(local("Keep metadata", "الاحتفاظ بالبيانات")) { _, _ ->
+                keepMetadata = true
+                picker.launch("image/*")
+            }
+            .setNegativeButton(local("Cancel", "إلغاء")) { _, _ -> finish() }
+            .setOnCancelListener { finish() }
+            .show()
+    }
+
+    private fun convert(sourceUri: Uri) {
+        runCatching {
+            val sourceExif = if (keepMetadata) {
+                contentResolver.openInputStream(sourceUri).use { input ->
+                    input?.let { ExifInterface(it) }
+                }
+            } else null
+
+            val bitmap = loadOrientedBitmap(sourceUri, 2400)
+            val values = ContentValues().apply {
+                put(MediaStore.Images.Media.DISPLAY_NAME, "Converted_${System.currentTimeMillis()}.jpg")
+                put(MediaStore.Images.Media.MIME_TYPE, "image/jpeg")
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                    put(MediaStore.Images.Media.RELATIVE_PATH, "Pictures/Shortcut")
+                }
+            }
+            val outputUri = requireNotNull(contentResolver.insert(MediaStore.Images.Media.EXTERNAL_CONTENT_URI, values))
+            contentResolver.openOutputStream(outputUri).use { out ->
+                requireNotNull(out)
+                check(bitmap.compress(Bitmap.CompressFormat.JPEG, 92, out))
+            }
+            bitmap.recycle()
+
+            if (sourceExif != null) copyCommonExif(sourceExif, outputUri)
+            outputUri
+        }.onSuccess {
+            Toast.makeText(
+                this,
+                if (keepMetadata) local("JPEG saved with common metadata", "تم حفظ JPEG مع البيانات الشائعة")
+                else local("JPEG saved without metadata", "تم حفظ JPEG بدون metadata"),
+                Toast.LENGTH_LONG,
+            ).show()
+        }.onFailure {
+            Toast.makeText(this, it.message ?: local("Conversion failed", "فشل التحويل"), Toast.LENGTH_LONG).show()
+        }
+        finish()
+    }
+
+    private fun copyCommonExif(source: ExifInterface, outputUri: Uri) {
+        contentResolver.openFileDescriptor(outputUri, "rw")?.use { descriptor ->
+            val target = ExifInterface(descriptor.fileDescriptor)
+            COMMON_TAGS.forEach { tag ->
+                source.getAttribute(tag)?.let { value -> target.setAttribute(tag, value) }
+            }
+            target.setAttribute(ExifInterface.TAG_ORIENTATION, ExifInterface.ORIENTATION_NORMAL.toString())
+            target.saveAttributes()
+        }
+    }
+
+    private fun loadOrientedBitmap(uri: Uri, maxDimension: Int): Bitmap {
+        val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
+        contentResolver.openInputStream(uri).use { BitmapFactory.decodeStream(it, null, bounds) }
+        var sample = 1
+        while (max(bounds.outWidth / sample, bounds.outHeight / sample) > maxDimension * 2) sample *= 2
+        val decoded = contentResolver.openInputStream(uri).use {
+            BitmapFactory.decodeStream(it, null, BitmapFactory.Options().apply { inSampleSize = sample })
+        } ?: error("Unable to decode image")
+
+        val orientation = contentResolver.openInputStream(uri).use { input: InputStream? ->
+            if (input == null) ExifInterface.ORIENTATION_NORMAL
+            else runCatching { ExifInterface(input).getAttributeInt(ExifInterface.TAG_ORIENTATION, ExifInterface.ORIENTATION_NORMAL) }
+                .getOrDefault(ExifInterface.ORIENTATION_NORMAL)
+        }
+        val matrix = Matrix()
+        when (orientation) {
+            ExifInterface.ORIENTATION_ROTATE_90 -> matrix.postRotate(90f)
+            ExifInterface.ORIENTATION_ROTATE_180 -> matrix.postRotate(180f)
+            ExifInterface.ORIENTATION_ROTATE_270 -> matrix.postRotate(270f)
+            ExifInterface.ORIENTATION_FLIP_HORIZONTAL -> matrix.preScale(-1f, 1f)
+            ExifInterface.ORIENTATION_FLIP_VERTICAL -> matrix.preScale(1f, -1f)
+            ExifInterface.ORIENTATION_TRANSPOSE -> { matrix.preScale(-1f, 1f); matrix.postRotate(270f) }
+            ExifInterface.ORIENTATION_TRANSVERSE -> { matrix.preScale(-1f, 1f); matrix.postRotate(90f) }
+        }
+        val oriented = if (!matrix.isIdentity) {
+            Bitmap.createBitmap(decoded, 0, 0, decoded.width, decoded.height, matrix, true).also {
+                if (it !== decoded) decoded.recycle()
+            }
+        } else decoded
+
+        val scale = maxDimension.toFloat() / max(oriented.width, oriented.height)
+        return if (scale < 1f) {
+            Bitmap.createScaledBitmap(
+                oriented,
+                (oriented.width * scale).toInt().coerceAtLeast(1),
+                (oriented.height * scale).toInt().coerceAtLeast(1),
+                true,
+            ).also { if (it !== oriented) oriented.recycle() }
+        } else oriented
+    }
+
+    private fun local(en: String, ar: String): String =
+        if (resources.configuration.locales[0].language == "ar") ar else en
+
+    companion object {
+        private val COMMON_TAGS = listOf(
+            ExifInterface.TAG_MAKE,
+            ExifInterface.TAG_MODEL,
+            ExifInterface.TAG_DATETIME,
+            ExifInterface.TAG_DATETIME_ORIGINAL,
+            ExifInterface.TAG_F_NUMBER,
+            ExifInterface.TAG_EXPOSURE_TIME,
+            ExifInterface.TAG_PHOTOGRAPHIC_SENSITIVITY,
+            ExifInterface.TAG_FOCAL_LENGTH,
+            ExifInterface.TAG_GPS_LATITUDE,
+            ExifInterface.TAG_GPS_LATITUDE_REF,
+            ExifInterface.TAG_GPS_LONGITUDE,
+            ExifInterface.TAG_GPS_LONGITUDE_REF,
+            ExifInterface.TAG_GPS_ALTITUDE,
+            ExifInterface.TAG_GPS_ALTITUDE_REF,
+            ExifInterface.TAG_IMAGE_DESCRIPTION,
+        )
+    }
+}
