@@ -2,20 +2,29 @@ package com.explapp.shortcut.scheduler
 
 import com.explapp.shortcut.domain.RepeatOption
 import com.explapp.shortcut.domain.ScheduledAppShortcut
+import com.explapp.shortcut.domain.ScheduledMessage
 import java.time.ZonedDateTime
 
 object NextRunCalculator {
-    fun nextRun(
+    fun nextRun(now: ZonedDateTime, shortcut: ScheduledAppShortcut): ZonedDateTime =
+        nextRun(now, shortcut.hour, shortcut.minute, shortcut.repeat)
+
+    fun nextRun(now: ZonedDateTime, message: ScheduledMessage): ZonedDateTime =
+        nextRun(now, message.hour, message.minute, message.repeat)
+
+    private fun nextRun(
         now: ZonedDateTime,
-        shortcut: ScheduledAppShortcut,
+        hour: Int,
+        minute: Int,
+        repeat: RepeatOption,
     ): ZonedDateTime {
         val todayAtTime = now
-            .withHour(shortcut.hour)
-            .withMinute(shortcut.minute)
+            .withHour(hour)
+            .withMinute(minute)
             .withSecond(0)
             .withNano(0)
 
-        return when (shortcut.repeat) {
+        return when (repeat) {
             RepeatOption.ONCE,
             RepeatOption.DAILY,
             -> if (todayAtTime.isAfter(now)) todayAtTime else todayAtTime.plusDays(1)
@@ -28,7 +37,7 @@ object NextRunCalculator {
 
             RepeatOption.WEEKDAYS -> {
                 var candidate = if (todayAtTime.isAfter(now)) todayAtTime else todayAtTime.plusDays(1)
-                while (candidate.dayOfWeek.value !in shortcut.repeat.isoWeekdays) {
+                while (candidate.dayOfWeek.value !in repeat.isoWeekdays) {
                     candidate = candidate.plusDays(1)
                 }
                 candidate
