@@ -8,7 +8,6 @@
     <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
     <uses-permission android:name="android.permission.READ_MEDIA_IMAGES" />
     <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" android:maxSdkVersion="32" />
-    <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" android:maxSdkVersion="28" />
     <uses-permission android:name="android.permission.NFC" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PROJECTION" />
@@ -49,6 +48,7 @@
         <activity android:name=".tools.NfcSetupActivity" android:exported="false" />
         <activity android:name=".tools.ScreenCaptureActivity" android:exported="false" />
         <activity android:name=".tools.ImageBatchActivity" android:exported="false" />
+        <activity android:name=".tools.QuickFileActivity" android:exported="false" />
         <activity android:name=".tools.ImageCropActivity" android:exported="false" />
         <activity android:name=".tools.JpegConvertActivity" android:exported="false" />
         <activity android:name=".tools.MultiUrlPdfActivity" android:exported="false" />
