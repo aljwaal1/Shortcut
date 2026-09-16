@@ -1,6 +1,15 @@
 package com.explapp.shortcut.ui
 
+import android.Manifest
+import android.app.AlarmManager
 import android.content.Context
+import android.content.Intent
+import android.content.pm.PackageManager
+import android.net.Uri
+import android.os.Build
+import android.provider.Settings
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatDelegate
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -15,7 +24,9 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.AutoAwesome
+import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.Language
@@ -24,6 +35,7 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
@@ -31,6 +43,7 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
@@ -41,12 +54,17 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
+import androidx.core.content.ContextCompat
 import androidx.core.os.LocaleListCompat
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
 import com.explapp.shortcut.R
 import com.explapp.shortcut.data.ShortcutStore
 import com.explapp.shortcut.domain.ScheduledAppShortcut
+import com.explapp.shortcut.domain.ShortcutCollection
 import com.explapp.shortcut.scheduler.AndroidAlarmScheduler
 
 private const val PREFS = "shortcut_preferences"
@@ -71,6 +89,7 @@ fun ShortcutApp() {
         mutableStateOf(context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).getBoolean(KEY_ONBOARDING, false))
     }
     var showBuilder by remember { mutableStateOf(false) }
+    var showPermissions by remember { mutableStateOf(false) }
 
     LaunchedEffect(Unit) {
         shortcuts.forEach(scheduler::schedule)
@@ -87,6 +106,8 @@ fun ShortcutApp() {
             },
         )
 
+        showPermissions -> PermissionsScreen(onBack = { showPermissions = false })
+
         showBuilder -> CreateShortcutScreen(
             onCancel = { showBuilder = false },
             onSave = { shortcut ->
@@ -100,6 +121,14 @@ fun ShortcutApp() {
         else -> MainShell(
             shortcuts = shortcuts,
             onCreateShortcut = { showBuilder = true },
+            onDeleteShortcut = { shortcut ->
+                scheduler.cancel(shortcut)
+                val updated = ShortcutCollection.remove(shortcuts, shortcut)
+                shortcuts.clear()
+                shortcuts.addAll(updated)
+                store.save(updated)
+            },
+            onOpenPermissions = { showPermissions = true },
         )
     }
 }
@@ -141,6 +170,8 @@ private fun OnboardingScreen(onDone: () -> Unit) {
 private fun MainShell(
     shortcuts: List<ScheduledAppShortcut>,
     onCreateShortcut: () -> Unit,
+    onDeleteShortcut: (ScheduledAppShortcut) -> Unit,
+    onOpenPermissions: () -> Unit,
 ) {
     var selected by remember { mutableStateOf(MainTab.HOME) }
 
@@ -166,10 +197,10 @@ private fun MainShell(
         },
     ) { padding ->
         when (selected) {
-            MainTab.HOME -> HomeScreen(padding, shortcuts, onCreateShortcut)
+            MainTab.HOME -> HomeScreen(padding, shortcuts, onCreateShortcut, onDeleteShortcut)
             MainTab.TEMPLATES -> TemplatesScreen(padding, onCreateShortcut)
             MainTab.HISTORY -> HistoryScreen(padding)
-            MainTab.SETTINGS -> SettingsScreen(padding)
+            MainTab.SETTINGS -> SettingsScreen(padding, onOpenPermissions)
         }
     }
 }
@@ -179,6 +210,7 @@ private fun HomeScreen(
     padding: PaddingValues,
     shortcuts: List<ScheduledAppShortcut>,
     onCreateShortcut: () -> Unit,
+    onDeleteShortcut: (ScheduledAppShortcut) -> Unit,
 ) {
     LazyColumn(
         modifier = Modifier.fillMaxSize().padding(padding),
@@ -203,13 +235,24 @@ private fun HomeScreen(
             item { Text(stringResource(R.string.saved_shortcuts), style = MaterialTheme.typography.titleLarge) }
             items(shortcuts) { shortcut ->
                 Card(modifier = Modifier.fillMaxWidth()) {
-                    Column(Modifier.padding(18.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                        Text(shortcut.name, style = MaterialTheme.typography.titleMedium)
-                        Text(shortcut.packageName, style = MaterialTheme.typography.bodySmall)
-                        Text(
-                            "%02d:%02d • %s".format(shortcut.hour, shortcut.minute, shortcut.repeat.name),
-                            style = MaterialTheme.typography.bodyMedium,
-                        )
+                    Row(
+                        Modifier.fillMaxWidth().padding(18.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                    ) {
+                        Column(
+                            modifier = Modifier.weight(1f),
+                            verticalArrangement = Arrangement.spacedBy(4.dp),
+                        ) {
+                            Text(shortcut.name, style = MaterialTheme.typography.titleMedium)
+                            Text(shortcut.packageName, style = MaterialTheme.typography.bodySmall)
+                            Text(
+                                "%02d:%02d • %s".format(shortcut.hour, shortcut.minute, shortcut.repeat.name),
+                                style = MaterialTheme.typography.bodyMedium,
+                            )
+                        }
+                        IconButton(onClick = { onDeleteShortcut(shortcut) }) {
+                            Icon(Icons.Default.Delete, contentDescription = stringResource(R.string.delete_shortcut))
+                        }
                     }
                 }
             }
@@ -278,9 +321,11 @@ private fun HistoryScreen(padding: PaddingValues) {
 }
 
 @Composable
-private fun SettingsScreen(padding: PaddingValues) {
+private fun SettingsScreen(
+    padding: PaddingValues,
+    onOpenPermissions: () -> Unit,
+) {
     val rows = listOf(
-        R.string.permissions,
         R.string.advanced_mode,
         R.string.backup,
         R.string.contact_us,
@@ -308,9 +353,109 @@ private fun SettingsScreen(padding: PaddingValues) {
                 }
             }
         }
+        item {
+            Card(onClick = onOpenPermissions, modifier = Modifier.fillMaxWidth()) {
+                Text(stringResource(R.string.permissions), modifier = Modifier.padding(18.dp), style = MaterialTheme.typography.titleMedium)
+            }
+        }
         items(rows) { label ->
             Card(modifier = Modifier.fillMaxWidth()) {
                 Text(stringResource(label), modifier = Modifier.padding(18.dp), style = MaterialTheme.typography.titleMedium)
+            }
+        }
+    }
+}
+
+@Composable
+private fun PermissionsScreen(onBack: () -> Unit) {
+    val context = LocalContext.current
+    val lifecycleOwner = LocalLifecycleOwner.current
+    var refreshKey by remember { mutableIntStateOf(0) }
+
+    val notificationLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.RequestPermission(),
+    ) {
+        refreshKey++
+    }
+
+    DisposableEffect(lifecycleOwner) {
+        val observer = LifecycleEventObserver { _, event ->
+            if (event == Lifecycle.Event.ON_RESUME) refreshKey++
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
+    }
+
+    val notificationsGranted = remember(refreshKey) {
+        Build.VERSION.SDK_INT < 33 ||
+            ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) == PackageManager.PERMISSION_GRANTED
+    }
+    val alarmManager = remember(context) { context.getSystemService(AlarmManager::class.java) }
+    val exactAlarmGranted = remember(refreshKey) {
+        Build.VERSION.SDK_INT < Build.VERSION_CODES.S || alarmManager.canScheduleExactAlarms()
+    }
+
+    LazyColumn(
+        modifier = Modifier.fillMaxSize(),
+        contentPadding = PaddingValues(20.dp),
+        verticalArrangement = Arrangement.spacedBy(12.dp),
+    ) {
+        item {
+            Row(verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
+                IconButton(onClick = onBack) {
+                    Icon(Icons.Default.ArrowBack, contentDescription = stringResource(R.string.back))
+                }
+                Text(stringResource(R.string.permissions), style = MaterialTheme.typography.headlineMedium)
+            }
+        }
+        item {
+            PermissionCard(
+                title = stringResource(R.string.notification_permission),
+                description = stringResource(R.string.notification_permission_desc),
+                granted = notificationsGranted,
+                action = if (!notificationsGranted && Build.VERSION.SDK_INT >= 33) {
+                    {
+                        notificationLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
+                    }
+                } else null,
+            )
+        }
+        item {
+            PermissionCard(
+                title = stringResource(R.string.exact_alarm_permission),
+                description = stringResource(R.string.exact_alarm_permission_desc),
+                granted = exactAlarmGranted,
+                action = if (!exactAlarmGranted && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                    {
+                        val intent = Intent(
+                            Settings.ACTION_REQUEST_SCHEDULE_EXACT_ALARM,
+                            Uri.parse("package:${context.packageName}"),
+                        )
+                        context.startActivity(intent)
+                    }
+                } else null,
+            )
+        }
+    }
+}
+
+@Composable
+private fun PermissionCard(
+    title: String,
+    description: String,
+    granted: Boolean,
+    action: (() -> Unit)?,
+) {
+    Card(modifier = Modifier.fillMaxWidth()) {
+        Column(Modifier.padding(18.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Text(title, style = MaterialTheme.typography.titleMedium)
+            Text(description, style = MaterialTheme.typography.bodyMedium)
+            Text(
+                stringResource(if (granted) R.string.permission_granted else R.string.permission_needed),
+                style = MaterialTheme.typography.labelLarge,
+            )
+            if (action != null) {
+                Button(onClick = action) { Text(stringResource(R.string.allow_permission)) }
             }
         }
     }
