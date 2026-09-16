@@ -13,7 +13,7 @@ object ToolRouter {
         ToolId.PARKED_CAR -> Intent(context, ParkedCarActivity::class.java)
         ToolId.BATTERY_CHARGER -> Intent(context, BatterySetupActivity::class.java)
         ToolId.NFC_TRIGGER -> Intent(context, NfcSetupActivity::class.java)
-        ToolId.APP_USAGE_TIME -> Intent(context, AppUsageActivity::class.java)
+        ToolId.APP_OPEN_ROUTINE -> Intent(context, AppUsageActivity::class.java)
         ToolId.IMAGE_CROP -> Intent(context, ImageCropActivity::class.java)
         ToolId.IMAGE_TO_JPEG -> Intent(context, JpegConvertActivity::class.java)
         ToolId.MULTI_URL_TO_PDF -> Intent(context, MultiUrlPdfActivity::class.java)
