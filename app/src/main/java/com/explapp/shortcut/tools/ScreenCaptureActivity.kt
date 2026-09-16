@@ -1,5 +1,6 @@
 package com.explapp.shortcut.tools
 
+import android.Manifest
 import android.app.Activity
 import android.app.NotificationChannel
 import android.app.NotificationManager
@@ -8,10 +9,10 @@ import android.app.Service
 import android.content.BroadcastReceiver
 import android.content.ClipData
 import android.content.ClipboardManager
-import android.content.ContentValues
 import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
+import android.content.pm.PackageManager
 import android.content.pm.ServiceInfo
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
@@ -26,7 +27,6 @@ import android.os.Bundle
 import android.os.Handler
 import android.os.IBinder
 import android.os.Looper
-import android.provider.MediaStore
 import android.widget.Toast
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
@@ -64,7 +64,6 @@ class ScreenCaptureActivity : AppCompatActivity() {
             .putExtra(ScreenCaptureService.EXTRA_RESULT_CODE, result.resultCode)
             .putExtra(ScreenCaptureService.EXTRA_DATA, data)
         ContextCompat.startForegroundService(this, service)
-        // Put Shortcut behind the previously used app before the service captures the frame.
         moveTaskToBack(true)
     }
 
@@ -87,14 +86,11 @@ class ScreenCaptureActivity : AppCompatActivity() {
 
     private fun saveScreenshot(file: File) {
         runCatching {
-            val values = ContentValues().apply {
-                put(MediaStore.Images.Media.DISPLAY_NAME, "Screenshot_${System.currentTimeMillis()}.png")
-                put(MediaStore.Images.Media.MIME_TYPE, "image/png")
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-                    put(MediaStore.Images.Media.RELATIVE_PATH, "Pictures/Shortcut")
-                }
-            }
-            val uri = requireNotNull(contentResolver.insert(MediaStore.Images.Media.EXTERNAL_CONTENT_URI, values))
+            val uri = ToolOutputStore(this).create(
+                "Screenshot_${System.currentTimeMillis()}.png",
+                "image/png",
+                true,
+            )
             contentResolver.openOutputStream(uri).use { output ->
                 requireNotNull(output)
                 file.inputStream().use { it.copyTo(output) }
@@ -139,7 +135,9 @@ class ScreenCaptureActivity : AppCompatActivity() {
             Toast.LENGTH_LONG,
         ).show()
 
-        if (text.isNotBlank()) {
+        val canNotify = Build.VERSION.SDK_INT < 33 ||
+            ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS) == PackageManager.PERMISSION_GRANTED
+        if (text.isNotBlank() && canNotify) {
             val manager = getSystemService(NotificationManager::class.java)
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
                 manager.createNotificationChannel(
