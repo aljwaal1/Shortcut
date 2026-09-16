@@ -26,18 +26,9 @@
                 android:value="true" />
         </service>
 
-        <service
-            android:name=".advanced.ShortcutAutomationAccessibilityService"
-            android:exported="true"
-            android:label="@string/advanced_accessibility_label"
-            android:permission="android.permission.BIND_ACCESSIBILITY_SERVICE">
-            <intent-filter>
-                <action android:name="android.accessibilityservice.AccessibilityService" />
-            </intent-filter>
-            <meta-data
-                android:name="android.accessibilityservice"
-                android:resource="@xml/automation_accessibility_service" />
-        </service>
+        <!-- Standard build intentionally does NOT register an AccessibilityService.
+             This keeps sideloaded installs away from Android restricted-settings warnings.
+             Advanced automation can be shipped separately with explicit disclosure/consent. -->
 
         <receiver
             android:name=".scheduler.ScheduledAppLaunchReceiver"
