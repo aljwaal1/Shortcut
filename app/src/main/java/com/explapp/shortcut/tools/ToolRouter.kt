@@ -5,6 +5,7 @@ import android.content.Intent
 import com.explapp.shortcut.automation.BatterySetupActivity
 import com.explapp.shortcut.automation.CarModeActivity
 import com.explapp.shortcut.automation.ParkedCarActivity
+import com.explapp.shortcut.usage.AppUsageActivity
 
 object ToolRouter {
     fun intent(context: Context, tool: ToolId): Intent = when (tool) {
@@ -12,6 +13,7 @@ object ToolRouter {
         ToolId.PARKED_CAR -> Intent(context, ParkedCarActivity::class.java)
         ToolId.BATTERY_CHARGER -> Intent(context, BatterySetupActivity::class.java)
         ToolId.NFC_TRIGGER -> Intent(context, NfcSetupActivity::class.java)
+        ToolId.APP_USAGE_TIME -> Intent(context, AppUsageActivity::class.java)
         ToolId.IMAGE_CROP -> Intent(context, ImageCropActivity::class.java)
         ToolId.IMAGE_TO_JPEG -> Intent(context, JpegConvertActivity::class.java)
         ToolId.MULTI_URL_TO_PDF -> Intent(context, MultiUrlPdfActivity::class.java)
