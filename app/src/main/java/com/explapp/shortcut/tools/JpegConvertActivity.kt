@@ -1,14 +1,11 @@
 package com.explapp.shortcut.tools
 
 import android.app.AlertDialog
-import android.content.ContentValues
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.graphics.Matrix
 import android.net.Uri
-import android.os.Build
 import android.os.Bundle
-import android.provider.MediaStore
 import android.widget.Toast
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
@@ -51,32 +48,27 @@ class JpegConvertActivity : AppCompatActivity() {
     private fun convert(sourceUri: Uri) {
         runCatching {
             val sourceExif = if (keepMetadata) {
-                contentResolver.openInputStream(sourceUri).use { input ->
-                    input?.let { ExifInterface(it) }
-                }
+                contentResolver.openInputStream(sourceUri).use { input -> input?.let { ExifInterface(it) } }
             } else null
 
             val bitmap = loadOrientedBitmap(sourceUri, 2400)
-            val values = ContentValues().apply {
-                put(MediaStore.Images.Media.DISPLAY_NAME, "Converted_${System.currentTimeMillis()}.jpg")
-                put(MediaStore.Images.Media.MIME_TYPE, "image/jpeg")
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-                    put(MediaStore.Images.Media.RELATIVE_PATH, "Pictures/Shortcut")
-                }
-            }
-            val outputUri = requireNotNull(contentResolver.insert(MediaStore.Images.Media.EXTERNAL_CONTENT_URI, values))
+            val outputUri = ToolOutputStore(this).create(
+                "Converted_${System.currentTimeMillis()}.jpg",
+                "image/jpeg",
+                true,
+            )
             contentResolver.openOutputStream(outputUri).use { out ->
                 requireNotNull(out)
                 check(bitmap.compress(Bitmap.CompressFormat.JPEG, 92, out))
             }
             bitmap.recycle()
 
-            if (sourceExif != null) copyCommonExif(sourceExif, outputUri)
+            if (sourceExif != null && outputUri.scheme == "content") copyCommonExif(sourceExif, outputUri)
             outputUri
         }.onSuccess {
             Toast.makeText(
                 this,
-                if (keepMetadata) local("JPEG saved with common metadata", "تم حفظ JPEG مع البيانات الشائعة")
+                if (keepMetadata) local("JPEG saved; metadata is preserved where the output format supports it", "تم حفظ JPEG؛ تُحفظ البيانات حيث يدعم ملف الإخراج ذلك")
                 else local("JPEG saved without metadata", "تم حفظ JPEG بدون metadata"),
                 Toast.LENGTH_LONG,
             ).show()
