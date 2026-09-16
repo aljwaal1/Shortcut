@@ -7,10 +7,12 @@ data class MessageCapability(
     val autoSends: Boolean,
 )
 
-object MessageCapability {
-    fun forPlatform(platform: MessagePlatform): com.explapp.shortcut.messages.MessageCapability =
-        com.explapp.shortcut.messages.MessageCapability(
+object MessageCapabilities {
+    fun forPlatform(platform: MessagePlatform): MessageCapability = when (platform) {
+        MessagePlatform.TELEGRAM,
+        MessagePlatform.WHATSAPP -> MessageCapability(
             opensPreparedMessage = true,
             autoSends = false,
         )
+    }
 }
