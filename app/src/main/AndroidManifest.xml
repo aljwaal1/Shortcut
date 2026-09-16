@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
-<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
     <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM" />
@@ -11,6 +12,7 @@
     <uses-permission android:name="android.permission.NFC" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PROJECTION" />
+    <uses-permission android:name="android.permission.PACKAGE_USAGE_STATS" tools:ignore="ProtectedPermissions" />
     <uses-feature android:name="android.hardware.nfc" android:required="false" />
 
     <queries>
@@ -43,6 +45,7 @@
         <activity android:name=".automation.BatterySetupActivity" android:exported="false" />
         <activity android:name=".automation.CarModeActivity" android:exported="false" />
         <activity android:name=".automation.ParkedCarActivity" android:exported="false" />
+        <activity android:name=".usage.AppUsageActivity" android:exported="false" />
         <activity android:name=".tools.NfcSetupActivity" android:exported="false" />
         <activity android:name=".tools.ScreenCaptureActivity" android:exported="false" />
         <activity android:name=".tools.ImageCropActivity" android:exported="false" />
