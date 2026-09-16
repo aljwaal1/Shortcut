@@ -13,7 +13,12 @@ class AndroidAlarmScheduler(
     fun schedule(shortcut: ScheduledAppShortcut) {
         val alarmManager = context.getSystemService(AlarmManager::class.java)
         val triggerAt = NextRunCalculator.nextRun(ZonedDateTime.now(), shortcut)
-        val pendingIntent = pendingIntent(shortcut, PendingIntent.FLAG_UPDATE_CURRENT)
+        val pendingIntent = PendingIntent.getBroadcast(
+            context,
+            requestCode(shortcut),
+            ScheduledAppLaunchReceiver.intent(context, shortcut),
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
+        )
 
         val triggerAtMillis = triggerAt.toInstant().toEpochMilli()
         val canUseExact = Build.VERSION.SDK_INT < Build.VERSION_CODES.S || alarmManager.canScheduleExactAlarms()
@@ -34,20 +39,15 @@ class AndroidAlarmScheduler(
     }
 
     fun cancel(shortcut: ScheduledAppShortcut) {
-        val existing = pendingIntent(shortcut, PendingIntent.FLAG_NO_CREATE) ?: return
+        val existing = PendingIntent.getBroadcast(
+            context,
+            requestCode(shortcut),
+            ScheduledAppLaunchReceiver.intent(context, shortcut),
+            PendingIntent.FLAG_NO_CREATE or PendingIntent.FLAG_IMMUTABLE,
+        ) ?: return
         context.getSystemService(AlarmManager::class.java).cancel(existing)
         existing.cancel()
     }
-
-    private fun pendingIntent(
-        shortcut: ScheduledAppShortcut,
-        baseFlag: Int,
-    ): PendingIntent? = PendingIntent.getBroadcast(
-        context,
-        requestCode(shortcut),
-        ScheduledAppLaunchReceiver.intent(context, shortcut),
-        baseFlag or PendingIntent.FLAG_IMMUTABLE,
-    )
 
     private fun requestCode(shortcut: ScheduledAppShortcut): Int =
         listOf(shortcut.packageName, shortcut.hour, shortcut.minute, shortcut.name)
