@@ -47,9 +47,37 @@
             </intent-filter>
         </receiver>
 
-        <activity
-            android:name=".tools.ToolActivity"
+        <receiver
+            android:name=".automation.BatteryCheckReceiver"
             android:exported="false" />
+
+        <receiver
+            android:name=".automation.ChargerEventReceiver"
+            android:enabled="true"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="android.intent.action.ACTION_POWER_CONNECTED" />
+                <action android:name="android.intent.action.ACTION_POWER_DISCONNECTED" />
+                <action android:name="android.intent.action.BOOT_COMPLETED" />
+                <action android:name="android.intent.action.MY_PACKAGE_REPLACED" />
+            </intent-filter>
+        </receiver>
+
+        <activity android:name=".automation.BatterySetupActivity" android:exported="false" />
+        <activity android:name=".automation.CarModeActivity" android:exported="false" />
+        <activity android:name=".tools.NfcSetupActivity" android:exported="false" />
+        <activity android:name=".tools.ToolActivity" android:exported="false" />
+
+        <activity
+            android:name=".tools.NfcDispatchActivity"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="shortcut" android:host="tool" />
+            </intent-filter>
+        </activity>
 
         <activity
             android:name=".MainActivity"
