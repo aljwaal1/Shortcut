@@ -62,10 +62,14 @@ import androidx.core.os.LocaleListCompat
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import com.explapp.shortcut.R
+import com.explapp.shortcut.data.MessageStore
 import com.explapp.shortcut.data.ShortcutStore
+import com.explapp.shortcut.domain.MessagePlatform
 import com.explapp.shortcut.domain.ScheduledAppShortcut
+import com.explapp.shortcut.domain.ScheduledMessage
 import com.explapp.shortcut.domain.ShortcutCollection
 import com.explapp.shortcut.scheduler.AndroidAlarmScheduler
+import com.explapp.shortcut.scheduler.AndroidMessageScheduler
 
 private const val PREFS = "shortcut_preferences"
 private const val KEY_ONBOARDING = "onboarding_complete"
@@ -82,17 +86,24 @@ fun ShortcutApp() {
     val context = LocalContext.current
     val store = remember(context) { ShortcutStore(context.applicationContext) }
     val scheduler = remember(context) { AndroidAlarmScheduler(context.applicationContext) }
+    val messageStore = remember(context) { MessageStore(context.applicationContext) }
+    val messageScheduler = remember(context) { AndroidMessageScheduler(context.applicationContext) }
     val shortcuts = remember {
         mutableStateListOf<ScheduledAppShortcut>().apply { addAll(store.load()) }
+    }
+    val messages = remember {
+        mutableStateListOf<ScheduledMessage>().apply { addAll(messageStore.load()) }
     }
     var onboardingComplete by remember {
         mutableStateOf(context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).getBoolean(KEY_ONBOARDING, false))
     }
     var showBuilder by remember { mutableStateOf(false) }
+    var showMessageBuilder by remember { mutableStateOf<MessagePlatform?>(null) }
     var showPermissions by remember { mutableStateOf(false) }
 
     LaunchedEffect(Unit) {
         shortcuts.forEach(scheduler::schedule)
+        messages.forEach(messageScheduler::schedule)
     }
 
     when {
@@ -118,15 +129,33 @@ fun ShortcutApp() {
             },
         )
 
+        showMessageBuilder != null -> CreateMessageScreen(
+            initialPlatform = showMessageBuilder ?: MessagePlatform.WHATSAPP,
+            onCancel = { showMessageBuilder = null },
+            onSave = { message ->
+                messages.add(message)
+                messageStore.save(messages)
+                messageScheduler.schedule(message)
+                showMessageBuilder = null
+            },
+        )
+
         else -> MainShell(
             shortcuts = shortcuts,
+            messages = messages,
             onCreateShortcut = { showBuilder = true },
+            onCreateMessage = { showMessageBuilder = it },
             onDeleteShortcut = { shortcut ->
                 scheduler.cancel(shortcut)
                 val updated = ShortcutCollection.remove(shortcuts, shortcut)
                 shortcuts.clear()
                 shortcuts.addAll(updated)
                 store.save(updated)
+            },
+            onDeleteMessage = { message ->
+                messageScheduler.cancel(message)
+                messages.remove(message)
+                messageStore.save(messages)
             },
             onOpenPermissions = { showPermissions = true },
         )
@@ -169,8 +198,11 @@ private fun OnboardingScreen(onDone: () -> Unit) {
 @Composable
 private fun MainShell(
     shortcuts: List<ScheduledAppShortcut>,
+    messages: List<ScheduledMessage>,
     onCreateShortcut: () -> Unit,
+    onCreateMessage: (MessagePlatform) -> Unit,
     onDeleteShortcut: (ScheduledAppShortcut) -> Unit,
+    onDeleteMessage: (ScheduledMessage) -> Unit,
     onOpenPermissions: () -> Unit,
 ) {
     var selected by remember { mutableStateOf(MainTab.HOME) }
@@ -197,8 +229,15 @@ private fun MainShell(
         },
     ) { padding ->
         when (selected) {
-            MainTab.HOME -> HomeScreen(padding, shortcuts, onCreateShortcut, onDeleteShortcut)
-            MainTab.TEMPLATES -> TemplatesScreen(padding, onCreateShortcut)
+            MainTab.HOME -> HomeScreen(
+                padding = padding,
+                shortcuts = shortcuts,
+                messages = messages,
+                onCreateShortcut = onCreateShortcut,
+                onDeleteShortcut = onDeleteShortcut,
+                onDeleteMessage = onDeleteMessage,
+            )
+            MainTab.TEMPLATES -> TemplatesScreen(padding, onCreateShortcut, onCreateMessage)
             MainTab.HISTORY -> HistoryScreen(padding)
             MainTab.SETTINGS -> SettingsScreen(padding, onOpenPermissions)
         }
@@ -209,8 +248,10 @@ private fun MainShell(
 private fun HomeScreen(
     padding: PaddingValues,
     shortcuts: List<ScheduledAppShortcut>,
+    messages: List<ScheduledMessage>,
     onCreateShortcut: () -> Unit,
     onDeleteShortcut: (ScheduledAppShortcut) -> Unit,
+    onDeleteMessage: (ScheduledMessage) -> Unit,
 ) {
     LazyColumn(
         modifier = Modifier.fillMaxSize().padding(padding),
@@ -222,7 +263,8 @@ private fun HomeScreen(
             Spacer(Modifier.height(4.dp))
             Text(stringResource(R.string.my_shortcuts), style = MaterialTheme.typography.titleMedium)
         }
-        item { DashboardCard(R.string.scheduled_automations, shortcuts.size.toString()) }
+        item { DashboardCard(R.string.scheduled_automations, (shortcuts.size + messages.size).toString()) }
+        item { DashboardCard(R.string.scheduled_messages, messages.size.toString()) }
         item { DashboardCard(R.string.ready_templates, "7") }
         item { DashboardCard(R.string.recent_activity, "0") }
         item {
@@ -257,6 +299,38 @@ private fun HomeScreen(
                 }
             }
         }
+        if (messages.isNotEmpty()) {
+            item { Text(stringResource(R.string.scheduled_messages), style = MaterialTheme.typography.titleLarge) }
+            items(messages) { message ->
+                Card(modifier = Modifier.fillMaxWidth()) {
+                    Row(
+                        Modifier.fillMaxWidth().padding(18.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                    ) {
+                        Column(
+                            modifier = Modifier.weight(1f),
+                            verticalArrangement = Arrangement.spacedBy(4.dp),
+                        ) {
+                            Text(message.name, style = MaterialTheme.typography.titleMedium)
+                            Text(
+                                stringResource(
+                                    if (message.platform == MessagePlatform.WHATSAPP) R.string.whatsapp else R.string.telegram,
+                                ),
+                                style = MaterialTheme.typography.bodySmall,
+                            )
+                            Text(message.recipient, style = MaterialTheme.typography.bodySmall)
+                            Text(
+                                "%02d:%02d • %s".format(message.hour, message.minute, message.repeat.name),
+                                style = MaterialTheme.typography.bodyMedium,
+                            )
+                        }
+                        IconButton(onClick = { onDeleteMessage(message) }) {
+                            Icon(Icons.Default.Delete, contentDescription = stringResource(R.string.delete_message))
+                        }
+                    }
+                }
+            }
+        }
     }
 }
 
@@ -277,6 +351,7 @@ private fun DashboardCard(label: Int, value: String) {
 private fun TemplatesScreen(
     padding: PaddingValues,
     onCreateShortcut: () -> Unit,
+    onCreateMessage: (MessagePlatform) -> Unit,
 ) {
     val templates = listOf(
         R.string.template_open_app,
@@ -298,12 +373,17 @@ private fun TemplatesScreen(
                 Column(Modifier.padding(18.dp)) {
                     Text(stringResource(title), style = MaterialTheme.typography.titleMedium)
                     Spacer(Modifier.height(8.dp))
-                    if (title == R.string.template_open_app) {
-                        Button(onClick = onCreateShortcut) {
+                    when (title) {
+                        R.string.template_open_app -> Button(onClick = onCreateShortcut) {
                             Text(stringResource(R.string.create_shortcut))
                         }
-                    } else {
-                        Text(stringResource(R.string.coming_soon), style = MaterialTheme.typography.bodySmall)
+                        R.string.template_whatsapp -> Button(onClick = { onCreateMessage(MessagePlatform.WHATSAPP) }) {
+                            Text(stringResource(R.string.template_whatsapp))
+                        }
+                        R.string.template_telegram -> Button(onClick = { onCreateMessage(MessagePlatform.TELEGRAM) }) {
+                            Text(stringResource(R.string.template_telegram))
+                        }
+                        else -> Text(stringResource(R.string.coming_soon), style = MaterialTheme.typography.bodySmall)
                     }
                 }
             }
