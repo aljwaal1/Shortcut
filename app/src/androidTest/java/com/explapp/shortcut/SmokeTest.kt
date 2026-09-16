@@ -1,6 +1,5 @@
 package com.explapp.shortcut
 
-import androidx.compose.ui.test.assertExists
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.test.ext.junit.runners.AndroidJUnit4
@@ -15,6 +14,6 @@ class SmokeTest {
 
     @Test
     fun appLaunches() {
-        composeRule.onNodeWithTag("shortcut_root").assertExists()
+        composeRule.onNodeWithTag("shortcut_root").fetchSemanticsNode()
     }
 }
