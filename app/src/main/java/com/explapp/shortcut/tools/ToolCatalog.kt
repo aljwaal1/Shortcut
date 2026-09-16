@@ -30,6 +30,7 @@ enum class ToolId {
     URL_TO_PDF,
     MULTI_URL_TO_PDF,
     SCREENSHOT_CAPTURE,
+    APP_USAGE_TIME,
 }
 
 data class ShortcutTool(
@@ -69,6 +70,7 @@ object ToolCatalog {
         ShortcutTool(ToolId.BATTERY_CHARGER, ToolSection.AUTOMATION, "Battery / charger", "البطارية / الشاحن"),
         ShortcutTool(ToolId.NFC_TRIGGER, ToolSection.AUTOMATION, "NFC trigger", "تشغيل عبر NFC"),
         ShortcutTool(ToolId.APP_OPEN_ROUTINE, ToolSection.AUTOMATION, "When an app opens", "عند فتح تطبيق"),
+        ShortcutTool(ToolId.APP_USAGE_TIME, ToolSection.AUTOMATION, "App usage time", "وقت استخدام التطبيقات"),
         ShortcutTool(ToolId.MORNING_SLEEP, ToolSection.AUTOMATION, "Morning / sleep routine", "روتين الصباح / النوم"),
         ShortcutTool(ToolId.CALENDAR_REMINDERS, ToolSection.AUTOMATION, "Calendar reminders", "تنبيهات التقويم"),
     )
