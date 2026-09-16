@@ -4,16 +4,14 @@ import android.app.AlertDialog
 import android.app.AppOpsManager
 import android.app.usage.UsageStatsManager
 import android.content.Intent
+import android.os.Build
 import android.os.Bundle
 import android.provider.Settings
 import android.widget.ArrayAdapter
 import android.widget.ListView
-import android.widget.TextView
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
-import java.text.DateFormat
 import java.util.Calendar
-import java.util.Date
 import java.util.concurrent.TimeUnit
 
 class AppUsageActivity : AppCompatActivity() {
@@ -121,7 +119,12 @@ class AppUsageActivity : AppCompatActivity() {
 
     private fun hasUsageAccess(): Boolean {
         val appOps = getSystemService(AppOpsManager::class.java)
-        val mode = appOps.unsafeCheckOpNoThrow(AppOpsManager.OPSTR_GET_USAGE_STATS, android.os.Process.myUid(), packageName)
+        val mode = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            appOps.unsafeCheckOpNoThrow(AppOpsManager.OPSTR_GET_USAGE_STATS, android.os.Process.myUid(), packageName)
+        } else {
+            @Suppress("DEPRECATION")
+            appOps.checkOpNoThrow(AppOpsManager.OPSTR_GET_USAGE_STATS, android.os.Process.myUid(), packageName)
+        }
         return mode == AppOpsManager.MODE_ALLOWED
     }
 
