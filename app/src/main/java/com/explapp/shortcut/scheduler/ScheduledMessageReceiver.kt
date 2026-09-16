@@ -17,11 +17,14 @@ import com.explapp.shortcut.data.MessageStore
 import com.explapp.shortcut.domain.MessagePlatform
 import com.explapp.shortcut.domain.RepeatOption
 import com.explapp.shortcut.domain.ScheduledMessage
+import com.explapp.shortcut.execution.TaskExecutionReporter
+import com.explapp.shortcut.execution.TaskExecutionResult
 import com.explapp.shortcut.messages.MessageDeepLinkFactory
 
 class ScheduledMessageReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent) {
         val message = intent.toScheduledMessage() ?: return
+        val startedAt = System.currentTimeMillis()
         val openIntent = Intent(
             Intent.ACTION_VIEW,
             Uri.parse(
@@ -33,14 +36,19 @@ class ScheduledMessageReceiver : BroadcastReceiver() {
             ),
         ).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
 
+        var failureReason: String? = null
         val launched = runCatching {
             context.startActivity(openIntent)
             true
-        }.getOrDefault(false)
+        }.onFailure { failureReason = it.message ?: it.javaClass.simpleName }
+            .getOrDefault(false)
 
-        if (!launched) {
-            showReadyNotification(context, message, openIntent)
-        }
+        TaskExecutionReporter(context).report(
+            if (launched) TaskExecutionResult.success(message.name, startedAt)
+            else TaskExecutionResult.failure(message.name, failureReason ?: "Could not open messaging app", startedAt),
+        )
+
+        if (!launched) showReadyNotification(context, message, openIntent)
 
         if (message.repeat == RepeatOption.ONCE) {
             MessageStore(context).remove(message)
@@ -49,29 +57,18 @@ class ScheduledMessageReceiver : BroadcastReceiver() {
         }
     }
 
-    private fun showReadyNotification(
-        context: Context,
-        message: ScheduledMessage,
-        openIntent: Intent,
-    ) {
+    private fun showReadyNotification(context: Context, message: ScheduledMessage, openIntent: Intent) {
         if (Build.VERSION.SDK_INT >= 33 &&
             ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED
-        ) {
-            return
-        }
+        ) return
 
         val manager = context.getSystemService(NotificationManager::class.java)
         val channelId = "scheduled_messages"
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             manager.createNotificationChannel(
-                NotificationChannel(
-                    channelId,
-                    context.getString(R.string.scheduled_messages),
-                    NotificationManager.IMPORTANCE_HIGH,
-                ),
+                NotificationChannel(channelId, context.getString(R.string.scheduled_messages), NotificationManager.IMPORTANCE_HIGH),
             )
         }
-
         val pendingIntent = PendingIntent.getActivity(
             context,
             message.hashCode(),
@@ -86,7 +83,6 @@ class ScheduledMessageReceiver : BroadcastReceiver() {
             .setAutoCancel(true)
             .setContentIntent(pendingIntent)
             .build()
-
         manager.notify(message.hashCode(), notification)
     }
 
@@ -112,19 +108,13 @@ class ScheduledMessageReceiver : BroadcastReceiver() {
 
         private fun Intent.toScheduledMessage(): ScheduledMessage? {
             val name = getStringExtra(EXTRA_NAME) ?: return null
-            val platform = runCatching {
-                MessagePlatform.valueOf(getStringExtra(EXTRA_PLATFORM).orEmpty())
-            }.getOrNull() ?: return null
+            val platform = runCatching { MessagePlatform.valueOf(getStringExtra(EXTRA_PLATFORM).orEmpty()) }.getOrNull() ?: return null
             val recipient = getStringExtra(EXTRA_RECIPIENT) ?: return null
             val body = getStringExtra(EXTRA_MESSAGE) ?: return null
             val hour = getIntExtra(EXTRA_HOUR, -1)
             val minute = getIntExtra(EXTRA_MINUTE, -1)
-            val repeat = runCatching {
-                RepeatOption.valueOf(getStringExtra(EXTRA_REPEAT).orEmpty())
-            }.getOrNull() ?: return null
-
-            return ScheduledMessage(name, platform, recipient, body, hour, minute, repeat)
-                .takeIf { it.isValid() }
+            val repeat = runCatching { RepeatOption.valueOf(getStringExtra(EXTRA_REPEAT).orEmpty()) }.getOrNull() ?: return null
+            return ScheduledMessage(name, platform, recipient, body, hour, minute, repeat).takeIf { it.isValid() }
         }
     }
 }
