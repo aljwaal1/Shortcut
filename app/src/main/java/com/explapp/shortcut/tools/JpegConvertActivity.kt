@@ -1,27 +1,28 @@
 package com.explapp.shortcut.tools
 
 import android.app.AlertDialog
+import android.content.Intent
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.graphics.Matrix
 import android.net.Uri
 import android.os.Bundle
+import android.widget.LinearLayout
+import android.widget.ProgressBar
+import android.widget.TextView
 import android.widget.Toast
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
 import androidx.exifinterface.media.ExifInterface
 import java.io.InputStream
+import java.util.concurrent.atomic.AtomicBoolean
 import kotlin.math.max
 
 class JpegConvertActivity : AppCompatActivity() {
     private var keepMetadata = false
 
-    private val picker = registerForActivityResult(ActivityResultContracts.GetContent()) { uri ->
-        if (uri == null) {
-            finish()
-            return@registerForActivityResult
-        }
-        convert(uri)
+    private val picker = registerForActivityResult(ActivityResultContracts.GetMultipleContents()) { uris ->
+        if (uris.isEmpty()) finish() else confirmBatch(uris)
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -45,45 +46,137 @@ class JpegConvertActivity : AppCompatActivity() {
             .show()
     }
 
-    private fun convert(sourceUri: Uri) {
-        runCatching {
-            val sourceExif = if (keepMetadata) {
-                contentResolver.openInputStream(sourceUri).use { input -> input?.let { ExifInterface(it) } }
-            } else null
+    private fun confirmBatch(uris: List<Uri>) {
+        AlertDialog.Builder(this)
+            .setTitle(local("Convert to JPEG", "تحويل إلى JPEG"))
+            .setMessage(local(
+                "${uris.size} image(s) selected. They will be processed in the order returned by Android. Original files will not be changed.",
+                "تم اختيار ${uris.size} صورة. ستُعالج حسب الترتيب الذي أعاده Android، ولن يتم تعديل الملفات الأصلية.",
+            ))
+            .setPositiveButton(local("Start", "ابدأ")) { _, _ -> convertBatch(uris) }
+            .setNeutralButton(local("Choose again", "اختيار من جديد")) { _, _ -> picker.launch("image/*") }
+            .setNegativeButton(local("Cancel", "إلغاء")) { _, _ -> finish() }
+            .setOnCancelListener { finish() }
+            .show()
+    }
 
-            val bitmap = loadOrientedBitmap(sourceUri, 2400)
-            val outputUri = ToolOutputStore(this).create(
-                "Converted_${System.currentTimeMillis()}.jpg",
-                "image/jpeg",
-                true,
-            )
-            contentResolver.openOutputStream(outputUri).use { out ->
-                requireNotNull(out)
-                check(bitmap.compress(Bitmap.CompressFormat.JPEG, 92, out))
+    private fun convertBatch(uris: List<Uri>) {
+        val cancelled = AtomicBoolean(false)
+        val progress = ProgressBar(this, null, android.R.attr.progressBarStyleHorizontal).apply {
+            max = uris.size
+            progress = 0
+        }
+        val label = TextView(this).apply { text = local("Preparing…", "جارٍ التحضير…") }
+        val container = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            val pad = (20 * resources.displayMetrics.density).toInt()
+            setPadding(pad, pad, pad, 0)
+            addView(label)
+            addView(progress)
+        }
+        val dialog = AlertDialog.Builder(this)
+            .setTitle(local("Converting images", "تحويل الصور"))
+            .setView(container)
+            .setNegativeButton(local("Cancel", "إلغاء")) { _, _ -> cancelled.set(true) }
+            .setCancelable(false)
+            .create()
+        dialog.show()
+
+        Thread {
+            val outputs = mutableListOf<Uri>()
+            var failure: Throwable? = null
+            uris.forEachIndexed { index, sourceUri ->
+                if (cancelled.get()) return@forEachIndexed
+                runOnUiThread {
+                    label.text = local("Image ${index + 1} of ${uris.size}", "الصورة ${index + 1} من ${uris.size}")
+                }
+                runCatching { convertOne(sourceUri, index) }
+                    .onSuccess { outputs += it }
+                    .onFailure { failure = it; cancelled.set(true) }
+                runOnUiThread { progress.progress = index + 1 }
             }
-            bitmap.recycle()
+            runOnUiThread {
+                dialog.dismiss()
+                when {
+                    failure != null -> showFailure(failure!!)
+                    cancelled.get() -> {
+                        Toast.makeText(this, local("Conversion cancelled", "تم إلغاء التحويل"), Toast.LENGTH_LONG).show()
+                        finish()
+                    }
+                    else -> showCompleted(outputs)
+                }
+            }
+        }.start()
+    }
 
-            if (sourceExif != null && outputUri.scheme == "content") copyCommonExif(sourceExif, outputUri)
-            outputUri
-        }.onSuccess {
-            Toast.makeText(
-                this,
-                if (keepMetadata) local("JPEG saved; metadata is preserved where the output format supports it", "تم حفظ JPEG؛ تُحفظ البيانات حيث يدعم ملف الإخراج ذلك")
-                else local("JPEG saved without metadata", "تم حفظ JPEG بدون metadata"),
-                Toast.LENGTH_LONG,
-            ).show()
+    private fun convertOne(sourceUri: Uri, index: Int): Uri {
+        val sourceExif = if (keepMetadata) {
+            contentResolver.openInputStream(sourceUri).use { input -> input?.let { ExifInterface(it) } }
+        } else null
+        val bitmap = loadOrientedBitmap(sourceUri, 2400)
+        val outputUri = ToolOutputStore(this).create(
+            "Converted_${System.currentTimeMillis()}_${index + 1}.jpg",
+            "image/jpeg",
+            true,
+        )
+        contentResolver.openOutputStream(outputUri).use { out ->
+            requireNotNull(out)
+            check(bitmap.compress(Bitmap.CompressFormat.JPEG, 92, out))
+        }
+        bitmap.recycle()
+        if (sourceExif != null && outputUri.scheme == "content") copyCommonExif(sourceExif, outputUri)
+        return outputUri
+    }
+
+    private fun showCompleted(outputs: List<Uri>) {
+        AlertDialog.Builder(this)
+            .setTitle(local("JPEG conversion complete", "اكتمل تحويل JPEG"))
+            .setMessage(local("${outputs.size} file(s) saved.", "تم حفظ ${outputs.size} ملف."))
+            .setPositiveButton(local("Share", "مشاركة")) { _, _ -> share(outputs) }
+            .setNeutralButton(local("Open first", "فتح الأول")) { _, _ -> openFirst(outputs) }
+            .setNegativeButton(local("Done", "تم")) { _, _ -> finish() }
+            .setOnCancelListener { finish() }
+            .show()
+    }
+
+    private fun share(outputs: List<Uri>) {
+        val contentUris = ArrayList(outputs.filter { it.scheme == "content" })
+        if (contentUris.isEmpty()) return finish()
+        val intent = Intent(Intent.ACTION_SEND_MULTIPLE).apply {
+            type = "image/jpeg"
+            putParcelableArrayListExtra(Intent.EXTRA_STREAM, contentUris)
+            addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+        }
+        startActivity(Intent.createChooser(intent, local("Share JPEG files", "مشاركة ملفات JPEG")))
+        finish()
+    }
+
+    private fun openFirst(outputs: List<Uri>) {
+        val uri = outputs.firstOrNull { it.scheme == "content" } ?: return finish()
+        runCatching {
+            startActivity(Intent(Intent.ACTION_VIEW).apply {
+                setDataAndType(uri, "image/jpeg")
+                addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+            })
         }.onFailure {
-            Toast.makeText(this, it.message ?: local("Conversion failed", "فشل التحويل"), Toast.LENGTH_LONG).show()
+            Toast.makeText(this, local("No app can open this file", "لا يوجد تطبيق لفتح الملف"), Toast.LENGTH_LONG).show()
         }
         finish()
+    }
+
+    private fun showFailure(error: Throwable) {
+        AlertDialog.Builder(this)
+            .setTitle(local("Conversion failed", "فشل التحويل"))
+            .setMessage(error.message ?: error.javaClass.simpleName)
+            .setPositiveButton("OK") { _, _ -> finish() }
+            .setOnCancelListener { finish() }
+            .show()
     }
 
     private fun copyCommonExif(source: ExifInterface, outputUri: Uri) {
         contentResolver.openFileDescriptor(outputUri, "rw")?.use { descriptor ->
             val target = ExifInterface(descriptor.fileDescriptor)
-            COMMON_TAGS.forEach { tag ->
-                source.getAttribute(tag)?.let { value -> target.setAttribute(tag, value) }
-            }
+            COMMON_TAGS.forEach { tag -> source.getAttribute(tag)?.let { target.setAttribute(tag, it) } }
             target.setAttribute(ExifInterface.TAG_ORIENTATION, ExifInterface.ORIENTATION_NORMAL.toString())
             target.saveAttributes()
         }
@@ -97,7 +190,6 @@ class JpegConvertActivity : AppCompatActivity() {
         val decoded = contentResolver.openInputStream(uri).use {
             BitmapFactory.decodeStream(it, null, BitmapFactory.Options().apply { inSampleSize = sample })
         } ?: error("Unable to decode image")
-
         val orientation = contentResolver.openInputStream(uri).use { input: InputStream? ->
             if (input == null) ExifInterface.ORIENTATION_NORMAL
             else runCatching { ExifInterface(input).getAttributeInt(ExifInterface.TAG_ORIENTATION, ExifInterface.ORIENTATION_NORMAL) }
@@ -118,7 +210,6 @@ class JpegConvertActivity : AppCompatActivity() {
                 if (it !== decoded) decoded.recycle()
             }
         } else decoded
-
         val scale = maxDimension.toFloat() / max(oriented.width, oriented.height)
         return if (scale < 1f) {
             Bitmap.createScaledBitmap(
