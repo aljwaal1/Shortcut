@@ -8,7 +8,7 @@ object NextRunCalculator {
     fun nextRun(
         now: ZonedDateTime,
         shortcut: ScheduledAppShortcut,
-    ): ZonedDateTime? {
+    ): ZonedDateTime {
         val todayAtTime = now
             .withHour(shortcut.hour)
             .withMinute(shortcut.minute)
@@ -16,13 +16,9 @@ object NextRunCalculator {
             .withNano(0)
 
         return when (shortcut.repeat) {
-            RepeatOption.ONCE -> todayAtTime.takeIf { it.isAfter(now) }
-
-            RepeatOption.DAILY -> if (todayAtTime.isAfter(now)) {
-                todayAtTime
-            } else {
-                todayAtTime.plusDays(1)
-            }
+            RepeatOption.ONCE,
+            RepeatOption.DAILY,
+            -> if (todayAtTime.isAfter(now)) todayAtTime else todayAtTime.plusDays(1)
 
             RepeatOption.WEEKLY -> if (todayAtTime.isAfter(now)) {
                 todayAtTime
