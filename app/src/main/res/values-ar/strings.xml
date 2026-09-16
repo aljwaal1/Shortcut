@@ -25,7 +25,7 @@
     <string name="template_open_app">فتح تطبيق في وقت محدد</string>
     <string name="template_whatsapp">جدولة رسالة واتساب</string>
     <string name="template_telegram">جدولة رسالة تيليجرام</string>
-    <string name="template_unlock_maps">عند فتح الهاتف: Wi‑Fi ثم الخرائط</string>
+    <string name="template_unlock_maps">عند فتح الهاتف: Wi‑Fi والخرائط</string>
     <string name="template_car_mode">وضع السيارة</string>
     <string name="template_sleep_mode">وضع النوم</string>
     <string name="template_battery_80">عند وصول البطارية إلى 80%</string>
@@ -81,4 +81,19 @@
     <string name="permission_granted">مسموح</string>
     <string name="permission_needed">تحتاج إلى صلاحية</string>
     <string name="allow_permission">سماح</string>
+    <string name="unlock_template_title">أتمتة فتح الهاتف</string>
+    <string name="unlock_template_notification">تم فتح الهاتف. اختر التحكم بـ Wi‑Fi أو افتح الخرائط.</string>
+    <string name="open_wifi">Wi‑Fi</string>
+    <string name="open_maps">الخرائط</string>
+    <string name="enable_template">تفعيل القالب</string>
+    <string name="disable_template">إيقاف القالب</string>
+    <string name="template_enabled">مفعّل</string>
+    <string name="advanced_accessibility_label">الأتمتة المتقدمة للاختصارات</string>
+    <string name="advanced_accessibility_description">أتمتة اختيارية مبنية على قواعد المستخدم، تستجيب للمحفزات التي تختارها مثل فتح الهاتف، ولا تقرأ محتوى الشاشة.</string>
+    <string name="accessibility_permission">صلاحية الأتمتة المتقدمة</string>
+    <string name="accessibility_permission_desc">مطلوبة فقط للقواعد المتقدمة مثل الاستجابة بعد فتح قفل الهاتف.</string>
+    <string name="advanced_disclosure_title">تفعيل الأتمتة المتقدمة؟</string>
+    <string name="advanced_disclosure_body">تستخدم هذه الميزة الاختيارية خدمة إمكانية الوصول في Android فقط لإبقاء قواعد الأتمتة المحددة التي تنشئها فعالة والاستجابة للمحفزات التي تختارها، مثل فتح الهاتف. لا تقرأ كلمات المرور أو الرسائل أو محتوى الشاشة. ويمكنك إيقافها في أي وقت من إعدادات إمكانية الوصول.</string>
+    <string name="agree_and_open_settings">موافق، افتح الإعدادات</string>
+    <string name="unlock_template_note">لا يسمح Android للتطبيقات العادية بتشغيل Wi‑Fi أو إيقافه مباشرة. بعد فتح الهاتف يعرض «الاختصارات» إجراءات سريعة للوحة Wi‑Fi الرسمية والخرائط.</string>
 </resources>
