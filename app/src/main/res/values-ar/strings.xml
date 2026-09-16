@@ -8,6 +8,7 @@
     <string name="create_shortcut">إنشاء اختصار</string>
     <string name="my_shortcuts">اختصاراتي</string>
     <string name="scheduled_automations">الأتمتة المجدولة</string>
+    <string name="scheduled_messages">الرسائل المجدولة</string>
     <string name="ready_templates">قوالب جاهزة</string>
     <string name="recent_activity">النشاط الأخير</string>
     <string name="easy_builder">الإنشاء السهل</string>
@@ -43,6 +44,17 @@
     <string name="about">عن التطبيق</string>
     <string name="coming_soon">قادمة في البناء التالي</string>
     <string name="builder_title">فتح تطبيق حسب جدول</string>
+    <string name="message_builder_title">جدولة رسالة</string>
+    <string name="message_app">تطبيق المراسلة</string>
+    <string name="whatsapp">واتساب</string>
+    <string name="telegram">تيليجرام</string>
+    <string name="whatsapp_number">رقم واتساب</string>
+    <string name="whatsapp_number_hint">أدخل الرقم الدولي كاملًا، مثل +46701234567.</string>
+    <string name="telegram_username">اسم مستخدم تيليجرام</string>
+    <string name="telegram_username_hint">أدخل اسم المستخدم العام، مع @ أو بدونها.</string>
+    <string name="message_text">نص الرسالة</string>
+    <string name="message_standard_mode_note">عند الموعد يفتح التطبيق المحادثة المطلوبة والنص جاهزًا، ثم تراجعه وتضغط إرسال.</string>
+    <string name="message_ready_fallback">رسالتك جاهزة. اضغط لفتح المحادثة.</string>
     <string name="shortcut_name">اسم الاختصار</string>
     <string name="choose_app">اختر التطبيق</string>
     <string name="selected_app">التطبيق المختار</string>
@@ -58,6 +70,7 @@
     <string name="cancel">إلغاء</string>
     <string name="back">رجوع</string>
     <string name="delete_shortcut">حذف الاختصار</string>
+    <string name="delete_message">حذف الرسالة المجدولة</string>
     <string name="no_apps_found">لم يتم العثور على تطبيقات قابلة للفتح</string>
     <string name="saved_shortcuts">الاختصارات المحفوظة</string>
     <string name="open_now_fallback">منع أندرويد الفتح التلقائي. اضغط لفتح التطبيق الآن.</string>
