@@ -8,6 +8,7 @@
     <string name="create_shortcut">Create shortcut</string>
     <string name="my_shortcuts">My shortcuts</string>
     <string name="scheduled_automations">Scheduled automations</string>
+    <string name="scheduled_messages">Scheduled messages</string>
     <string name="ready_templates">Ready templates</string>
     <string name="recent_activity">Recent activity</string>
     <string name="easy_builder">Easy Builder</string>
@@ -43,6 +44,17 @@
     <string name="about">About</string>
     <string name="coming_soon">Coming in the next build</string>
     <string name="builder_title">Open an app on schedule</string>
+    <string name="message_builder_title">Schedule a message</string>
+    <string name="message_app">Messaging app</string>
+    <string name="whatsapp">WhatsApp</string>
+    <string name="telegram">Telegram</string>
+    <string name="whatsapp_number">WhatsApp number</string>
+    <string name="whatsapp_number_hint">Use the full international number, for example +46701234567.</string>
+    <string name="telegram_username">Telegram username</string>
+    <string name="telegram_username_hint">Enter the public username, with or without @.</string>
+    <string name="message_text">Message</string>
+    <string name="message_standard_mode_note">At the scheduled time the app opens the selected chat with the text prepared. You review it and tap Send.</string>
+    <string name="message_ready_fallback">Your message is ready. Tap to open the chat.</string>
     <string name="shortcut_name">Shortcut name</string>
     <string name="choose_app">Choose app</string>
     <string name="selected_app">Selected app</string>
@@ -58,6 +70,7 @@
     <string name="cancel">Cancel</string>
     <string name="back">Back</string>
     <string name="delete_shortcut">Delete shortcut</string>
+    <string name="delete_message">Delete scheduled message</string>
     <string name="no_apps_found">No launchable apps found</string>
     <string name="saved_shortcuts">Saved shortcuts</string>
     <string name="open_now_fallback">Android prevented automatic opening. Tap to open now.</string>
