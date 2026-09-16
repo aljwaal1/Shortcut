@@ -42,4 +42,20 @@
     <string name="privacy">سياسة الخصوصية</string>
     <string name="about">عن التطبيق</string>
     <string name="coming_soon">قادمة في البناء التالي</string>
+    <string name="builder_title">فتح تطبيق حسب جدول</string>
+    <string name="shortcut_name">اسم الاختصار</string>
+    <string name="choose_app">اختر التطبيق</string>
+    <string name="selected_app">التطبيق المختار</string>
+    <string name="time">الوقت</string>
+    <string name="hour">الساعة</string>
+    <string name="minute">الدقيقة</string>
+    <string name="repeat">التكرار</string>
+    <string name="repeat_once">مرة واحدة</string>
+    <string name="repeat_daily">يوميًا</string>
+    <string name="repeat_weekdays">أيام العمل</string>
+    <string name="repeat_weekly">أسبوعيًا</string>
+    <string name="save">حفظ</string>
+    <string name="cancel">إلغاء</string>
+    <string name="no_apps_found">لم يتم العثور على تطبيقات قابلة للفتح</string>
+    <string name="saved_shortcuts">الاختصارات المحفوظة</string>
 </resources>
