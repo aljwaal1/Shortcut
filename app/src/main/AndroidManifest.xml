@@ -48,6 +48,7 @@
         <activity android:name=".usage.AppUsageActivity" android:exported="false" />
         <activity android:name=".tools.NfcSetupActivity" android:exported="false" />
         <activity android:name=".tools.ScreenCaptureActivity" android:exported="false" />
+        <activity android:name=".tools.ImageBatchActivity" android:exported="false" />
         <activity android:name=".tools.ImageCropActivity" android:exported="false" />
         <activity android:name=".tools.JpegConvertActivity" android:exported="false" />
         <activity android:name=".tools.MultiUrlPdfActivity" android:exported="false" />
