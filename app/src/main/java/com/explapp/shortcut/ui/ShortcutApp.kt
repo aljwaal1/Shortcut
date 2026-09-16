@@ -22,7 +22,6 @@ import androidx.compose.material.icons.filled.Language
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
-import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -34,6 +33,7 @@ import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -44,6 +44,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.core.os.LocaleListCompat
 import com.explapp.shortcut.R
+import com.explapp.shortcut.domain.ScheduledAppShortcut
 
 private const val PREFS = "shortcut_preferences"
 private const val KEY_ONBOARDING = "onboarding_complete"
@@ -61,9 +62,11 @@ fun ShortcutApp() {
     var onboardingComplete by remember {
         mutableStateOf(context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).getBoolean(KEY_ONBOARDING, false))
     }
+    var showBuilder by remember { mutableStateOf(false) }
+    val shortcuts = remember { mutableStateListOf<ScheduledAppShortcut>() }
 
-    if (!onboardingComplete) {
-        OnboardingScreen(
+    when {
+        !onboardingComplete -> OnboardingScreen(
             onDone = {
                 context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
                     .edit()
@@ -72,8 +75,19 @@ fun ShortcutApp() {
                 onboardingComplete = true
             },
         )
-    } else {
-        MainShell()
+
+        showBuilder -> CreateShortcutScreen(
+            onCancel = { showBuilder = false },
+            onSave = { shortcut ->
+                shortcuts.add(shortcut)
+                showBuilder = false
+            },
+        )
+
+        else -> MainShell(
+            shortcuts = shortcuts,
+            onCreateShortcut = { showBuilder = true },
+        )
     }
 }
 
@@ -111,7 +125,10 @@ private fun OnboardingScreen(onDone: () -> Unit) {
 }
 
 @Composable
-private fun MainShell() {
+private fun MainShell(
+    shortcuts: List<ScheduledAppShortcut>,
+    onCreateShortcut: () -> Unit,
+) {
     var selected by remember { mutableStateOf(MainTab.HOME) }
 
     Scaffold(
@@ -129,15 +146,15 @@ private fun MainShell() {
         },
         floatingActionButton = {
             if (selected == MainTab.HOME) {
-                FloatingActionButton(onClick = { }) {
+                FloatingActionButton(onClick = onCreateShortcut) {
                     Icon(Icons.Default.Add, contentDescription = stringResource(R.string.create_shortcut))
                 }
             }
         },
     ) { padding ->
         when (selected) {
-            MainTab.HOME -> HomeScreen(padding)
-            MainTab.TEMPLATES -> TemplatesScreen(padding)
+            MainTab.HOME -> HomeScreen(padding, shortcuts, onCreateShortcut)
+            MainTab.TEMPLATES -> TemplatesScreen(padding, onCreateShortcut)
             MainTab.HISTORY -> HistoryScreen(padding)
             MainTab.SETTINGS -> SettingsScreen(padding)
         }
@@ -145,7 +162,11 @@ private fun MainShell() {
 }
 
 @Composable
-private fun HomeScreen(padding: PaddingValues) {
+private fun HomeScreen(
+    padding: PaddingValues,
+    shortcuts: List<ScheduledAppShortcut>,
+    onCreateShortcut: () -> Unit,
+) {
     LazyColumn(
         modifier = Modifier.fillMaxSize().padding(padding),
         contentPadding = PaddingValues(20.dp),
@@ -156,13 +177,28 @@ private fun HomeScreen(padding: PaddingValues) {
             Spacer(Modifier.height(4.dp))
             Text(stringResource(R.string.my_shortcuts), style = MaterialTheme.typography.titleMedium)
         }
-        item { DashboardCard(R.string.scheduled_automations, "0") }
+        item { DashboardCard(R.string.scheduled_automations, shortcuts.size.toString()) }
         item { DashboardCard(R.string.ready_templates, "7") }
         item { DashboardCard(R.string.recent_activity, "0") }
         item {
-            Button(onClick = { }, modifier = Modifier.fillMaxWidth()) {
+            Button(onClick = onCreateShortcut, modifier = Modifier.fillMaxWidth()) {
                 Icon(Icons.Default.Add, contentDescription = null)
                 Text("  ${stringResource(R.string.create_shortcut)}")
+            }
+        }
+        if (shortcuts.isNotEmpty()) {
+            item { Text(stringResource(R.string.saved_shortcuts), style = MaterialTheme.typography.titleLarge) }
+            items(shortcuts) { shortcut ->
+                Card(modifier = Modifier.fillMaxWidth()) {
+                    Column(Modifier.padding(18.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                        Text(shortcut.name, style = MaterialTheme.typography.titleMedium)
+                        Text(shortcut.packageName, style = MaterialTheme.typography.bodySmall)
+                        Text(
+                            "%02d:%02d • %s".format(shortcut.hour, shortcut.minute, shortcut.repeat.name),
+                            style = MaterialTheme.typography.bodyMedium,
+                        )
+                    }
+                }
             }
         }
     }
@@ -182,7 +218,10 @@ private fun DashboardCard(label: Int, value: String) {
 }
 
 @Composable
-private fun TemplatesScreen(padding: PaddingValues) {
+private fun TemplatesScreen(
+    padding: PaddingValues,
+    onCreateShortcut: () -> Unit,
+) {
     val templates = listOf(
         R.string.template_open_app,
         R.string.template_whatsapp,
@@ -203,7 +242,13 @@ private fun TemplatesScreen(padding: PaddingValues) {
                 Column(Modifier.padding(18.dp)) {
                     Text(stringResource(title), style = MaterialTheme.typography.titleMedium)
                     Spacer(Modifier.height(8.dp))
-                    Text(stringResource(R.string.coming_soon), style = MaterialTheme.typography.bodySmall)
+                    if (title == R.string.template_open_app) {
+                        Button(onClick = onCreateShortcut) {
+                            Text(stringResource(R.string.create_shortcut))
+                        }
+                    } else {
+                        Text(stringResource(R.string.coming_soon), style = MaterialTheme.typography.bodySmall)
+                    }
                 }
             }
         }
