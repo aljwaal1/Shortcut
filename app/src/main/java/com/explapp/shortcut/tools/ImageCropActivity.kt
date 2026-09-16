@@ -1,14 +1,11 @@
 package com.explapp.shortcut.tools
 
 import android.app.AlertDialog
-import android.content.ContentValues
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.graphics.Matrix
 import android.net.Uri
-import android.os.Build
 import android.os.Bundle
-import android.provider.MediaStore
 import android.widget.Toast
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
@@ -29,13 +26,7 @@ class ImageCropActivity : AppCompatActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        val labels = arrayOf(
-            "1:1",
-            "4:3",
-            "3:4",
-            "16:9",
-            "9:16",
-        )
+        val labels = arrayOf("1:1", "4:3", "3:4", "16:9", "9:16")
         val ratios = floatArrayOf(1f, 4f / 3f, 3f / 4f, 16f / 9f, 9f / 16f)
         AlertDialog.Builder(this)
             .setTitle(local("Choose crop ratio", "اختر نسبة القص"))
@@ -53,14 +44,11 @@ class ImageCropActivity : AppCompatActivity() {
             val source = loadOrientedBitmap(uri, 2400)
             val rect = ImageCropMath.centerCrop(source.width, source.height, ratio)
             val cropped = Bitmap.createBitmap(source, rect.left, rect.top, rect.width, rect.height)
-            val values = ContentValues().apply {
-                put(MediaStore.Images.Media.DISPLAY_NAME, "Cropped_${System.currentTimeMillis()}.png")
-                put(MediaStore.Images.Media.MIME_TYPE, "image/png")
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-                    put(MediaStore.Images.Media.RELATIVE_PATH, "Pictures/Shortcut")
-                }
-            }
-            val outputUri = requireNotNull(contentResolver.insert(MediaStore.Images.Media.EXTERNAL_CONTENT_URI, values))
+            val outputUri = ToolOutputStore(this).create(
+                "Cropped_${System.currentTimeMillis()}.png",
+                "image/png",
+                true,
+            )
             contentResolver.openOutputStream(outputUri).use { out ->
                 requireNotNull(out)
                 check(cropped.compress(Bitmap.CompressFormat.PNG, 100, out))
