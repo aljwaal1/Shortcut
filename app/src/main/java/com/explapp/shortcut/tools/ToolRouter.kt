@@ -4,10 +4,12 @@ import android.content.Context
 import android.content.Intent
 import com.explapp.shortcut.automation.BatterySetupActivity
 import com.explapp.shortcut.automation.CarModeActivity
+import com.explapp.shortcut.automation.ParkedCarActivity
 
 object ToolRouter {
     fun intent(context: Context, tool: ToolId): Intent = when (tool) {
         ToolId.CAR_MODE -> Intent(context, CarModeActivity::class.java)
+        ToolId.PARKED_CAR -> Intent(context, ParkedCarActivity::class.java)
         ToolId.BATTERY_CHARGER -> Intent(context, BatterySetupActivity::class.java)
         ToolId.NFC_TRIGGER -> Intent(context, NfcSetupActivity::class.java)
         ToolId.IMAGE_CROP -> Intent(context, ImageCropActivity::class.java)
