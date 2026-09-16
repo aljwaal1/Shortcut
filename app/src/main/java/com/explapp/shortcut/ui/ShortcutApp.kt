@@ -2,7 +2,6 @@ package com.explapp.shortcut.ui
 
 import android.Manifest
 import android.app.AlarmManager
-import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
@@ -24,15 +23,14 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.Language
 import androidx.compose.material.icons.filled.Settings
-import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.FloatingActionButton
@@ -64,16 +62,18 @@ import androidx.core.os.LocaleListCompat
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import com.explapp.shortcut.R
-import com.explapp.shortcut.advanced.AdvancedAutomationStore
-import com.explapp.shortcut.advanced.ShortcutAutomationAccessibilityService
 import com.explapp.shortcut.data.MessageStore
 import com.explapp.shortcut.data.ShortcutStore
 import com.explapp.shortcut.domain.MessagePlatform
 import com.explapp.shortcut.domain.ScheduledAppShortcut
 import com.explapp.shortcut.domain.ScheduledMessage
 import com.explapp.shortcut.domain.ShortcutCollection
+import com.explapp.shortcut.execution.TaskExecutionReporter
+import com.explapp.shortcut.execution.TaskExecutionStatus
 import com.explapp.shortcut.scheduler.AndroidAlarmScheduler
 import com.explapp.shortcut.scheduler.AndroidMessageScheduler
+import java.text.DateFormat
+import java.util.Date
 
 private const val PREFS = "shortcut_preferences"
 private const val KEY_ONBOARDING = "onboarding_complete"
@@ -92,21 +92,14 @@ fun ShortcutApp() {
     val scheduler = remember(context) { AndroidAlarmScheduler(context.applicationContext) }
     val messageStore = remember(context) { MessageStore(context.applicationContext) }
     val messageScheduler = remember(context) { AndroidMessageScheduler(context.applicationContext) }
-    val advancedStore = remember(context) { AdvancedAutomationStore(context.applicationContext) }
-    val shortcuts = remember {
-        mutableStateListOf<ScheduledAppShortcut>().apply { addAll(store.load()) }
-    }
-    val messages = remember {
-        mutableStateListOf<ScheduledMessage>().apply { addAll(messageStore.load()) }
-    }
+    val shortcuts = remember { mutableStateListOf<ScheduledAppShortcut>().apply { addAll(store.load()) } }
+    val messages = remember { mutableStateListOf<ScheduledMessage>().apply { addAll(messageStore.load()) } }
     var onboardingComplete by remember {
         mutableStateOf(context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).getBoolean(KEY_ONBOARDING, false))
     }
     var showBuilder by remember { mutableStateOf(false) }
     var showMessageBuilder by remember { mutableStateOf<MessagePlatform?>(null) }
     var showPermissions by remember { mutableStateOf(false) }
-    var showAdvancedDisclosure by remember { mutableStateOf(false) }
-    var unlockTemplateEnabled by remember { mutableStateOf(advancedStore.unlockWifiMapsEnabled) }
 
     LaunchedEffect(Unit) {
         shortcuts.forEach(scheduler::schedule)
@@ -117,15 +110,11 @@ fun ShortcutApp() {
         !onboardingComplete -> OnboardingScreen(
             onDone = {
                 context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
-                    .edit()
-                    .putBoolean(KEY_ONBOARDING, true)
-                    .apply()
+                    .edit().putBoolean(KEY_ONBOARDING, true).apply()
                 onboardingComplete = true
             },
         )
-
         showPermissions -> PermissionsScreen(onBack = { showPermissions = false })
-
         showBuilder -> CreateShortcutScreen(
             onCancel = { showBuilder = false },
             onSave = { shortcut ->
@@ -135,7 +124,6 @@ fun ShortcutApp() {
                 showBuilder = false
             },
         )
-
         showMessageBuilder != null -> CreateMessageScreen(
             initialPlatform = showMessageBuilder ?: MessagePlatform.WHATSAPP,
             onCancel = { showMessageBuilder = null },
@@ -146,21 +134,11 @@ fun ShortcutApp() {
                 showMessageBuilder = null
             },
         )
-
         else -> MainShell(
             shortcuts = shortcuts,
             messages = messages,
-            unlockTemplateEnabled = unlockTemplateEnabled,
             onCreateShortcut = { showBuilder = true },
             onCreateMessage = { showMessageBuilder = it },
-            onToggleUnlockTemplate = {
-                if (unlockTemplateEnabled) {
-                    advancedStore.unlockWifiMapsEnabled = false
-                    unlockTemplateEnabled = false
-                } else {
-                    showAdvancedDisclosure = true
-                }
-            },
             onDeleteShortcut = { shortcut ->
                 scheduler.cancel(shortcut)
                 val updated = ShortcutCollection.remove(shortcuts, shortcut)
@@ -174,33 +152,6 @@ fun ShortcutApp() {
                 messageStore.save(messages)
             },
             onOpenPermissions = { showPermissions = true },
-        )
-    }
-
-    if (showAdvancedDisclosure) {
-        AlertDialog(
-            onDismissRequest = { showAdvancedDisclosure = false },
-            title = { Text(stringResource(R.string.advanced_disclosure_title)) },
-            text = { Text(stringResource(R.string.advanced_disclosure_body)) },
-            dismissButton = {
-                TextButton(onClick = { showAdvancedDisclosure = false }) {
-                    Text(stringResource(R.string.cancel))
-                }
-            },
-            confirmButton = {
-                Button(
-                    onClick = {
-                        advancedStore.unlockWifiMapsEnabled = true
-                        unlockTemplateEnabled = true
-                        showAdvancedDisclosure = false
-                        runCatching {
-                            context.startActivity(Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS))
-                        }
-                    },
-                ) {
-                    Text(stringResource(R.string.agree_and_open_settings))
-                }
-            },
         )
     }
 }
@@ -218,10 +169,7 @@ private fun OnboardingScreen(onDone: () -> Unit) {
         modifier = Modifier.fillMaxSize().padding(24.dp),
         verticalArrangement = Arrangement.Center,
     ) {
-        Icon(
-            imageVector = if (page == 2) Icons.Default.Language else Icons.Default.AutoAwesome,
-            contentDescription = null,
-        )
+        Icon(imageVector = if (page == 2) Icons.Default.Language else Icons.Default.AutoAwesome, contentDescription = null)
         Spacer(Modifier.height(24.dp))
         Text(stringResource(pages[page].first), style = MaterialTheme.typography.headlineMedium)
         Spacer(Modifier.height(12.dp))
@@ -229,9 +177,7 @@ private fun OnboardingScreen(onDone: () -> Unit) {
         Spacer(Modifier.height(32.dp))
         Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
             TextButton(onClick = onDone) { Text(stringResource(R.string.skip)) }
-            Button(onClick = {
-                if (page < pages.lastIndex) page++ else onDone()
-            }) {
+            Button(onClick = { if (page < pages.lastIndex) page++ else onDone() }) {
                 Text(stringResource(if (page < pages.lastIndex) R.string.next else R.string.get_started))
             }
         }
@@ -242,10 +188,8 @@ private fun OnboardingScreen(onDone: () -> Unit) {
 private fun MainShell(
     shortcuts: List<ScheduledAppShortcut>,
     messages: List<ScheduledMessage>,
-    unlockTemplateEnabled: Boolean,
     onCreateShortcut: () -> Unit,
     onCreateMessage: (MessagePlatform) -> Unit,
-    onToggleUnlockTemplate: () -> Unit,
     onDeleteShortcut: (ScheduledAppShortcut) -> Unit,
     onDeleteMessage: (ScheduledMessage) -> Unit,
     onOpenPermissions: () -> Unit,
@@ -274,21 +218,8 @@ private fun MainShell(
         },
     ) { padding ->
         when (selected) {
-            MainTab.HOME -> HomeScreen(
-                padding = padding,
-                shortcuts = shortcuts,
-                messages = messages,
-                onCreateShortcut = onCreateShortcut,
-                onDeleteShortcut = onDeleteShortcut,
-                onDeleteMessage = onDeleteMessage,
-            )
-            MainTab.TEMPLATES -> TemplatesScreen(
-                padding = padding,
-                unlockTemplateEnabled = unlockTemplateEnabled,
-                onCreateShortcut = onCreateShortcut,
-                onCreateMessage = onCreateMessage,
-                onToggleUnlockTemplate = onToggleUnlockTemplate,
-            )
+            MainTab.HOME -> HomeScreen(padding, shortcuts, messages, onCreateShortcut, onDeleteShortcut, onDeleteMessage)
+            MainTab.TEMPLATES -> TemplatesScreen(padding, onCreateShortcut, onCreateMessage)
             MainTab.HISTORY -> HistoryScreen(padding)
             MainTab.SETTINGS -> SettingsScreen(padding, onOpenPermissions)
         }
@@ -304,6 +235,8 @@ private fun HomeScreen(
     onDeleteShortcut: (ScheduledAppShortcut) -> Unit,
     onDeleteMessage: (ScheduledMessage) -> Unit,
 ) {
+    val context = LocalContext.current
+    val recent = TaskExecutionReporter(context.applicationContext).last()
     LazyColumn(
         modifier = Modifier.fillMaxSize().padding(padding),
         contentPadding = PaddingValues(20.dp),
@@ -316,8 +249,8 @@ private fun HomeScreen(
         }
         item { DashboardCard(R.string.scheduled_automations, (shortcuts.size + messages.size).toString()) }
         item { DashboardCard(R.string.scheduled_messages, messages.size.toString()) }
-        item { DashboardCard(R.string.ready_templates, "7") }
-        item { DashboardCard(R.string.recent_activity, "0") }
+        item { DashboardCard(R.string.ready_templates, "3") }
+        item { DashboardCard(R.string.recent_activity, if (recent == null) "0" else "1") }
         item {
             Button(onClick = onCreateShortcut, modifier = Modifier.fillMaxWidth()) {
                 Icon(Icons.Default.Add, contentDescription = null)
@@ -328,20 +261,11 @@ private fun HomeScreen(
             item { Text(stringResource(R.string.saved_shortcuts), style = MaterialTheme.typography.titleLarge) }
             items(shortcuts) { shortcut ->
                 Card(modifier = Modifier.fillMaxWidth()) {
-                    Row(
-                        Modifier.fillMaxWidth().padding(18.dp),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                    ) {
-                        Column(
-                            modifier = Modifier.weight(1f),
-                            verticalArrangement = Arrangement.spacedBy(4.dp),
-                        ) {
+                    Row(Modifier.fillMaxWidth().padding(18.dp), horizontalArrangement = Arrangement.SpaceBetween) {
+                        Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
                             Text(shortcut.name, style = MaterialTheme.typography.titleMedium)
                             Text(shortcut.packageName, style = MaterialTheme.typography.bodySmall)
-                            Text(
-                                "%02d:%02d • %s".format(shortcut.hour, shortcut.minute, shortcut.repeat.name),
-                                style = MaterialTheme.typography.bodyMedium,
-                            )
+                            Text("%02d:%02d • %s".format(shortcut.hour, shortcut.minute, shortcut.repeat.name), style = MaterialTheme.typography.bodyMedium)
                         }
                         IconButton(onClick = { onDeleteShortcut(shortcut) }) {
                             Icon(Icons.Default.Delete, contentDescription = stringResource(R.string.delete_shortcut))
@@ -354,26 +278,12 @@ private fun HomeScreen(
             item { Text(stringResource(R.string.scheduled_messages), style = MaterialTheme.typography.titleLarge) }
             items(messages) { message ->
                 Card(modifier = Modifier.fillMaxWidth()) {
-                    Row(
-                        Modifier.fillMaxWidth().padding(18.dp),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                    ) {
-                        Column(
-                            modifier = Modifier.weight(1f),
-                            verticalArrangement = Arrangement.spacedBy(4.dp),
-                        ) {
+                    Row(Modifier.fillMaxWidth().padding(18.dp), horizontalArrangement = Arrangement.SpaceBetween) {
+                        Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
                             Text(message.name, style = MaterialTheme.typography.titleMedium)
-                            Text(
-                                stringResource(
-                                    if (message.platform == MessagePlatform.WHATSAPP) R.string.whatsapp else R.string.telegram,
-                                ),
-                                style = MaterialTheme.typography.bodySmall,
-                            )
+                            Text(stringResource(if (message.platform == MessagePlatform.WHATSAPP) R.string.whatsapp else R.string.telegram), style = MaterialTheme.typography.bodySmall)
                             Text(message.recipient, style = MaterialTheme.typography.bodySmall)
-                            Text(
-                                "%02d:%02d • %s".format(message.hour, message.minute, message.repeat.name),
-                                style = MaterialTheme.typography.bodyMedium,
-                            )
+                            Text("%02d:%02d • %s".format(message.hour, message.minute, message.repeat.name), style = MaterialTheme.typography.bodyMedium)
                         }
                         IconButton(onClick = { onDeleteMessage(message) }) {
                             Icon(Icons.Default.Delete, contentDescription = stringResource(R.string.delete_message))
@@ -388,10 +298,7 @@ private fun HomeScreen(
 @Composable
 private fun DashboardCard(label: Int, value: String) {
     Card(modifier = Modifier.fillMaxWidth()) {
-        Row(
-            modifier = Modifier.fillMaxWidth().padding(18.dp),
-            horizontalArrangement = Arrangement.SpaceBetween,
-        ) {
+        Row(modifier = Modifier.fillMaxWidth().padding(18.dp), horizontalArrangement = Arrangement.SpaceBetween) {
             Text(stringResource(label), style = MaterialTheme.typography.titleMedium)
             Text(value, style = MaterialTheme.typography.titleLarge)
         }
@@ -401,20 +308,10 @@ private fun DashboardCard(label: Int, value: String) {
 @Composable
 private fun TemplatesScreen(
     padding: PaddingValues,
-    unlockTemplateEnabled: Boolean,
     onCreateShortcut: () -> Unit,
     onCreateMessage: (MessagePlatform) -> Unit,
-    onToggleUnlockTemplate: () -> Unit,
 ) {
-    val templates = listOf(
-        R.string.template_open_app,
-        R.string.template_whatsapp,
-        R.string.template_telegram,
-        R.string.template_unlock_maps,
-        R.string.template_car_mode,
-        R.string.template_sleep_mode,
-        R.string.template_battery_80,
-    )
+    val templates = listOf(R.string.template_open_app, R.string.template_whatsapp, R.string.template_telegram)
     LazyColumn(
         modifier = Modifier.fillMaxSize().padding(padding),
         contentPadding = PaddingValues(20.dp),
@@ -426,29 +323,9 @@ private fun TemplatesScreen(
                 Column(Modifier.padding(18.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     Text(stringResource(title), style = MaterialTheme.typography.titleMedium)
                     when (title) {
-                        R.string.template_open_app -> Button(onClick = onCreateShortcut) {
-                            Text(stringResource(R.string.create_shortcut))
-                        }
-                        R.string.template_whatsapp -> Button(onClick = { onCreateMessage(MessagePlatform.WHATSAPP) }) {
-                            Text(stringResource(R.string.template_whatsapp))
-                        }
-                        R.string.template_telegram -> Button(onClick = { onCreateMessage(MessagePlatform.TELEGRAM) }) {
-                            Text(stringResource(R.string.template_telegram))
-                        }
-                        R.string.template_unlock_maps -> {
-                            Text(stringResource(R.string.unlock_template_note), style = MaterialTheme.typography.bodySmall)
-                            if (unlockTemplateEnabled) {
-                                Text(stringResource(R.string.template_enabled), style = MaterialTheme.typography.labelLarge)
-                            }
-                            Button(onClick = onToggleUnlockTemplate) {
-                                Text(
-                                    stringResource(
-                                        if (unlockTemplateEnabled) R.string.disable_template else R.string.enable_template,
-                                    ),
-                                )
-                            }
-                        }
-                        else -> Text(stringResource(R.string.coming_soon), style = MaterialTheme.typography.bodySmall)
+                        R.string.template_open_app -> Button(onClick = onCreateShortcut) { Text(stringResource(R.string.create_shortcut)) }
+                        R.string.template_whatsapp -> Button(onClick = { onCreateMessage(MessagePlatform.WHATSAPP) }) { Text(stringResource(R.string.template_whatsapp)) }
+                        R.string.template_telegram -> Button(onClick = { onCreateMessage(MessagePlatform.TELEGRAM) }) { Text(stringResource(R.string.template_telegram)) }
                     }
                 }
             }
@@ -458,28 +335,46 @@ private fun TemplatesScreen(
 
 @Composable
 private fun HistoryScreen(padding: PaddingValues) {
-    Column(Modifier.fillMaxSize().padding(padding).padding(20.dp)) {
-        Text(stringResource(R.string.history), style = MaterialTheme.typography.headlineMedium)
-        Spacer(Modifier.height(16.dp))
-        Text(stringResource(R.string.recent_activity))
+    val context = LocalContext.current
+    val result = TaskExecutionReporter(context.applicationContext).last()
+    val ar = context.resources.configuration.locales[0].language == "ar"
+    LazyColumn(
+        modifier = Modifier.fillMaxSize().padding(padding),
+        contentPadding = PaddingValues(20.dp),
+        verticalArrangement = Arrangement.spacedBy(12.dp),
+    ) {
+        item { Text(stringResource(R.string.history), style = MaterialTheme.typography.headlineMedium) }
+        if (result == null) {
+            item { Text(stringResource(R.string.recent_activity)) }
+        } else {
+            item {
+                Card(modifier = Modifier.fillMaxWidth()) {
+                    Column(Modifier.padding(18.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                        Text(
+                            if (result.status == TaskExecutionStatus.SUCCESS) {
+                                if (ar) "✅ تم التنفيذ بنجاح" else "✅ Completed successfully"
+                            } else {
+                                if (ar) "❌ فشل التنفيذ" else "❌ Execution failed"
+                            },
+                            style = MaterialTheme.typography.titleMedium,
+                        )
+                        Text(result.taskName, style = MaterialTheme.typography.bodyLarge)
+                        result.reason?.takeIf { it.isNotBlank() }?.let { Text(it, style = MaterialTheme.typography.bodyMedium) }
+                        Text(
+                            if (ar) "المدة: %.1f ث".format(result.durationMs / 1000.0) else "Duration: %.1fs".format(result.durationMs / 1000.0),
+                            style = MaterialTheme.typography.bodySmall,
+                        )
+                        Text(DateFormat.getDateTimeInstance(DateFormat.SHORT, DateFormat.SHORT).format(Date(result.finishedAtMs)), style = MaterialTheme.typography.bodySmall)
+                    }
+                }
+            }
+        }
     }
 }
 
 @Composable
-private fun SettingsScreen(
-    padding: PaddingValues,
-    onOpenPermissions: () -> Unit,
-) {
-    val rows = listOf(
-        R.string.advanced_mode,
-        R.string.backup,
-        R.string.contact_us,
-        R.string.feedback,
-        R.string.report_problem,
-        R.string.privacy,
-        R.string.about,
-    )
-
+private fun SettingsScreen(padding: PaddingValues, onOpenPermissions: () -> Unit) {
+    val rows = listOf(R.string.backup, R.string.contact_us, R.string.feedback, R.string.report_problem, R.string.privacy, R.string.about)
     LazyColumn(
         modifier = Modifier.fillMaxSize().padding(padding),
         contentPadding = PaddingValues(20.dp),
@@ -516,31 +411,20 @@ private fun PermissionsScreen(onBack: () -> Unit) {
     val context = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
     var refreshKey by remember { mutableIntStateOf(0) }
-
-    val notificationLauncher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.RequestPermission(),
-    ) {
-        refreshKey++
-    }
+    val notificationLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { refreshKey++ }
 
     DisposableEffect(lifecycleOwner) {
-        val observer = LifecycleEventObserver { _, event ->
-            if (event == Lifecycle.Event.ON_RESUME) refreshKey++
-        }
+        val observer = LifecycleEventObserver { _, event -> if (event == Lifecycle.Event.ON_RESUME) refreshKey++ }
         lifecycleOwner.lifecycle.addObserver(observer)
         onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
     }
 
     val notificationsGranted = remember(refreshKey) {
-        Build.VERSION.SDK_INT < 33 ||
-            ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) == PackageManager.PERMISSION_GRANTED
+        Build.VERSION.SDK_INT < 33 || ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) == PackageManager.PERMISSION_GRANTED
     }
     val alarmManager = remember(context) { context.getSystemService(AlarmManager::class.java) }
     val exactAlarmGranted = remember(refreshKey) {
         Build.VERSION.SDK_INT < Build.VERSION_CODES.S || alarmManager.canScheduleExactAlarms()
-    }
-    val accessibilityGranted = remember(refreshKey) {
-        isAdvancedAccessibilityEnabled(context)
     }
 
     LazyColumn(
@@ -551,7 +435,7 @@ private fun PermissionsScreen(onBack: () -> Unit) {
         item {
             Row(verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
                 IconButton(onClick = onBack) {
-                    Icon(Icons.Default.ArrowBack, contentDescription = stringResource(R.string.back))
+                    Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = stringResource(R.string.back))
                 }
                 Text(stringResource(R.string.permissions), style = MaterialTheme.typography.headlineMedium)
             }
@@ -562,9 +446,7 @@ private fun PermissionsScreen(onBack: () -> Unit) {
                 description = stringResource(R.string.notification_permission_desc),
                 granted = notificationsGranted,
                 action = if (!notificationsGranted && Build.VERSION.SDK_INT >= 33) {
-                    {
-                        notificationLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
-                    }
+                    { notificationLauncher.launch(Manifest.permission.POST_NOTIFICATIONS) }
                 } else null,
             )
         }
@@ -575,23 +457,12 @@ private fun PermissionsScreen(onBack: () -> Unit) {
                 granted = exactAlarmGranted,
                 action = if (!exactAlarmGranted && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
                     {
-                        val intent = Intent(
-                            Settings.ACTION_REQUEST_SCHEDULE_EXACT_ALARM,
-                            Uri.parse("package:${context.packageName}"),
+                        context.startActivity(
+                            Intent(
+                                Settings.ACTION_REQUEST_SCHEDULE_EXACT_ALARM,
+                                Uri.parse("package:${context.packageName}"),
+                            ),
                         )
-                        context.startActivity(intent)
-                    }
-                } else null,
-            )
-        }
-        item {
-            PermissionCard(
-                title = stringResource(R.string.accessibility_permission),
-                description = stringResource(R.string.accessibility_permission_desc),
-                granted = accessibilityGranted,
-                action = if (!accessibilityGranted) {
-                    {
-                        runCatching { context.startActivity(Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS)) }
                     }
                 } else null,
             )
@@ -600,34 +471,15 @@ private fun PermissionsScreen(onBack: () -> Unit) {
 }
 
 @Composable
-private fun PermissionCard(
-    title: String,
-    description: String,
-    granted: Boolean,
-    action: (() -> Unit)?,
-) {
+private fun PermissionCard(title: String, description: String, granted: Boolean, action: (() -> Unit)?) {
     Card(modifier = Modifier.fillMaxWidth()) {
         Column(Modifier.padding(18.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             Text(title, style = MaterialTheme.typography.titleMedium)
             Text(description, style = MaterialTheme.typography.bodyMedium)
-            Text(
-                stringResource(if (granted) R.string.permission_granted else R.string.permission_needed),
-                style = MaterialTheme.typography.labelLarge,
-            )
-            if (action != null) {
-                Button(onClick = action) { Text(stringResource(R.string.allow_permission)) }
-            }
+            Text(stringResource(if (granted) R.string.permission_granted else R.string.permission_needed), style = MaterialTheme.typography.labelLarge)
+            if (action != null) Button(onClick = action) { Text(stringResource(R.string.allow_permission)) }
         }
     }
-}
-
-private fun isAdvancedAccessibilityEnabled(context: Context): Boolean {
-    val component = ComponentName(context, ShortcutAutomationAccessibilityService::class.java).flattenToString()
-    val enabled = Settings.Secure.getString(
-        context.contentResolver,
-        Settings.Secure.ENABLED_ACCESSIBILITY_SERVICES,
-    ).orEmpty()
-    return enabled.split(':').any { it.equals(component, ignoreCase = true) }
 }
 
 private fun setAppLocale(tag: String) {
