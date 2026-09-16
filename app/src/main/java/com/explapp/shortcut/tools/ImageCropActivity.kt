@@ -55,12 +55,13 @@ class ImageCropActivity : AppCompatActivity() {
             }
             if (cropped !== source) cropped.recycle()
             source.recycle()
-        }.onSuccess {
-            Toast.makeText(this, local("Cropped image saved", "تم حفظ الصورة المقصوصة"), Toast.LENGTH_LONG).show()
+            outputUri
+        }.onSuccess { output ->
+            ToolResultActions.show(this, listOf(output), ToolOutputResultPolicy.forTool(ToolId.IMAGE_CROP).mime)
         }.onFailure {
             Toast.makeText(this, it.message ?: local("Crop failed", "فشل القص"), Toast.LENGTH_LONG).show()
+            finish()
         }
-        finish()
     }
 
     private fun loadOrientedBitmap(uri: Uri, maxDimension: Int): Bitmap {
