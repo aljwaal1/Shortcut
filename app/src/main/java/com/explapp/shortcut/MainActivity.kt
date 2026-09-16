@@ -1,6 +1,5 @@
 package com.explapp.shortcut
 
-import android.content.Intent
 import android.os.Bundle
 import androidx.activity.compose.setContent
 import androidx.appcompat.app.AppCompatActivity
@@ -19,8 +18,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.dp
-import com.explapp.shortcut.tools.ToolActivity
 import com.explapp.shortcut.tools.ToolHubScreen
+import com.explapp.shortcut.tools.ToolRouter
 import com.explapp.shortcut.ui.ShortcutApp
 import com.explapp.shortcut.ui.ShortcutTheme
 
@@ -38,12 +37,7 @@ class MainActivity : AppCompatActivity() {
                     if (showTools) {
                         ToolHubScreen(
                             onBack = { showTools = false },
-                            onTool = { tool ->
-                                startActivity(
-                                    Intent(this@MainActivity, ToolActivity::class.java)
-                                        .putExtra(ToolActivity.EXTRA_TOOL, tool.name),
-                                )
-                            },
+                            onTool = { tool -> startActivity(ToolRouter.intent(this@MainActivity, tool)) },
                         )
                     } else {
                         ShortcutApp()
