@@ -1,9 +1,13 @@
 package com.explapp.shortcut.ui
 
 import android.Manifest
+import android.app.AlarmManager
 import android.app.TimePickerDialog
+import android.content.Intent
 import android.content.pm.PackageManager
+import android.net.Uri
 import android.os.Build
+import android.provider.Settings
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.Image
@@ -47,6 +51,8 @@ import com.explapp.shortcut.data.InstalledApp
 import com.explapp.shortcut.data.InstalledAppRepository
 import com.explapp.shortcut.domain.RepeatOption
 import com.explapp.shortcut.domain.ScheduledAppShortcut
+import com.explapp.shortcut.permissions.SchedulingPermissionPlan
+import com.explapp.shortcut.permissions.SchedulingPermissionStep
 import java.util.Locale
 
 @Composable
@@ -56,6 +62,7 @@ fun CreateShortcutScreen(
 ) {
     val context = LocalContext.current
     val apps = remember { InstalledAppRepository(context).loadLaunchableApps() }
+    val alarmManager = remember(context) { context.getSystemService(AlarmManager::class.java) }
 
     var name by remember { mutableStateOf("") }
     var selectedApp by remember { mutableStateOf<InstalledApp?>(null) }
@@ -65,12 +72,32 @@ fun CreateShortcutScreen(
     var showAppPicker by remember { mutableStateOf(false) }
     var pendingSave by remember { mutableStateOf<ScheduledAppShortcut?>(null) }
 
-    val notificationPermissionLauncher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.RequestPermission(),
-    ) {
+    fun finishPendingSave() {
         pendingSave?.let(onSave)
         pendingSave = null
     }
+
+    val exactAlarmLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.StartActivityForResult(),
+    ) { finishPendingSave() }
+
+    fun requestExactAlarmOrSave() {
+        val exactGranted = Build.VERSION.SDK_INT < Build.VERSION_CODES.S || alarmManager.canScheduleExactAlarms()
+        if (!exactGranted && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            exactAlarmLauncher.launch(
+                Intent(
+                    Settings.ACTION_REQUEST_SCHEDULE_EXACT_ALARM,
+                    Uri.parse("package:${context.packageName}"),
+                ),
+            )
+        } else {
+            finishPendingSave()
+        }
+    }
+
+    val notificationPermissionLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.RequestPermission(),
+    ) { requestExactAlarmOrSave() }
 
     val model = ScheduledAppShortcut(
         name = name.ifBlank { selectedApp?.label.orEmpty() },
@@ -80,14 +107,15 @@ fun CreateShortcutScreen(
         repeat = repeat,
     )
 
-    fun saveWithNeededPermission() {
-        val needsNotificationPermission = Build.VERSION.SDK_INT >= 33 &&
-            ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED
-        if (needsNotificationPermission) {
-            pendingSave = model
-            notificationPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
-        } else {
-            onSave(model)
+    fun saveWithNeededPermissions() {
+        pendingSave = model
+        val notificationsGranted = Build.VERSION.SDK_INT < 33 ||
+            ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) == PackageManager.PERMISSION_GRANTED
+        val exactGranted = Build.VERSION.SDK_INT < Build.VERSION_CODES.S || alarmManager.canScheduleExactAlarms()
+        when (SchedulingPermissionPlan.steps(Build.VERSION.SDK_INT, notificationsGranted, exactGranted).firstOrNull()) {
+            SchedulingPermissionStep.NOTIFICATIONS -> notificationPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
+            SchedulingPermissionStep.EXACT_ALARM -> requestExactAlarmOrSave()
+            null -> finishPendingSave()
         }
     }
 
@@ -146,7 +174,7 @@ fun CreateShortcutScreen(
         item {
             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                 TextButton(onClick = onCancel, modifier = Modifier.weight(1f)) { Text(stringResource(R.string.cancel)) }
-                Button(onClick = ::saveWithNeededPermission, enabled = model.isValid(), modifier = Modifier.weight(1f)) {
+                Button(onClick = ::saveWithNeededPermissions, enabled = model.isValid(), modifier = Modifier.weight(1f)) {
                     Text(stringResource(R.string.save))
                 }
             }
