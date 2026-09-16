@@ -1,0 +1,263 @@
+package com.explapp.shortcut.ui
+
+import android.content.Context
+import androidx.appcompat.app.AppCompatDelegate
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.AutoAwesome
+import androidx.compose.material.icons.filled.History
+import androidx.compose.material.icons.filled.Home
+import androidx.compose.material.icons.filled.Language
+import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material3.Button
+import androidx.compose.material3.Card
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.FloatingActionButton
+import androidx.compose.material3.Icon
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.NavigationBar
+import androidx.compose.material3.NavigationBarItem
+import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.unit.dp
+import androidx.core.os.LocaleListCompat
+import com.explapp.shortcut.R
+
+private const val PREFS = "shortcut_preferences"
+private const val KEY_ONBOARDING = "onboarding_complete"
+
+private enum class MainTab(val label: Int, val icon: ImageVector) {
+    HOME(R.string.home, Icons.Default.Home),
+    TEMPLATES(R.string.templates, Icons.Default.AutoAwesome),
+    HISTORY(R.string.history, Icons.Default.History),
+    SETTINGS(R.string.settings, Icons.Default.Settings),
+}
+
+@Composable
+fun ShortcutApp() {
+    val context = LocalContext.current
+    var onboardingComplete by remember {
+        mutableStateOf(context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).getBoolean(KEY_ONBOARDING, false))
+    }
+
+    if (!onboardingComplete) {
+        OnboardingScreen(
+            onDone = {
+                context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+                    .edit()
+                    .putBoolean(KEY_ONBOARDING, true)
+                    .apply()
+                onboardingComplete = true
+            },
+        )
+    } else {
+        MainShell()
+    }
+}
+
+@Composable
+private fun OnboardingScreen(onDone: () -> Unit) {
+    val pages = listOf(
+        R.string.onboarding_title_1 to R.string.onboarding_body_1,
+        R.string.onboarding_title_2 to R.string.onboarding_body_2,
+        R.string.onboarding_title_3 to R.string.onboarding_body_3,
+    )
+    var page by remember { mutableIntStateOf(0) }
+
+    Column(
+        modifier = Modifier.fillMaxSize().padding(24.dp),
+        verticalArrangement = Arrangement.Center,
+    ) {
+        Icon(
+            imageVector = if (page == 2) Icons.Default.Language else Icons.Default.AutoAwesome,
+            contentDescription = null,
+        )
+        Spacer(Modifier.height(24.dp))
+        Text(stringResource(pages[page].first), style = MaterialTheme.typography.headlineMedium)
+        Spacer(Modifier.height(12.dp))
+        Text(stringResource(pages[page].second), style = MaterialTheme.typography.bodyLarge)
+        Spacer(Modifier.height(32.dp))
+        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+            TextButton(onClick = onDone) { Text(stringResource(R.string.skip)) }
+            Button(onClick = {
+                if (page < pages.lastIndex) page++ else onDone()
+            }) {
+                Text(stringResource(if (page < pages.lastIndex) R.string.next else R.string.get_started))
+            }
+        }
+    }
+}
+
+@Composable
+private fun MainShell() {
+    var selected by remember { mutableStateOf(MainTab.HOME) }
+
+    Scaffold(
+        bottomBar = {
+            NavigationBar {
+                MainTab.entries.forEach { tab ->
+                    NavigationBarItem(
+                        selected = selected == tab,
+                        onClick = { selected = tab },
+                        icon = { Icon(tab.icon, contentDescription = null) },
+                        label = { Text(stringResource(tab.label)) },
+                    )
+                }
+            }
+        },
+        floatingActionButton = {
+            if (selected == MainTab.HOME) {
+                FloatingActionButton(onClick = { }) {
+                    Icon(Icons.Default.Add, contentDescription = stringResource(R.string.create_shortcut))
+                }
+            }
+        },
+    ) { padding ->
+        when (selected) {
+            MainTab.HOME -> HomeScreen(padding)
+            MainTab.TEMPLATES -> TemplatesScreen(padding)
+            MainTab.HISTORY -> HistoryScreen(padding)
+            MainTab.SETTINGS -> SettingsScreen(padding)
+        }
+    }
+}
+
+@Composable
+private fun HomeScreen(padding: PaddingValues) {
+    LazyColumn(
+        modifier = Modifier.fillMaxSize().padding(padding),
+        contentPadding = PaddingValues(20.dp),
+        verticalArrangement = Arrangement.spacedBy(12.dp),
+    ) {
+        item {
+            Text(stringResource(R.string.app_name), style = MaterialTheme.typography.headlineMedium)
+            Spacer(Modifier.height(4.dp))
+            Text(stringResource(R.string.my_shortcuts), style = MaterialTheme.typography.titleMedium)
+        }
+        item { DashboardCard(R.string.scheduled_automations, "0") }
+        item { DashboardCard(R.string.ready_templates, "7") }
+        item { DashboardCard(R.string.recent_activity, "0") }
+        item {
+            Button(onClick = { }, modifier = Modifier.fillMaxWidth()) {
+                Icon(Icons.Default.Add, contentDescription = null)
+                Text("  ${stringResource(R.string.create_shortcut)}")
+            }
+        }
+    }
+}
+
+@Composable
+private fun DashboardCard(label: Int, value: String) {
+    Card(modifier = Modifier.fillMaxWidth()) {
+        Row(
+            modifier = Modifier.fillMaxWidth().padding(18.dp),
+            horizontalArrangement = Arrangement.SpaceBetween,
+        ) {
+            Text(stringResource(label), style = MaterialTheme.typography.titleMedium)
+            Text(value, style = MaterialTheme.typography.titleLarge)
+        }
+    }
+}
+
+@Composable
+private fun TemplatesScreen(padding: PaddingValues) {
+    val templates = listOf(
+        R.string.template_open_app,
+        R.string.template_whatsapp,
+        R.string.template_telegram,
+        R.string.template_unlock_maps,
+        R.string.template_car_mode,
+        R.string.template_sleep_mode,
+        R.string.template_battery_80,
+    )
+    LazyColumn(
+        modifier = Modifier.fillMaxSize().padding(padding),
+        contentPadding = PaddingValues(20.dp),
+        verticalArrangement = Arrangement.spacedBy(12.dp),
+    ) {
+        item { Text(stringResource(R.string.ready_templates), style = MaterialTheme.typography.headlineMedium) }
+        items(templates) { title ->
+            Card(modifier = Modifier.fillMaxWidth()) {
+                Column(Modifier.padding(18.dp)) {
+                    Text(stringResource(title), style = MaterialTheme.typography.titleMedium)
+                    Spacer(Modifier.height(8.dp))
+                    Text(stringResource(R.string.coming_soon), style = MaterialTheme.typography.bodySmall)
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun HistoryScreen(padding: PaddingValues) {
+    Column(Modifier.fillMaxSize().padding(padding).padding(20.dp)) {
+        Text(stringResource(R.string.history), style = MaterialTheme.typography.headlineMedium)
+        Spacer(Modifier.height(16.dp))
+        Text(stringResource(R.string.recent_activity))
+    }
+}
+
+@Composable
+private fun SettingsScreen(padding: PaddingValues) {
+    val rows = listOf(
+        R.string.permissions,
+        R.string.advanced_mode,
+        R.string.backup,
+        R.string.contact_us,
+        R.string.feedback,
+        R.string.report_problem,
+        R.string.privacy,
+        R.string.about,
+    )
+
+    LazyColumn(
+        modifier = Modifier.fillMaxSize().padding(padding),
+        contentPadding = PaddingValues(20.dp),
+        verticalArrangement = Arrangement.spacedBy(10.dp),
+    ) {
+        item { Text(stringResource(R.string.settings), style = MaterialTheme.typography.headlineMedium) }
+        item {
+            Card(modifier = Modifier.fillMaxWidth()) {
+                Column(Modifier.padding(18.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text(stringResource(R.string.language), style = MaterialTheme.typography.titleMedium)
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        TextButton(onClick = { setAppLocale("") }) { Text(stringResource(R.string.language_system)) }
+                        TextButton(onClick = { setAppLocale("ar") }) { Text(stringResource(R.string.language_arabic)) }
+                        TextButton(onClick = { setAppLocale("en") }) { Text(stringResource(R.string.language_english)) }
+                    }
+                }
+            }
+        }
+        items(rows) { label ->
+            Card(modifier = Modifier.fillMaxWidth()) {
+                Text(stringResource(label), modifier = Modifier.padding(18.dp), style = MaterialTheme.typography.titleMedium)
+            }
+        }
+    }
+}
+
+private fun setAppLocale(tag: String) {
+    AppCompatDelegate.setApplicationLocales(LocaleListCompat.forLanguageTags(tag))
+}
