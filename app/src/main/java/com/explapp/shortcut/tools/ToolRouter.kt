@@ -10,6 +10,9 @@ object ToolRouter {
         ToolId.CAR_MODE -> Intent(context, CarModeActivity::class.java)
         ToolId.BATTERY_CHARGER -> Intent(context, BatterySetupActivity::class.java)
         ToolId.NFC_TRIGGER -> Intent(context, NfcSetupActivity::class.java)
+        ToolId.SCREENSHOT_CAPTURE -> Intent(context, ScreenCaptureActivity::class.java)
+        ToolId.SCREENSHOT_OCR_SEARCH -> Intent(context, ScreenCaptureActivity::class.java)
+            .putExtra(ScreenCaptureActivity.EXTRA_OCR, true)
         else -> Intent(context, ToolActivity::class.java).putExtra(ToolActivity.EXTRA_TOOL, tool.name)
     }
 }
