@@ -1,8 +1,12 @@
 package com.explapp.shortcut.ui
 
 import android.Manifest
+import android.app.AlarmManager
+import android.content.Intent
 import android.content.pm.PackageManager
+import android.net.Uri
 import android.os.Build
+import android.provider.Settings
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Arrangement
@@ -36,6 +40,8 @@ import com.explapp.shortcut.R
 import com.explapp.shortcut.domain.MessagePlatform
 import com.explapp.shortcut.domain.RepeatOption
 import com.explapp.shortcut.domain.ScheduledMessage
+import com.explapp.shortcut.permissions.SchedulingPermissionPlan
+import com.explapp.shortcut.permissions.SchedulingPermissionStep
 
 @Composable
 fun CreateMessageScreen(
@@ -44,6 +50,7 @@ fun CreateMessageScreen(
     onSave: (ScheduledMessage) -> Unit,
 ) {
     val context = LocalContext.current
+    val alarmManager = remember(context) { context.getSystemService(AlarmManager::class.java) }
     var name by remember { mutableStateOf("") }
     var platform by remember { mutableStateOf(initialPlatform) }
     var recipient by remember { mutableStateOf("") }
@@ -53,12 +60,30 @@ fun CreateMessageScreen(
     var repeat by remember { mutableStateOf(RepeatOption.ONCE) }
     var pendingSave by remember { mutableStateOf<ScheduledMessage?>(null) }
 
-    val notificationPermissionLauncher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.RequestPermission(),
-    ) {
+    fun finishPendingSave() {
         pendingSave?.let(onSave)
         pendingSave = null
     }
+
+    val exactAlarmLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.StartActivityForResult(),
+    ) { finishPendingSave() }
+
+    fun requestExactAlarmOrSave() {
+        val exactGranted = Build.VERSION.SDK_INT < Build.VERSION_CODES.S || alarmManager.canScheduleExactAlarms()
+        if (!exactGranted && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            exactAlarmLauncher.launch(
+                Intent(
+                    Settings.ACTION_REQUEST_SCHEDULE_EXACT_ALARM,
+                    Uri.parse("package:${context.packageName}"),
+                ),
+            )
+        } else finishPendingSave()
+    }
+
+    val notificationPermissionLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.RequestPermission(),
+    ) { requestExactAlarmOrSave() }
 
     val defaultName = when (platform) {
         MessagePlatform.WHATSAPP -> stringResource(R.string.template_whatsapp)
@@ -74,14 +99,15 @@ fun CreateMessageScreen(
         repeat = repeat,
     )
 
-    fun saveWithNeededPermission() {
-        val needsNotificationPermission = Build.VERSION.SDK_INT >= 33 &&
-            ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED
-        if (needsNotificationPermission) {
-            pendingSave = model
-            notificationPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
-        } else {
-            onSave(model)
+    fun saveWithNeededPermissions() {
+        pendingSave = model
+        val notificationsGranted = Build.VERSION.SDK_INT < 33 ||
+            ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) == PackageManager.PERMISSION_GRANTED
+        val exactGranted = Build.VERSION.SDK_INT < Build.VERSION_CODES.S || alarmManager.canScheduleExactAlarms()
+        when (SchedulingPermissionPlan.steps(Build.VERSION.SDK_INT, notificationsGranted, exactGranted).firstOrNull()) {
+            SchedulingPermissionStep.NOTIFICATIONS -> notificationPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
+            SchedulingPermissionStep.EXACT_ALARM -> requestExactAlarmOrSave()
+            null -> finishPendingSave()
         }
     }
 
@@ -98,77 +124,33 @@ fun CreateMessageScreen(
                     FilterChip(
                         selected = platform == option,
                         onClick = { platform = option },
-                        label = {
-                            Text(
-                                stringResource(
-                                    if (option == MessagePlatform.WHATSAPP) R.string.whatsapp else R.string.telegram,
-                                ),
-                            )
-                        },
+                        label = { Text(stringResource(if (option == MessagePlatform.WHATSAPP) R.string.whatsapp else R.string.telegram)) },
                     )
                 }
             }
         }
         item {
-            OutlinedTextField(
-                value = name,
-                onValueChange = { name = it },
-                label = { Text(stringResource(R.string.shortcut_name)) },
-                modifier = Modifier.fillMaxWidth(),
-                singleLine = true,
-            )
+            OutlinedTextField(value = name, onValueChange = { name = it }, label = { Text(stringResource(R.string.shortcut_name)) }, modifier = Modifier.fillMaxWidth(), singleLine = true)
         }
         item {
             OutlinedTextField(
                 value = recipient,
                 onValueChange = { recipient = it },
-                label = {
-                    Text(
-                        stringResource(
-                            if (platform == MessagePlatform.WHATSAPP) R.string.whatsapp_number else R.string.telegram_username,
-                        ),
-                    )
-                },
-                supportingText = {
-                    Text(
-                        stringResource(
-                            if (platform == MessagePlatform.WHATSAPP) R.string.whatsapp_number_hint else R.string.telegram_username_hint,
-                        ),
-                    )
-                },
+                label = { Text(stringResource(if (platform == MessagePlatform.WHATSAPP) R.string.whatsapp_number else R.string.telegram_username)) },
+                supportingText = { Text(stringResource(if (platform == MessagePlatform.WHATSAPP) R.string.whatsapp_number_hint else R.string.telegram_username_hint)) },
                 modifier = Modifier.fillMaxWidth(),
                 singleLine = true,
             )
         }
         item {
-            OutlinedTextField(
-                value = body,
-                onValueChange = { body = it },
-                label = { Text(stringResource(R.string.message_text)) },
-                modifier = Modifier.fillMaxWidth(),
-                minLines = 4,
-            )
+            OutlinedTextField(value = body, onValueChange = { body = it }, label = { Text(stringResource(R.string.message_text)) }, modifier = Modifier.fillMaxWidth(), minLines = 4)
         }
         item {
             Text(stringResource(R.string.time), style = MaterialTheme.typography.titleMedium)
             Spacer(Modifier.height(8.dp))
             Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                OutlinedTextField(
-                    value = hour,
-                    onValueChange = { value -> hour = value.filter(Char::isDigit).take(2) },
-                    label = { Text(stringResource(R.string.hour)) },
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                    modifier = Modifier.weight(1f),
-                    singleLine = true,
-                )
-                OutlinedTextField(
-                    value = minute,
-                    onValueChange = { value -> minute = value.filter(Char::isDigit).take(2) },
-                    label = { Text(stringResource(R.string.minute)) },
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                    modifier = Modifier.weight(1f),
-                    singleLine = true,
-                )
+                OutlinedTextField(value = hour, onValueChange = { hour = it.filter(Char::isDigit).take(2) }, label = { Text(stringResource(R.string.hour)) }, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number), modifier = Modifier.weight(1f), singleLine = true)
+                OutlinedTextField(value = minute, onValueChange = { minute = it.filter(Char::isDigit).take(2) }, label = { Text(stringResource(R.string.minute)) }, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number), modifier = Modifier.weight(1f), singleLine = true)
             }
         }
         item {
@@ -176,29 +158,15 @@ fun CreateMessageScreen(
             Spacer(Modifier.height(8.dp))
             Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
                 RepeatOption.entries.forEach { option ->
-                    FilterChip(
-                        selected = repeat == option,
-                        onClick = { repeat = option },
-                        label = { Text(messageRepeatLabel(option)) },
-                    )
+                    FilterChip(selected = repeat == option, onClick = { repeat = option }, label = { Text(messageRepeatLabel(option)) })
                 }
             }
         }
-        item {
-            Text(stringResource(R.string.message_standard_mode_note), style = MaterialTheme.typography.bodySmall)
-        }
+        item { Text(stringResource(R.string.message_standard_mode_note), style = MaterialTheme.typography.bodySmall) }
         item {
             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                TextButton(onClick = onCancel, modifier = Modifier.weight(1f)) {
-                    Text(stringResource(R.string.cancel))
-                }
-                Button(
-                    onClick = ::saveWithNeededPermission,
-                    enabled = model.isValid(),
-                    modifier = Modifier.weight(1f),
-                ) {
-                    Text(stringResource(R.string.save))
-                }
+                TextButton(onClick = onCancel, modifier = Modifier.weight(1f)) { Text(stringResource(R.string.cancel)) }
+                Button(onClick = ::saveWithNeededPermissions, enabled = model.isValid(), modifier = Modifier.weight(1f)) { Text(stringResource(R.string.save)) }
             }
         }
     }
