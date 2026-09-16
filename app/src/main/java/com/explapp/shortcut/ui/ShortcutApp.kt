@@ -20,8 +20,10 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Add
@@ -32,7 +34,8 @@ import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.Language
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.Button
-import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.ElevatedCard
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -40,6 +43,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -51,12 +55,15 @@ import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
 import androidx.core.os.LocaleListCompat
@@ -70,7 +77,6 @@ import com.explapp.shortcut.domain.ScheduledAppShortcut
 import com.explapp.shortcut.domain.ScheduledMessage
 import com.explapp.shortcut.domain.ShortcutCollection
 import com.explapp.shortcut.execution.TaskExecutionReporter
-import com.explapp.shortcut.execution.TaskExecutionStatus
 import com.explapp.shortcut.scheduler.AndroidAlarmScheduler
 import com.explapp.shortcut.scheduler.AndroidMessageScheduler
 import java.text.DateFormat
@@ -87,7 +93,7 @@ private enum class MainTab(val label: Int, val icon: ImageVector) {
 }
 
 @Composable
-fun ShortcutApp() {
+fun ShortcutApp(onOpenTools: () -> Unit = {}) {
     val context = LocalContext.current
     val store = remember(context) { ShortcutStore(context.applicationContext) }
     val scheduler = remember(context) { AndroidAlarmScheduler(context.applicationContext) }
@@ -139,6 +145,7 @@ fun ShortcutApp() {
             shortcuts = shortcuts,
             messages = messages,
             onCreateShortcut = { showBuilder = true },
+            onOpenTools = onOpenTools,
             onCreateMessage = { showMessageBuilder = it },
             onDeleteShortcut = { shortcut ->
                 scheduler.cancel(shortcut)
@@ -169,12 +176,35 @@ private fun OnboardingScreen(onDone: () -> Unit) {
         modifier = Modifier.fillMaxSize().padding(24.dp),
         verticalArrangement = Arrangement.Center,
     ) {
-        Icon(imageVector = if (page == 2) Icons.Default.Language else Icons.Default.AutoAwesome, contentDescription = null)
+        Surface(
+            modifier = Modifier.size(72.dp),
+            shape = CircleShape,
+            color = if (page == 2) MaterialTheme.colorScheme.secondaryContainer else MaterialTheme.colorScheme.primaryContainer,
+        ) {
+            androidx.compose.foundation.layout.Box(contentAlignment = Alignment.Center) {
+                Icon(
+                    imageVector = if (page == 2) Icons.Default.Language else Icons.Default.AutoAwesome,
+                    contentDescription = null,
+                    modifier = Modifier.size(34.dp),
+                    tint = if (page == 2) MaterialTheme.colorScheme.secondary else MaterialTheme.colorScheme.primary,
+                )
+            }
+        }
         Spacer(Modifier.height(24.dp))
         Text(stringResource(pages[page].first), style = MaterialTheme.typography.headlineMedium)
         Spacer(Modifier.height(12.dp))
-        Text(stringResource(pages[page].second), style = MaterialTheme.typography.bodyLarge)
-        Spacer(Modifier.height(32.dp))
+        Text(
+            stringResource(pages[page].second),
+            style = MaterialTheme.typography.bodyLarge,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        Spacer(Modifier.height(18.dp))
+        Text(
+            "${page + 1} / ${pages.size}",
+            style = MaterialTheme.typography.labelLarge,
+            color = MaterialTheme.colorScheme.primary,
+        )
+        Spacer(Modifier.height(28.dp))
         Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
             TextButton(onClick = onDone) { Text(stringResource(R.string.skip)) }
             Button(onClick = { if (page < pages.lastIndex) page++ else onDone() }) {
@@ -189,6 +219,7 @@ private fun MainShell(
     shortcuts: List<ScheduledAppShortcut>,
     messages: List<ScheduledMessage>,
     onCreateShortcut: () -> Unit,
+    onOpenTools: () -> Unit,
     onCreateMessage: (MessagePlatform) -> Unit,
     onDeleteShortcut: (ScheduledAppShortcut) -> Unit,
     onDeleteMessage: (ScheduledMessage) -> Unit,
@@ -196,8 +227,12 @@ private fun MainShell(
 ) {
     var selected by remember { mutableStateOf(MainTab.HOME) }
     Scaffold(
+        containerColor = MaterialTheme.colorScheme.background,
         bottomBar = {
-            NavigationBar {
+            NavigationBar(
+                containerColor = MaterialTheme.colorScheme.surface,
+                tonalElevation = 5.dp,
+            ) {
                 MainTab.entries.forEach { tab ->
                     NavigationBarItem(
                         selected = selected == tab,
@@ -210,14 +245,26 @@ private fun MainShell(
         },
         floatingActionButton = {
             if (selected == MainTab.HOME) {
-                FloatingActionButton(onClick = onCreateShortcut) {
+                FloatingActionButton(
+                    onClick = onCreateShortcut,
+                    containerColor = MaterialTheme.colorScheme.primary,
+                    contentColor = MaterialTheme.colorScheme.onPrimary,
+                ) {
                     Icon(Icons.Default.Add, contentDescription = stringResource(R.string.create_shortcut))
                 }
             }
         },
     ) { padding ->
         when (selected) {
-            MainTab.HOME -> HomeScreen(padding, shortcuts, messages, onCreateShortcut, onDeleteShortcut, onDeleteMessage)
+            MainTab.HOME -> HomeScreen(
+                padding = padding,
+                shortcuts = shortcuts,
+                messages = messages,
+                onCreateShortcut = onCreateShortcut,
+                onOpenTools = onOpenTools,
+                onDeleteShortcut = onDeleteShortcut,
+                onDeleteMessage = onDeleteMessage,
+            )
             MainTab.TEMPLATES -> TemplatesScreen(padding, onCreateShortcut, onCreateMessage)
             MainTab.HISTORY -> HistoryScreen(padding)
             MainTab.SETTINGS -> SettingsScreen(padding, onOpenPermissions)
@@ -231,76 +278,155 @@ private fun HomeScreen(
     shortcuts: List<ScheduledAppShortcut>,
     messages: List<ScheduledMessage>,
     onCreateShortcut: () -> Unit,
+    onOpenTools: () -> Unit,
     onDeleteShortcut: (ScheduledAppShortcut) -> Unit,
     onDeleteMessage: (ScheduledMessage) -> Unit,
 ) {
     val context = LocalContext.current
+    val configuration = LocalConfiguration.current
+    val ar = configuration.locales[0].language == "ar"
     val recent = TaskExecutionReporter(context.applicationContext).last()
     LazyColumn(
         modifier = Modifier.fillMaxSize().padding(padding),
-        contentPadding = PaddingValues(20.dp),
-        verticalArrangement = Arrangement.spacedBy(12.dp),
+        contentPadding = PaddingValues(18.dp),
+        verticalArrangement = Arrangement.spacedBy(14.dp),
     ) {
         item {
-            Text(stringResource(R.string.app_name), style = MaterialTheme.typography.headlineMedium)
-            Spacer(Modifier.height(4.dp))
-            Text(stringResource(R.string.my_shortcuts), style = MaterialTheme.typography.titleMedium)
+            ShortcutHero(
+                isArabic = ar,
+                activeCount = shortcuts.size + messages.size,
+                onOpenTools = onOpenTools,
+            )
         }
-        item { DashboardCard(R.string.scheduled_automations, (shortcuts.size + messages.size).toString()) }
-        item { DashboardCard(R.string.scheduled_messages, messages.size.toString()) }
-        item { DashboardCard(R.string.ready_templates, "3") }
-        item { DashboardCard(R.string.recent_activity, if (recent == null) "0" else "1") }
+        item {
+            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                MetricTile(
+                    label = stringResource(R.string.scheduled_automations),
+                    value = (shortcuts.size + messages.size).toString(),
+                    icon = Icons.Default.AutoAwesome,
+                    accent = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.weight(1f),
+                )
+                MetricTile(
+                    label = stringResource(R.string.scheduled_messages),
+                    value = messages.size.toString(),
+                    icon = Icons.Default.Language,
+                    accent = MaterialTheme.colorScheme.secondary,
+                    modifier = Modifier.weight(1f),
+                )
+            }
+        }
+        item {
+            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                MetricTile(
+                    label = stringResource(R.string.ready_templates),
+                    value = "3",
+                    icon = Icons.Default.Add,
+                    accent = MaterialTheme.colorScheme.tertiary,
+                    modifier = Modifier.weight(1f),
+                )
+                MetricTile(
+                    label = stringResource(R.string.recent_activity),
+                    value = if (recent == null) "0" else "1",
+                    icon = Icons.Default.History,
+                    accent = Color(0xFF1B9C68),
+                    modifier = Modifier.weight(1f),
+                )
+            }
+        }
         item {
             Button(onClick = onCreateShortcut, modifier = Modifier.fillMaxWidth()) {
                 Icon(Icons.Default.Add, contentDescription = null)
-                Text("  ${stringResource(R.string.create_shortcut)}")
+                Text("  ${stringResource(R.string.create_shortcut)}", fontWeight = FontWeight.Bold)
             }
         }
+        item {
+            SectionLabel(
+                title = if (ar) "آخر تنفيذ" else "Latest run",
+                subtitle = if (ar) "تعرف فورًا إن كانت المهمة نجحت أو فشلت" else "See immediately whether the latest task succeeded",
+            )
+        }
+        item { ExecutionStatusCard(result = recent, isArabic = ar) }
+
         if (shortcuts.isNotEmpty()) {
-            item { Text(stringResource(R.string.saved_shortcuts), style = MaterialTheme.typography.titleLarge) }
+            item {
+                SectionLabel(
+                    title = stringResource(R.string.saved_shortcuts),
+                    subtitle = if (ar) "مهامك المجدولة الجاهزة للعمل" else "Your scheduled actions, ready to run",
+                )
+            }
             items(shortcuts) { shortcut ->
-                Card(modifier = Modifier.fillMaxWidth()) {
-                    Row(Modifier.fillMaxWidth().padding(18.dp), horizontalArrangement = Arrangement.SpaceBetween) {
-                        Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                            Text(shortcut.name, style = MaterialTheme.typography.titleMedium)
-                            Text(shortcut.packageName, style = MaterialTheme.typography.bodySmall)
-                            Text("%02d:%02d • %s".format(shortcut.hour, shortcut.minute, shortcut.repeat.name), style = MaterialTheme.typography.bodyMedium)
+                ElevatedCard(
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = CardDefaults.elevatedCardColors(containerColor = MaterialTheme.colorScheme.surface),
+                ) {
+                    Row(
+                        Modifier.fillMaxWidth().padding(16.dp),
+                        horizontalArrangement = Arrangement.spacedBy(14.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        AccentIcon(Icons.Default.AutoAwesome, MaterialTheme.colorScheme.primary)
+                        Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
+                            Text(shortcut.name, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                            Text(shortcut.packageName, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            Text(
+                                "%02d:%02d • %s".format(shortcut.hour, shortcut.minute, shortcut.repeat.name),
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = MaterialTheme.colorScheme.primary,
+                            )
                         }
                         IconButton(onClick = { onDeleteShortcut(shortcut) }) {
-                            Icon(Icons.Default.Delete, contentDescription = stringResource(R.string.delete_shortcut))
+                            Icon(Icons.Default.Delete, contentDescription = stringResource(R.string.delete_shortcut), tint = MaterialTheme.colorScheme.error)
                         }
                     }
                 }
             }
         }
+
         if (messages.isNotEmpty()) {
-            item { Text(stringResource(R.string.scheduled_messages), style = MaterialTheme.typography.titleLarge) }
+            item {
+                SectionLabel(
+                    title = stringResource(R.string.scheduled_messages),
+                    subtitle = if (ar) "رسائل مجهزة تفتح في الوقت الذي اخترته" else "Prepared messages opened at your chosen time",
+                )
+            }
             items(messages) { message ->
-                Card(modifier = Modifier.fillMaxWidth()) {
-                    Row(Modifier.fillMaxWidth().padding(18.dp), horizontalArrangement = Arrangement.SpaceBetween) {
-                        Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                            Text(message.name, style = MaterialTheme.typography.titleMedium)
-                            Text(stringResource(if (message.platform == MessagePlatform.WHATSAPP) R.string.whatsapp else R.string.telegram), style = MaterialTheme.typography.bodySmall)
-                            Text(message.recipient, style = MaterialTheme.typography.bodySmall)
-                            Text("%02d:%02d • %s".format(message.hour, message.minute, message.repeat.name), style = MaterialTheme.typography.bodyMedium)
+                ElevatedCard(modifier = Modifier.fillMaxWidth()) {
+                    Row(
+                        Modifier.fillMaxWidth().padding(16.dp),
+                        horizontalArrangement = Arrangement.spacedBy(14.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        AccentIcon(Icons.Default.Language, MaterialTheme.colorScheme.secondary)
+                        Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
+                            Text(message.name, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                            Text(
+                                stringResource(if (message.platform == MessagePlatform.WHATSAPP) R.string.whatsapp else R.string.telegram),
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.secondary,
+                            )
+                            Text(message.recipient, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            Text(
+                                "%02d:%02d • %s".format(message.hour, message.minute, message.repeat.name),
+                                style = MaterialTheme.typography.bodyMedium,
+                            )
                         }
                         IconButton(onClick = { onDeleteMessage(message) }) {
-                            Icon(Icons.Default.Delete, contentDescription = stringResource(R.string.delete_message))
+                            Icon(Icons.Default.Delete, contentDescription = stringResource(R.string.delete_message), tint = MaterialTheme.colorScheme.error)
                         }
                     }
                 }
             }
         }
+        item { Spacer(Modifier.height(8.dp)) }
     }
 }
 
 @Composable
-private fun DashboardCard(label: Int, value: String) {
-    Card(modifier = Modifier.fillMaxWidth()) {
-        Row(modifier = Modifier.fillMaxWidth().padding(18.dp), horizontalArrangement = Arrangement.SpaceBetween) {
-            Text(stringResource(label), style = MaterialTheme.typography.titleMedium)
-            Text(value, style = MaterialTheme.typography.titleLarge)
-        }
+private fun SectionLabel(title: String, subtitle: String) {
+    Column(verticalArrangement = Arrangement.spacedBy(3.dp)) {
+        Text(title, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.ExtraBold)
+        Text(subtitle, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
     }
 }
 
@@ -310,22 +436,46 @@ private fun TemplatesScreen(
     onCreateShortcut: () -> Unit,
     onCreateMessage: (MessagePlatform) -> Unit,
 ) {
-    val templates = listOf(R.string.template_open_app, R.string.template_whatsapp, R.string.template_telegram)
+    val configuration = LocalConfiguration.current
+    val ar = configuration.locales[0].language == "ar"
+    data class TemplateUi(val title: Int, val accent: Color, val action: () -> Unit)
+    val templates = listOf(
+        TemplateUi(R.string.template_open_app, MaterialTheme.colorScheme.primary, onCreateShortcut),
+        TemplateUi(R.string.template_whatsapp, MaterialTheme.colorScheme.secondary) { onCreateMessage(MessagePlatform.WHATSAPP) },
+        TemplateUi(R.string.template_telegram, MaterialTheme.colorScheme.tertiary) { onCreateMessage(MessagePlatform.TELEGRAM) },
+    )
     LazyColumn(
         modifier = Modifier.fillMaxSize().padding(padding),
-        contentPadding = PaddingValues(20.dp),
-        verticalArrangement = Arrangement.spacedBy(12.dp),
+        contentPadding = PaddingValues(18.dp),
+        verticalArrangement = Arrangement.spacedBy(14.dp),
     ) {
-        item { Text(stringResource(R.string.ready_templates), style = MaterialTheme.typography.headlineMedium) }
-        items(templates) { title ->
-            Card(modifier = Modifier.fillMaxWidth()) {
-                Column(Modifier.padding(18.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Text(stringResource(title), style = MaterialTheme.typography.titleMedium)
-                    when (title) {
-                        R.string.template_open_app -> Button(onClick = onCreateShortcut) { Text(stringResource(R.string.create_shortcut)) }
-                        R.string.template_whatsapp -> Button(onClick = { onCreateMessage(MessagePlatform.WHATSAPP) }) { Text(stringResource(R.string.template_whatsapp)) }
-                        R.string.template_telegram -> Button(onClick = { onCreateMessage(MessagePlatform.TELEGRAM) }) { Text(stringResource(R.string.template_telegram)) }
+        item {
+            SectionLabel(
+                title = stringResource(R.string.ready_templates),
+                subtitle = if (ar) "ابدأ من قالب جاهز ثم عدله كما تريد" else "Start from a ready template and make it yours",
+            )
+        }
+        items(templates) { template ->
+            ElevatedCard(
+                modifier = Modifier.fillMaxWidth(),
+                colors = CardDefaults.elevatedCardColors(containerColor = template.accent.copy(alpha = 0.09f)),
+                onClick = template.action,
+            ) {
+                Row(
+                    modifier = Modifier.fillMaxWidth().padding(18.dp),
+                    horizontalArrangement = Arrangement.spacedBy(14.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    AccentIcon(Icons.Default.AutoAwesome, template.accent)
+                    Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                        Text(stringResource(template.title), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                        Text(
+                            if (ar) "إعداد سريع بخطوات قليلة" else "Quick setup in a few steps",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
                     }
+                    Text("→", color = template.accent, style = MaterialTheme.typography.titleLarge)
                 }
             }
         }
@@ -340,33 +490,24 @@ private fun HistoryScreen(padding: PaddingValues) {
     val ar = configuration.locales[0].language == "ar"
     LazyColumn(
         modifier = Modifier.fillMaxSize().padding(padding),
-        contentPadding = PaddingValues(20.dp),
-        verticalArrangement = Arrangement.spacedBy(12.dp),
+        contentPadding = PaddingValues(18.dp),
+        verticalArrangement = Arrangement.spacedBy(14.dp),
     ) {
-        item { Text(stringResource(R.string.history), style = MaterialTheme.typography.headlineMedium) }
-        if (result == null) {
-            item { Text(stringResource(R.string.recent_activity)) }
-        } else {
+        item {
+            SectionLabel(
+                title = stringResource(R.string.history),
+                subtitle = if (ar) "نتيجة آخر مهمة ومدة تنفيذها" else "Your latest task result and execution time",
+            )
+        }
+        item { ExecutionStatusCard(result = result, isArabic = ar) }
+        if (result != null) {
             item {
-                Card(modifier = Modifier.fillMaxWidth()) {
-                    Column(Modifier.padding(18.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                        Text(
-                            if (result.status == TaskExecutionStatus.SUCCESS) {
-                                if (ar) "✅ تم التنفيذ بنجاح" else "✅ Completed successfully"
-                            } else {
-                                if (ar) "❌ فشل التنفيذ" else "❌ Execution failed"
-                            },
-                            style = MaterialTheme.typography.titleMedium,
-                        )
-                        Text(result.taskName, style = MaterialTheme.typography.bodyLarge)
-                        result.reason?.takeIf { it.isNotBlank() }?.let { Text(it, style = MaterialTheme.typography.bodyMedium) }
-                        Text(
-                            if (ar) "المدة: %.1f ث".format(result.durationMs / 1000.0) else "Duration: %.1fs".format(result.durationMs / 1000.0),
-                            style = MaterialTheme.typography.bodySmall,
-                        )
-                        Text(DateFormat.getDateTimeInstance(DateFormat.SHORT, DateFormat.SHORT).format(Date(result.finishedAtMs)), style = MaterialTheme.typography.bodySmall)
-                    }
-                }
+                Text(
+                    DateFormat.getDateTimeInstance(DateFormat.SHORT, DateFormat.SHORT).format(Date(result.finishedAtMs)),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(horizontal = 4.dp),
+                )
             }
         }
     }
@@ -374,18 +515,38 @@ private fun HistoryScreen(padding: PaddingValues) {
 
 @Composable
 private fun SettingsScreen(padding: PaddingValues, onOpenPermissions: () -> Unit) {
-    val rows = listOf(R.string.backup, R.string.contact_us, R.string.feedback, R.string.report_problem, R.string.privacy, R.string.about)
+    val configuration = LocalConfiguration.current
+    val ar = configuration.locales[0].language == "ar"
+    val rows = listOf(
+        R.string.backup,
+        R.string.contact_us,
+        R.string.feedback,
+        R.string.report_problem,
+        R.string.privacy,
+        R.string.about,
+    )
     LazyColumn(
         modifier = Modifier.fillMaxSize().padding(padding),
-        contentPadding = PaddingValues(20.dp),
-        verticalArrangement = Arrangement.spacedBy(10.dp),
+        contentPadding = PaddingValues(18.dp),
+        verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
-        item { Text(stringResource(R.string.settings), style = MaterialTheme.typography.headlineMedium) }
         item {
-            Card(modifier = Modifier.fillMaxWidth()) {
-                Column(Modifier.padding(18.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Text(stringResource(R.string.language), style = MaterialTheme.typography.titleMedium)
-                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            SectionLabel(
+                title = stringResource(R.string.settings),
+                subtitle = if (ar) "خصص اللغة والصلاحيات وخيارات التطبيق" else "Language, permissions and app options",
+            )
+        }
+        item {
+            ElevatedCard(
+                modifier = Modifier.fillMaxWidth(),
+                colors = CardDefaults.elevatedCardColors(containerColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.55f)),
+            ) {
+                Column(Modifier.padding(18.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                        AccentIcon(Icons.Default.Language, MaterialTheme.colorScheme.primary)
+                        Text(stringResource(R.string.language), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                    }
+                    Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                         TextButton(onClick = { setAppLocale("") }) { Text(stringResource(R.string.language_system)) }
                         TextButton(onClick = { setAppLocale("ar") }) { Text(stringResource(R.string.language_arabic)) }
                         TextButton(onClick = { setAppLocale("en") }) { Text(stringResource(R.string.language_english)) }
@@ -394,13 +555,32 @@ private fun SettingsScreen(padding: PaddingValues, onOpenPermissions: () -> Unit
             }
         }
         item {
-            Card(onClick = onOpenPermissions, modifier = Modifier.fillMaxWidth()) {
-                Text(stringResource(R.string.permissions), modifier = Modifier.padding(18.dp), style = MaterialTheme.typography.titleMedium)
+            ElevatedCard(
+                onClick = onOpenPermissions,
+                modifier = Modifier.fillMaxWidth(),
+                colors = CardDefaults.elevatedCardColors(containerColor = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.55f)),
+            ) {
+                Row(
+                    modifier = Modifier.fillMaxWidth().padding(18.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(12.dp),
+                ) {
+                    AccentIcon(Icons.Default.Settings, MaterialTheme.colorScheme.secondary)
+                    Text(stringResource(R.string.permissions), modifier = Modifier.weight(1f), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                    Text("→", color = MaterialTheme.colorScheme.secondary)
+                }
             }
         }
         items(rows) { label ->
-            Card(modifier = Modifier.fillMaxWidth()) {
-                Text(stringResource(label), modifier = Modifier.padding(18.dp), style = MaterialTheme.typography.titleMedium)
+            ElevatedCard(modifier = Modifier.fillMaxWidth()) {
+                Row(
+                    modifier = Modifier.fillMaxWidth().padding(17.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(12.dp),
+                ) {
+                    AccentIcon(Icons.Default.AutoAwesome, MaterialTheme.colorScheme.tertiary)
+                    Text(stringResource(label), modifier = Modifier.weight(1f), style = MaterialTheme.typography.titleMedium)
+                }
             }
         }
     }
@@ -410,6 +590,8 @@ private fun SettingsScreen(padding: PaddingValues, onOpenPermissions: () -> Unit
 private fun PermissionsScreen(onBack: () -> Unit) {
     val context = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
+    val configuration = LocalConfiguration.current
+    val ar = configuration.locales[0].language == "ar"
     var refreshKey by remember { mutableIntStateOf(0) }
     val notificationLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { refreshKey++ }
 
@@ -429,15 +611,22 @@ private fun PermissionsScreen(onBack: () -> Unit) {
 
     LazyColumn(
         modifier = Modifier.fillMaxSize(),
-        contentPadding = PaddingValues(20.dp),
-        verticalArrangement = Arrangement.spacedBy(12.dp),
+        contentPadding = PaddingValues(18.dp),
+        verticalArrangement = Arrangement.spacedBy(14.dp),
     ) {
         item {
-            Row(verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 IconButton(onClick = onBack) {
                     Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = stringResource(R.string.back))
                 }
-                Text(stringResource(R.string.permissions), style = MaterialTheme.typography.headlineMedium)
+                Column {
+                    Text(stringResource(R.string.permissions), style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.ExtraBold)
+                    Text(
+                        if (ar) "لا نطلب إلا ما تحتاجه الميزة" else "Only permissions needed by the feature",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
             }
         }
         item {
@@ -472,11 +661,23 @@ private fun PermissionsScreen(onBack: () -> Unit) {
 
 @Composable
 private fun PermissionCard(title: String, description: String, granted: Boolean, action: (() -> Unit)?) {
-    Card(modifier = Modifier.fillMaxWidth()) {
-        Column(Modifier.padding(18.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            Text(title, style = MaterialTheme.typography.titleMedium)
-            Text(description, style = MaterialTheme.typography.bodyMedium)
-            Text(stringResource(if (granted) R.string.permission_granted else R.string.permission_needed), style = MaterialTheme.typography.labelLarge)
+    val accent = if (granted) Color(0xFF1B9C68) else MaterialTheme.colorScheme.tertiary
+    ElevatedCard(
+        modifier = Modifier.fillMaxWidth(),
+        colors = CardDefaults.elevatedCardColors(containerColor = accent.copy(alpha = 0.08f)),
+    ) {
+        Column(Modifier.padding(18.dp), verticalArrangement = Arrangement.spacedBy(9.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                Surface(shape = CircleShape, color = accent.copy(alpha = 0.16f), modifier = Modifier.size(12.dp)) {}
+                Text(title, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+            }
+            Text(description, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Text(
+                stringResource(if (granted) R.string.permission_granted else R.string.permission_needed),
+                style = MaterialTheme.typography.labelLarge,
+                color = accent,
+                fontWeight = FontWeight.Bold,
+            )
             if (action != null) Button(onClick = action) { Text(stringResource(R.string.allow_permission)) }
         }
     }
