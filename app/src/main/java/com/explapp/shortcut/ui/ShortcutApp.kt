@@ -79,8 +79,6 @@ import com.explapp.shortcut.domain.ShortcutCollection
 import com.explapp.shortcut.execution.TaskExecutionReporter
 import com.explapp.shortcut.scheduler.AndroidAlarmScheduler
 import com.explapp.shortcut.scheduler.AndroidMessageScheduler
-import java.text.DateFormat
-import java.util.Date
 
 private const val PREFS = "shortcut_preferences"
 private const val KEY_ONBOARDING = "onboarding_complete"
@@ -266,7 +264,7 @@ private fun MainShell(
                 onDeleteMessage = onDeleteMessage,
             )
             MainTab.TEMPLATES -> TemplatesScreen(padding, onCreateShortcut, onCreateMessage)
-            MainTab.HISTORY -> HistoryScreen(padding)
+            MainTab.HISTORY -> ExecutionHistoryScreen(padding)
             MainTab.SETTINGS -> SettingsScreen(padding, onOpenPermissions)
         }
     }
@@ -347,6 +345,7 @@ private fun HomeScreen(
             )
         }
         item { ExecutionStatusCard(result = recent, isArabic = ar) }
+        item { HomeToolQuickRows() }
 
         if (shortcuts.isNotEmpty()) {
             item {
@@ -477,37 +476,6 @@ private fun TemplatesScreen(
                     }
                     Text("→", color = template.accent, style = MaterialTheme.typography.titleLarge)
                 }
-            }
-        }
-    }
-}
-
-@Composable
-private fun HistoryScreen(padding: PaddingValues) {
-    val context = LocalContext.current
-    val configuration = LocalConfiguration.current
-    val result = TaskExecutionReporter(context.applicationContext).last()
-    val ar = configuration.locales[0].language == "ar"
-    LazyColumn(
-        modifier = Modifier.fillMaxSize().padding(padding),
-        contentPadding = PaddingValues(18.dp),
-        verticalArrangement = Arrangement.spacedBy(14.dp),
-    ) {
-        item {
-            SectionLabel(
-                title = stringResource(R.string.history),
-                subtitle = if (ar) "نتيجة آخر مهمة ومدة تنفيذها" else "Your latest task result and execution time",
-            )
-        }
-        item { ExecutionStatusCard(result = result, isArabic = ar) }
-        if (result != null) {
-            item {
-                Text(
-                    DateFormat.getDateTimeInstance(DateFormat.SHORT, DateFormat.SHORT).format(Date(result.finishedAtMs)),
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.padding(horizontal = 4.dp),
-                )
             }
         }
     }
