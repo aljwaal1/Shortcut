@@ -58,4 +58,5 @@
     <string name="cancel">Cancel</string>
     <string name="no_apps_found">No launchable apps found</string>
     <string name="saved_shortcuts">Saved shortcuts</string>
+    <string name="open_now_fallback">Android prevented automatic opening. Tap to open now.</string>
 </resources>
