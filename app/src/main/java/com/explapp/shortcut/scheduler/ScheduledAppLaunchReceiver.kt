@@ -12,6 +12,7 @@ import android.os.Build
 import androidx.core.app.NotificationCompat
 import androidx.core.content.ContextCompat
 import com.explapp.shortcut.R
+import com.explapp.shortcut.data.ShortcutStore
 import com.explapp.shortcut.domain.RepeatOption
 import com.explapp.shortcut.domain.ScheduledAppShortcut
 
@@ -34,7 +35,9 @@ class ScheduledAppLaunchReceiver : BroadcastReceiver() {
             showOpenNowNotification(context, shortcut)
         }
 
-        if (shortcut.repeat != RepeatOption.ONCE) {
+        if (shortcut.repeat == RepeatOption.ONCE) {
+            ShortcutStore(context).remove(shortcut)
+        } else {
             AndroidAlarmScheduler(context).schedule(shortcut)
         }
     }
