@@ -15,25 +15,34 @@ import com.explapp.shortcut.R
 import com.explapp.shortcut.data.ShortcutStore
 import com.explapp.shortcut.domain.RepeatOption
 import com.explapp.shortcut.domain.ScheduledAppShortcut
+import com.explapp.shortcut.execution.TaskExecutionReporter
+import com.explapp.shortcut.execution.TaskExecutionResult
 
 class ScheduledAppLaunchReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent) {
         val shortcut = intent.toShortcut() ?: return
+        val startedAt = System.currentTimeMillis()
         val launchIntent = context.packageManager.getLaunchIntentForPackage(shortcut.packageName)
             ?.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
 
+        var failureReason: String? = null
         val launched = if (launchIntent != null) {
             runCatching {
                 context.startActivity(launchIntent)
                 true
-            }.getOrDefault(false)
+            }.onFailure { failureReason = it.message ?: it.javaClass.simpleName }
+                .getOrDefault(false)
         } else {
+            failureReason = "App not found"
             false
         }
 
-        if (!launched) {
-            showOpenNowNotification(context, shortcut)
-        }
+        TaskExecutionReporter(context).report(
+            if (launched) TaskExecutionResult.success(shortcut.name, startedAt)
+            else TaskExecutionResult.failure(shortcut.name, failureReason ?: "Could not open app", startedAt),
+        )
+
+        if (!launched) showOpenNowNotification(context, shortcut)
 
         if (shortcut.repeat == RepeatOption.ONCE) {
             ShortcutStore(context).remove(shortcut)
@@ -42,37 +51,24 @@ class ScheduledAppLaunchReceiver : BroadcastReceiver() {
         }
     }
 
-    private fun showOpenNowNotification(
-        context: Context,
-        shortcut: ScheduledAppShortcut,
-    ) {
+    private fun showOpenNowNotification(context: Context, shortcut: ScheduledAppShortcut) {
         if (Build.VERSION.SDK_INT >= 33 &&
             ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED
-        ) {
-            return
-        }
-
+        ) return
         val launchIntent = context.packageManager.getLaunchIntentForPackage(shortcut.packageName) ?: return
         val notificationManager = context.getSystemService(NotificationManager::class.java)
         val channelId = "scheduled_app_launch"
-
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             notificationManager.createNotificationChannel(
-                NotificationChannel(
-                    channelId,
-                    context.getString(R.string.scheduled_automations),
-                    NotificationManager.IMPORTANCE_HIGH,
-                ),
+                NotificationChannel(channelId, context.getString(R.string.scheduled_automations), NotificationManager.IMPORTANCE_HIGH),
             )
         }
-
         val openPendingIntent = PendingIntent.getActivity(
             context,
             shortcut.packageName.hashCode(),
             launchIntent,
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
         )
-
         val notification = NotificationCompat.Builder(context, channelId)
             .setSmallIcon(android.R.drawable.ic_menu_view)
             .setContentTitle(shortcut.name)
@@ -81,7 +77,6 @@ class ScheduledAppLaunchReceiver : BroadcastReceiver() {
             .setAutoCancel(true)
             .setContentIntent(openPendingIntent)
             .build()
-
         notificationManager.notify(shortcut.packageName.hashCode(), notification)
     }
 
@@ -106,12 +101,8 @@ class ScheduledAppLaunchReceiver : BroadcastReceiver() {
             val packageName = getStringExtra(EXTRA_PACKAGE) ?: return null
             val hour = getIntExtra(EXTRA_HOUR, -1)
             val minute = getIntExtra(EXTRA_MINUTE, -1)
-            val repeat = runCatching {
-                RepeatOption.valueOf(getStringExtra(EXTRA_REPEAT).orEmpty())
-            }.getOrNull() ?: return null
-
-            return ScheduledAppShortcut(name, packageName, hour, minute, repeat)
-                .takeIf { it.isValid() }
+            val repeat = runCatching { RepeatOption.valueOf(getStringExtra(EXTRA_REPEAT).orEmpty()) }.getOrNull() ?: return null
+            return ScheduledAppShortcut(name, packageName, hour, minute, repeat).takeIf { it.isValid() }
         }
     }
 }
