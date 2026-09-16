@@ -58,4 +58,5 @@
     <string name="cancel">إلغاء</string>
     <string name="no_apps_found">لم يتم العثور على تطبيقات قابلة للفتح</string>
     <string name="saved_shortcuts">الاختصارات المحفوظة</string>
+    <string name="open_now_fallback">منع أندرويد الفتح التلقائي. اضغط لفتح التطبيق الآن.</string>
 </resources>
