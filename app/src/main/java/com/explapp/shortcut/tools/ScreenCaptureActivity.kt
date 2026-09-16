@@ -95,13 +95,15 @@ class ScreenCaptureActivity : AppCompatActivity() {
                 requireNotNull(output)
                 file.inputStream().use { it.copyTo(output) }
             }
-        }.onSuccess {
-            Toast.makeText(this, local("Screenshot saved", "تم حفظ لقطة الشاشة"), Toast.LENGTH_LONG).show()
+            uri
+        }.onSuccess { uri ->
+            file.delete()
+            ToolResultActions.show(this, listOf(uri), ToolOutputResultPolicy.forTool(ToolId.SCREENSHOT_CAPTURE).mime)
         }.onFailure {
+            file.delete()
             Toast.makeText(this, it.message ?: "Screenshot error", Toast.LENGTH_LONG).show()
+            finish()
         }
-        file.delete()
-        finish()
     }
 
     private fun ocr(file: File) {
