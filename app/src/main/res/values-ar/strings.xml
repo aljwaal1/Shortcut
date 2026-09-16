@@ -1,0 +1,45 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">الاختصارات</string>
+    <string name="home">الرئيسية</string>
+    <string name="templates">القوالب</string>
+    <string name="history">السجل</string>
+    <string name="settings">الإعدادات</string>
+    <string name="create_shortcut">إنشاء اختصار</string>
+    <string name="my_shortcuts">اختصاراتي</string>
+    <string name="scheduled_automations">الأتمتة المجدولة</string>
+    <string name="ready_templates">قوالب جاهزة</string>
+    <string name="recent_activity">النشاط الأخير</string>
+    <string name="easy_builder">الإنشاء السهل</string>
+    <string name="advanced_builder">الإنشاء المتقدم</string>
+    <string name="onboarding_title_1">أتمت مهامك اليومية</string>
+    <string name="onboarding_body_1">أنشئ قواعد سهلة تفتح التطبيقات وتعرض التذكيرات وتنفذ الإجراءات بدلًا منك.</string>
+    <string name="onboarding_title_2">جدولة التطبيقات والرسائل</string>
+    <string name="onboarding_body_2">افتح تطبيقًا أو جهّز رسائل واتساب وتيليجرام في الوقت الذي تختاره.</string>
+    <string name="onboarding_title_3">أنت المتحكم دائمًا</string>
+    <string name="onboarding_body_3">لا تحتاج إلى حساب. تبقى اختصاراتك على جهازك، والصلاحيات المتقدمة اختيارية.</string>
+    <string name="next">التالي</string>
+    <string name="get_started">ابدأ الآن</string>
+    <string name="skip">تخطي</string>
+    <string name="template_open_app">فتح تطبيق في وقت محدد</string>
+    <string name="template_whatsapp">جدولة رسالة واتساب</string>
+    <string name="template_telegram">جدولة رسالة تيليجرام</string>
+    <string name="template_unlock_maps">عند فتح الهاتف: Wi‑Fi ثم الخرائط</string>
+    <string name="template_car_mode">وضع السيارة</string>
+    <string name="template_sleep_mode">وضع النوم</string>
+    <string name="template_battery_80">عند وصول البطارية إلى 80%</string>
+    <string name="language">اللغة</string>
+    <string name="language_system">حسب الجهاز</string>
+    <string name="language_arabic">العربية</string>
+    <string name="language_english">الإنجليزية</string>
+    <string name="theme">المظهر</string>
+    <string name="permissions">مركز الصلاحيات</string>
+    <string name="advanced_mode">الوضع المتقدم</string>
+    <string name="backup">النسخ الاحتياطي والاستعادة</string>
+    <string name="contact_us">تواصل معنا</string>
+    <string name="feedback">أرسل ملاحظة أو اقتراحًا</string>
+    <string name="report_problem">الإبلاغ عن مشكلة</string>
+    <string name="privacy">سياسة الخصوصية</string>
+    <string name="about">عن التطبيق</string>
+    <string name="coming_soon">قادمة في البناء التالي</string>
+</resources>
