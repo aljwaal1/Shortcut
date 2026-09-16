@@ -12,6 +12,16 @@ class NextRunCalculatorTest {
     private val zone = ZoneId.of("Europe/Stockholm")
 
     @Test
+    fun onceScheduleMovesToTomorrowWhenTimePassed() {
+        val now = ZonedDateTime.of(2026, 9, 16, 9, 0, 0, 0, zone)
+        val shortcut = ScheduledAppShortcut("Maps", "pkg", 7, 30, RepeatOption.ONCE)
+
+        val next = NextRunCalculator.nextRun(now, shortcut)
+
+        assertEquals(ZonedDateTime.of(2026, 9, 17, 7, 30, 0, 0, zone), next)
+    }
+
+    @Test
     fun dailyScheduleMovesToTomorrowWhenTimePassed() {
         val now = ZonedDateTime.of(2026, 9, 16, 9, 0, 0, 0, zone)
         val shortcut = ScheduledAppShortcut("Maps", "pkg", 7, 30, RepeatOption.DAILY)
