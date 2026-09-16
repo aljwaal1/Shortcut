@@ -1,6 +1,11 @@
 package com.explapp.shortcut.ui
 
+import android.Manifest
 import android.app.TimePickerDialog
+import android.content.pm.PackageManager
+import android.os.Build
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -35,6 +40,7 @@ import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
+import androidx.core.content.ContextCompat
 import androidx.core.graphics.drawable.toBitmap
 import com.explapp.shortcut.R
 import com.explapp.shortcut.data.InstalledApp
@@ -57,6 +63,14 @@ fun CreateShortcutScreen(
     var minute by remember { mutableIntStateOf(30) }
     var repeat by remember { mutableStateOf(RepeatOption.ONCE) }
     var showAppPicker by remember { mutableStateOf(false) }
+    var pendingSave by remember { mutableStateOf<ScheduledAppShortcut?>(null) }
+
+    val notificationPermissionLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.RequestPermission(),
+    ) {
+        pendingSave?.let(onSave)
+        pendingSave = null
+    }
 
     val model = ScheduledAppShortcut(
         name = name.ifBlank { selectedApp?.label.orEmpty() },
@@ -65,6 +79,17 @@ fun CreateShortcutScreen(
         minute = minute,
         repeat = repeat,
     )
+
+    fun saveWithNeededPermission() {
+        val needsNotificationPermission = Build.VERSION.SDK_INT >= 33 &&
+            ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED
+        if (needsNotificationPermission) {
+            pendingSave = model
+            notificationPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
+        } else {
+            onSave(model)
+        }
+    }
 
     LazyColumn(
         modifier = Modifier.fillMaxSize().padding(horizontal = 20.dp, vertical = 16.dp),
@@ -121,7 +146,7 @@ fun CreateShortcutScreen(
         item {
             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                 TextButton(onClick = onCancel, modifier = Modifier.weight(1f)) { Text(stringResource(R.string.cancel)) }
-                Button(onClick = { onSave(model) }, enabled = model.isValid(), modifier = Modifier.weight(1f)) {
+                Button(onClick = ::saveWithNeededPermission, enabled = model.isValid(), modifier = Modifier.weight(1f)) {
                     Text(stringResource(R.string.save))
                 }
             }
