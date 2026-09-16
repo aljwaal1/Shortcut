@@ -6,6 +6,7 @@
     <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
     <uses-permission android:name="android.permission.READ_MEDIA_IMAGES" />
     <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" android:maxSdkVersion="32" />
+    <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" android:maxSdkVersion="28" />
     <uses-permission android:name="android.permission.NFC" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PROJECTION" />
@@ -54,10 +55,7 @@
             </intent-filter>
         </receiver>
 
-        <receiver
-            android:name=".automation.BatteryCheckReceiver"
-            android:exported="false" />
-
+        <receiver android:name=".automation.BatteryCheckReceiver" android:exported="false" />
         <receiver
             android:name=".automation.ChargerEventReceiver"
             android:enabled="true"
@@ -74,6 +72,9 @@
         <activity android:name=".automation.CarModeActivity" android:exported="false" />
         <activity android:name=".tools.NfcSetupActivity" android:exported="false" />
         <activity android:name=".tools.ScreenCaptureActivity" android:exported="false" />
+        <activity android:name=".tools.ImageCropActivity" android:exported="false" />
+        <activity android:name=".tools.JpegConvertActivity" android:exported="false" />
+        <activity android:name=".tools.MultiUrlPdfActivity" android:exported="false" />
         <activity android:name=".tools.ToolActivity" android:exported="false" />
 
         <activity
