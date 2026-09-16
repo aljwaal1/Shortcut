@@ -15,6 +15,10 @@ class ShortcutStore(context: Context) {
             .apply()
     }
 
+    fun remove(shortcut: ScheduledAppShortcut) {
+        save(load().filterNot { it == shortcut })
+    }
+
     private companion object {
         const val PREFS_NAME = "shortcut_store"
         const val KEY_SHORTCUTS = "scheduled_shortcuts"
