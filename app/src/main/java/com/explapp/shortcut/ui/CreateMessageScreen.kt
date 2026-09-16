@@ -10,19 +10,26 @@ import android.provider.Settings
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material3.Button
+import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.ElevatedCard
 import androidx.compose.material3.FilterChip
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -30,9 +37,12 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
@@ -50,6 +60,7 @@ fun CreateMessageScreen(
     onSave: (ScheduledMessage) -> Unit,
 ) {
     val context = LocalContext.current
+    val ar = LocalConfiguration.current.locales[0].language == "ar"
     val alarmManager = remember(context) { context.getSystemService(AlarmManager::class.java) }
     var name by remember { mutableStateOf("") }
     var platform by remember { mutableStateOf(initialPlatform) }
@@ -112,25 +123,61 @@ fun CreateMessageScreen(
     }
 
     LazyColumn(
-        modifier = Modifier.fillMaxSize().padding(20.dp),
-        verticalArrangement = Arrangement.spacedBy(16.dp),
+        modifier = Modifier.fillMaxSize(),
+        contentPadding = androidx.compose.foundation.layout.PaddingValues(18.dp),
+        verticalArrangement = Arrangement.spacedBy(14.dp),
     ) {
-        item { Text(stringResource(R.string.message_builder_title), style = MaterialTheme.typography.headlineMedium) }
         item {
-            Text(stringResource(R.string.message_app), style = MaterialTheme.typography.titleMedium)
-            Spacer(Modifier.height(8.dp))
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                MessagePlatform.entries.forEach { option ->
-                    FilterChip(
-                        selected = platform == option,
-                        onClick = { platform = option },
-                        label = { Text(stringResource(if (option == MessagePlatform.WHATSAPP) R.string.whatsapp else R.string.telegram)) },
-                    )
+            ElevatedCard(
+                modifier = Modifier.fillMaxWidth(),
+                colors = CardDefaults.elevatedCardColors(containerColor = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.72f)),
+            ) {
+                Row(
+                    modifier = Modifier.fillMaxWidth().padding(18.dp),
+                    horizontalArrangement = Arrangement.spacedBy(14.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Surface(shape = CircleShape, color = MaterialTheme.colorScheme.secondary.copy(alpha = 0.14f), modifier = Modifier.size(50.dp)) {
+                        Box(contentAlignment = Alignment.Center) {
+                            Icon(Icons.Default.AutoAwesome, contentDescription = null, tint = MaterialTheme.colorScheme.secondary)
+                        }
+                    }
+                    Column(verticalArrangement = Arrangement.spacedBy(3.dp)) {
+                        Text(stringResource(R.string.message_builder_title), style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.ExtraBold)
+                        Text(
+                            if (ar) "جهّز الرسالة وحدد وقت فتح المحادثة" else "Prepare the message and choose when to open the chat",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
                 }
             }
         }
         item {
-            OutlinedTextField(value = name, onValueChange = { name = it }, label = { Text(stringResource(R.string.shortcut_name)) }, modifier = Modifier.fillMaxWidth(), singleLine = true)
+            MessageSectionCard(
+                title = stringResource(R.string.message_app),
+                subtitle = if (ar) "اختر التطبيق الذي ستجهز فيه الرسالة" else "Choose where the prepared message should open",
+                accent = MaterialTheme.colorScheme.secondary,
+            ) {
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    MessagePlatform.entries.forEach { option ->
+                        FilterChip(
+                            selected = platform == option,
+                            onClick = { platform = option },
+                            label = { Text(stringResource(if (option == MessagePlatform.WHATSAPP) R.string.whatsapp else R.string.telegram)) },
+                        )
+                    }
+                }
+            }
+        }
+        item {
+            OutlinedTextField(
+                value = name,
+                onValueChange = { name = it },
+                label = { Text(stringResource(R.string.shortcut_name)) },
+                modifier = Modifier.fillMaxWidth(),
+                singleLine = true,
+            )
         }
         item {
             OutlinedTextField(
@@ -143,31 +190,97 @@ fun CreateMessageScreen(
             )
         }
         item {
-            OutlinedTextField(value = body, onValueChange = { body = it }, label = { Text(stringResource(R.string.message_text)) }, modifier = Modifier.fillMaxWidth(), minLines = 4)
+            OutlinedTextField(
+                value = body,
+                onValueChange = { body = it },
+                label = { Text(stringResource(R.string.message_text)) },
+                modifier = Modifier.fillMaxWidth(),
+                minLines = 4,
+            )
         }
         item {
-            Text(stringResource(R.string.time), style = MaterialTheme.typography.titleMedium)
-            Spacer(Modifier.height(8.dp))
-            Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                OutlinedTextField(value = hour, onValueChange = { hour = it.filter(Char::isDigit).take(2) }, label = { Text(stringResource(R.string.hour)) }, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number), modifier = Modifier.weight(1f), singleLine = true)
-                OutlinedTextField(value = minute, onValueChange = { minute = it.filter(Char::isDigit).take(2) }, label = { Text(stringResource(R.string.minute)) }, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number), modifier = Modifier.weight(1f), singleLine = true)
-            }
-        }
-        item {
-            Text(stringResource(R.string.repeat), style = MaterialTheme.typography.titleMedium)
-            Spacer(Modifier.height(8.dp))
-            Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                RepeatOption.entries.forEach { option ->
-                    FilterChip(selected = repeat == option, onClick = { repeat = option }, label = { Text(messageRepeatLabel(option)) })
+            MessageSectionCard(
+                title = stringResource(R.string.time),
+                subtitle = if (ar) "وقت فتح المحادثة مع النص المجهز" else "When to open the chat with the prepared text",
+                accent = MaterialTheme.colorScheme.tertiary,
+            ) {
+                Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                    OutlinedTextField(
+                        value = hour,
+                        onValueChange = { hour = it.filter(Char::isDigit).take(2) },
+                        label = { Text(stringResource(R.string.hour)) },
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                        modifier = Modifier.weight(1f),
+                        singleLine = true,
+                    )
+                    OutlinedTextField(
+                        value = minute,
+                        onValueChange = { minute = it.filter(Char::isDigit).take(2) },
+                        label = { Text(stringResource(R.string.minute)) },
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                        modifier = Modifier.weight(1f),
+                        singleLine = true,
+                    )
                 }
             }
         }
-        item { Text(stringResource(R.string.message_standard_mode_note), style = MaterialTheme.typography.bodySmall) }
+        item {
+            MessageSectionCard(
+                title = stringResource(R.string.repeat),
+                subtitle = if (ar) "اختر عدد مرات فتح الرسالة المجهزة" else "Choose how often the prepared message should open",
+                accent = MaterialTheme.colorScheme.primary,
+            ) {
+                Column(verticalArrangement = Arrangement.spacedBy(7.dp)) {
+                    RepeatOption.entries.forEach { option ->
+                        FilterChip(
+                            selected = repeat == option,
+                            onClick = { repeat = option },
+                            label = { Text(messageRepeatLabel(option)) },
+                        )
+                    }
+                }
+            }
+        }
+        item {
+            ElevatedCard(
+                colors = CardDefaults.elevatedCardColors(containerColor = MaterialTheme.colorScheme.tertiaryContainer.copy(alpha = 0.55f)),
+                elevation = CardDefaults.elevatedCardElevation(defaultElevation = 0.dp),
+            ) {
+                Text(
+                    stringResource(R.string.message_standard_mode_note),
+                    modifier = Modifier.padding(15.dp),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+        }
         item {
             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                 TextButton(onClick = onCancel, modifier = Modifier.weight(1f)) { Text(stringResource(R.string.cancel)) }
-                Button(onClick = ::saveWithNeededPermissions, enabled = model.isValid(), modifier = Modifier.weight(1f)) { Text(stringResource(R.string.save)) }
+                Button(onClick = ::saveWithNeededPermissions, enabled = model.isValid(), modifier = Modifier.weight(1f)) {
+                    Text(stringResource(R.string.save), fontWeight = FontWeight.Bold)
+                }
             }
+        }
+    }
+}
+
+@Composable
+private fun MessageSectionCard(
+    title: String,
+    subtitle: String,
+    accent: androidx.compose.ui.graphics.Color,
+    content: @Composable () -> Unit,
+) {
+    ElevatedCard(
+        modifier = Modifier.fillMaxWidth(),
+        colors = CardDefaults.elevatedCardColors(containerColor = accent.copy(alpha = 0.07f)),
+        elevation = CardDefaults.elevatedCardElevation(defaultElevation = 0.dp),
+    ) {
+        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            Text(title, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+            Text(subtitle, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            content()
         }
     }
 }
