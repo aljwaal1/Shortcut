@@ -1,12 +1,12 @@
 package com.explapp.shortcut.messages
 
 import com.explapp.shortcut.domain.MessagePlatform
-import kotlin.test.Test
-import kotlin.test.assertEquals
+import org.junit.Assert.assertEquals
+import org.junit.Test
 
 class MessageDeepLinkFactoryTest {
     @Test
-    fun `whatsapp link normalizes international phone and prefills encoded text`() {
+    fun whatsappLinkNormalizesInternationalPhoneAndPrefillsEncodedText() {
         val link = MessageDeepLinkFactory.build(
             platform = MessagePlatform.WHATSAPP,
             recipient = "+46 70-123 45 67",
@@ -20,7 +20,7 @@ class MessageDeepLinkFactoryTest {
     }
 
     @Test
-    fun `telegram link removes at sign and opens username with draft text`() {
+    fun telegramLinkRemovesAtSignAndOpensUsernameWithDraftText() {
         val link = MessageDeepLinkFactory.build(
             platform = MessagePlatform.TELEGRAM,
             recipient = "@example_user",
