@@ -45,6 +45,7 @@ import androidx.compose.ui.unit.dp
 import androidx.core.os.LocaleListCompat
 import com.explapp.shortcut.R
 import com.explapp.shortcut.domain.ScheduledAppShortcut
+import com.explapp.shortcut.scheduler.AndroidAlarmScheduler
 
 private const val PREFS = "shortcut_preferences"
 private const val KEY_ONBOARDING = "onboarding_complete"
@@ -64,6 +65,7 @@ fun ShortcutApp() {
     }
     var showBuilder by remember { mutableStateOf(false) }
     val shortcuts = remember { mutableStateListOf<ScheduledAppShortcut>() }
+    val scheduler = remember(context) { AndroidAlarmScheduler(context.applicationContext) }
 
     when {
         !onboardingComplete -> OnboardingScreen(
@@ -80,6 +82,7 @@ fun ShortcutApp() {
             onCancel = { showBuilder = false },
             onSave = { shortcut ->
                 shortcuts.add(shortcut)
+                scheduler.schedule(shortcut)
                 showBuilder = false
             },
         )
