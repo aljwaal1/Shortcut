@@ -42,4 +42,20 @@
     <string name="privacy">Privacy policy</string>
     <string name="about">About</string>
     <string name="coming_soon">Coming in the next build</string>
+    <string name="builder_title">Open an app on schedule</string>
+    <string name="shortcut_name">Shortcut name</string>
+    <string name="choose_app">Choose app</string>
+    <string name="selected_app">Selected app</string>
+    <string name="time">Time</string>
+    <string name="hour">Hour</string>
+    <string name="minute">Minute</string>
+    <string name="repeat">Repeat</string>
+    <string name="repeat_once">Once</string>
+    <string name="repeat_daily">Daily</string>
+    <string name="repeat_weekdays">Weekdays</string>
+    <string name="repeat_weekly">Weekly</string>
+    <string name="save">Save</string>
+    <string name="cancel">Cancel</string>
+    <string name="no_apps_found">No launchable apps found</string>
+    <string name="saved_shortcuts">Saved shortcuts</string>
 </resources>
