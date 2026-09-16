@@ -8,14 +8,14 @@ import org.junit.Test
 class MessageCapabilityTest {
     @Test
     fun telegramStandardModePreparesButDoesNotAutoSend() {
-        val capability = MessageCapability.forPlatform(MessagePlatform.TELEGRAM)
+        val capability = MessageCapabilities.forPlatform(MessagePlatform.TELEGRAM)
         assertTrue(capability.opensPreparedMessage)
         assertFalse(capability.autoSends)
     }
 
     @Test
     fun whatsappStandardModePreparesButDoesNotAutoSend() {
-        val capability = MessageCapability.forPlatform(MessagePlatform.WHATSAPP)
+        val capability = MessageCapabilities.forPlatform(MessagePlatform.WHATSAPP)
         assertTrue(capability.opensPreparedMessage)
         assertFalse(capability.autoSends)
     }
