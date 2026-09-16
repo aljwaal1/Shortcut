@@ -25,7 +25,7 @@
     <string name="template_open_app">Open an app at a specific time</string>
     <string name="template_whatsapp">Schedule a WhatsApp message</string>
     <string name="template_telegram">Schedule a Telegram message</string>
-    <string name="template_unlock_maps">On unlock: connect Wi-Fi and open Maps</string>
+    <string name="template_unlock_maps">On unlock: Wi-Fi and Maps</string>
     <string name="template_car_mode">Car mode</string>
     <string name="template_sleep_mode">Sleep mode</string>
     <string name="template_battery_80">Battery reaches 80%</string>
@@ -81,4 +81,19 @@
     <string name="permission_granted">Allowed</string>
     <string name="permission_needed">Permission needed</string>
     <string name="allow_permission">Allow</string>
+    <string name="unlock_template_title">Unlock automation</string>
+    <string name="unlock_template_notification">Phone unlocked. Choose Wi-Fi controls or open Maps.</string>
+    <string name="open_wifi">Wi-Fi</string>
+    <string name="open_maps">Maps</string>
+    <string name="enable_template">Enable template</string>
+    <string name="disable_template">Disable template</string>
+    <string name="template_enabled">Enabled</string>
+    <string name="advanced_accessibility_label">Shortcut advanced automation</string>
+    <string name="advanced_accessibility_description">Optional rule-based automation that reacts to user-created triggers such as unlocking the phone. It does not read screen content.</string>
+    <string name="accessibility_permission">Advanced automation access</string>
+    <string name="accessibility_permission_desc">Needed only for advanced trigger rules such as reacting after the phone is unlocked.</string>
+    <string name="advanced_disclosure_title">Enable advanced automation?</string>
+    <string name="advanced_disclosure_body">This optional feature uses Android Accessibility Service only to keep deterministic automation rules active and react to triggers you choose, such as unlocking the phone. It does not read passwords, messages, or screen content. You can turn it off at any time in Android Accessibility settings.</string>
+    <string name="agree_and_open_settings">Agree and open settings</string>
+    <string name="unlock_template_note">Android does not allow normal apps to switch Wi-Fi on or off directly. After unlock, Shortcut shows quick actions for the official Wi-Fi panel and Maps.</string>
 </resources>
