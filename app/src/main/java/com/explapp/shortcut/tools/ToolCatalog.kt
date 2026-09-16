@@ -64,12 +64,12 @@ object ToolCatalog {
         ShortcutTool(ToolId.SCREENSHOT_OCR_SEARCH, ToolSection.QUICK, "Screenshot → OCR / Search", "لقطة شاشة → نص / بحث"),
         ShortcutTool(ToolId.WATER_EJECT, ToolSection.QUICK, "Water Eject", "طرد الماء"),
 
-        ShortcutTool(ToolId.CAR_MODE, ToolSection.AUTOMATION, "Car mode", "وضع السيارة"),
+        ShortcutTool(ToolId.CAR_MODE, ToolSection.AUTOMATION, "Guided car mode", "وضع السيارة الموجّه"),
         ShortcutTool(ToolId.PARKED_CAR, ToolSection.AUTOMATION, "Parked car location", "موقع السيارة المركونة"),
-        ShortcutTool(ToolId.BATTERY_CHARGER, ToolSection.AUTOMATION, "Battery / charger", "البطارية / الشاحن"),
+        ShortcutTool(ToolId.BATTERY_CHARGER, ToolSection.AUTOMATION, "Battery / charger automation", "أتمتة البطارية / الشاحن"),
         ShortcutTool(ToolId.NFC_TRIGGER, ToolSection.AUTOMATION, "NFC trigger", "تشغيل عبر NFC"),
         ShortcutTool(ToolId.APP_OPEN_ROUTINE, ToolSection.AUTOMATION, "App usage time", "وقت استخدام التطبيقات"),
-        ShortcutTool(ToolId.MORNING_SLEEP, ToolSection.AUTOMATION, "Morning / sleep routine", "روتين الصباح / النوم"),
-        ShortcutTool(ToolId.CALENDAR_REMINDERS, ToolSection.AUTOMATION, "Calendar reminders", "تنبيهات التقويم"),
+        ShortcutTool(ToolId.MORNING_SLEEP, ToolSection.AUTOMATION, "Morning / sleep alarm setup", "إعداد منبه الصباح / النوم"),
+        ShortcutTool(ToolId.CALENDAR_REMINDERS, ToolSection.AUTOMATION, "Add calendar reminder", "إضافة تذكير للتقويم"),
     )
 }
