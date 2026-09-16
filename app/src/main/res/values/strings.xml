@@ -56,7 +56,16 @@
     <string name="repeat_weekly">Weekly</string>
     <string name="save">Save</string>
     <string name="cancel">Cancel</string>
+    <string name="back">Back</string>
+    <string name="delete_shortcut">Delete shortcut</string>
     <string name="no_apps_found">No launchable apps found</string>
     <string name="saved_shortcuts">Saved shortcuts</string>
     <string name="open_now_fallback">Android prevented automatic opening. Tap to open now.</string>
+    <string name="notification_permission">Notifications</string>
+    <string name="notification_permission_desc">Used to show an Open now button if Android prevents automatic app launch.</string>
+    <string name="exact_alarm_permission">Precise scheduling</string>
+    <string name="exact_alarm_permission_desc">Allows scheduled shortcuts to run as close as possible to the exact time you choose.</string>
+    <string name="permission_granted">Allowed</string>
+    <string name="permission_needed">Permission needed</string>
+    <string name="allow_permission">Allow</string>
 </resources>
