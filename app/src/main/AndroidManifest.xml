@@ -31,6 +31,10 @@
             android:exported="false" />
 
         <receiver
+            android:name=".scheduler.ScheduledMessageReceiver"
+            android:exported="false" />
+
+        <receiver
             android:name=".scheduler.RestoreSchedulesReceiver"
             android:enabled="true"
             android:exported="false">
