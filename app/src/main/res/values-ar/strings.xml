@@ -56,7 +56,16 @@
     <string name="repeat_weekly">أسبوعيًا</string>
     <string name="save">حفظ</string>
     <string name="cancel">إلغاء</string>
+    <string name="back">رجوع</string>
+    <string name="delete_shortcut">حذف الاختصار</string>
     <string name="no_apps_found">لم يتم العثور على تطبيقات قابلة للفتح</string>
     <string name="saved_shortcuts">الاختصارات المحفوظة</string>
     <string name="open_now_fallback">منع أندرويد الفتح التلقائي. اضغط لفتح التطبيق الآن.</string>
+    <string name="notification_permission">الإشعارات</string>
+    <string name="notification_permission_desc">تُستخدم لإظهار زر «فتح الآن» إذا منع أندرويد فتح التطبيق تلقائيًا.</string>
+    <string name="exact_alarm_permission">الجدولة الدقيقة</string>
+    <string name="exact_alarm_permission_desc">تسمح للاختصارات المجدولة بالعمل في أقرب وقت ممكن من الساعة التي اخترتها.</string>
+    <string name="permission_granted">مسموح</string>
+    <string name="permission_needed">تحتاج إلى صلاحية</string>
+    <string name="allow_permission">سماح</string>
 </resources>
