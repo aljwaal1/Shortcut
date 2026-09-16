@@ -1,9 +1,9 @@
 package com.explapp.shortcut.tools
 
 import android.app.Activity
-import android.app.AlertDialog
 import android.app.NotificationChannel
 import android.app.NotificationManager
+import android.app.PendingIntent
 import android.app.Service
 import android.content.BroadcastReceiver
 import android.content.ClipData
@@ -64,6 +64,8 @@ class ScreenCaptureActivity : AppCompatActivity() {
             .putExtra(ScreenCaptureService.EXTRA_RESULT_CODE, result.resultCode)
             .putExtra(ScreenCaptureService.EXTRA_DATA, data)
         ContextCompat.startForegroundService(this, service)
+        // Put Shortcut behind the previously used app before the service captures the frame.
+        moveTaskToBack(true)
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -109,14 +111,16 @@ class ScreenCaptureActivity : AppCompatActivity() {
     private fun ocr(file: File) {
         val bitmap = BitmapFactory.decodeFile(file.absolutePath)
         if (bitmap == null) {
-            file.delete(); finish(); return
+            file.delete()
+            finish()
+            return
         }
         TextRecognition.getClient(TextRecognizerOptions.DEFAULT_OPTIONS)
             .process(InputImage.fromBitmap(bitmap, 0))
             .addOnSuccessListener { result ->
                 bitmap.recycle()
                 file.delete()
-                showText(result.text)
+                deliverOcrText(result.text)
             }
             .addOnFailureListener {
                 bitmap.recycle()
@@ -126,25 +130,41 @@ class ScreenCaptureActivity : AppCompatActivity() {
             }
     }
 
-    private fun showText(text: String) {
+    private fun deliverOcrText(text: String) {
         val clipboard = getSystemService(ClipboardManager::class.java)
-        AlertDialog.Builder(this)
-            .setTitle(local("Screenshot text", "نص لقطة الشاشة"))
-            .setMessage(text.ifBlank { local("No text found", "لم يتم العثور على نص") })
-            .setPositiveButton(local("Copy", "نسخ")) { _, _ ->
-                clipboard.setPrimaryClip(ClipData.newPlainText("Shortcut OCR", text))
-                finish()
+        clipboard.setPrimaryClip(ClipData.newPlainText("Shortcut OCR", text))
+        Toast.makeText(
+            this,
+            if (text.isBlank()) local("No text found", "لم يتم العثور على نص") else local("Text copied to clipboard", "تم نسخ النص إلى الحافظة"),
+            Toast.LENGTH_LONG,
+        ).show()
+
+        if (text.isNotBlank()) {
+            val manager = getSystemService(NotificationManager::class.java)
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                manager.createNotificationChannel(
+                    NotificationChannel(OCR_CHANNEL, local("Screenshot OCR", "نص لقطة الشاشة"), NotificationManager.IMPORTANCE_DEFAULT),
+                )
             }
-            .setNeutralButton(local("Search", "بحث")) { _, _ ->
-                if (text.isNotBlank()) {
-                    val url = "https://www.google.com/search?q=${Uri.encode(text.take(500))}"
-                    runCatching { startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url))) }
-                }
-                finish()
-            }
-            .setNegativeButton(local("Close", "إغلاق")) { _, _ -> finish() }
-            .setOnCancelListener { finish() }
-            .show()
+            val searchUri = Uri.parse("https://www.google.com/search?q=${Uri.encode(text.take(500))}")
+            val searchIntent = Intent(Intent.ACTION_VIEW, searchUri)
+            val pending = PendingIntent.getActivity(
+                this,
+                8842,
+                searchIntent,
+                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
+            )
+            val notification = NotificationCompat.Builder(this, OCR_CHANNEL)
+                .setSmallIcon(android.R.drawable.ic_menu_search)
+                .setContentTitle(local("Screenshot text copied", "تم نسخ نص لقطة الشاشة"))
+                .setContentText(text.replace('\n', ' ').take(120))
+                .setContentIntent(pending)
+                .setAutoCancel(true)
+                .addAction(0, local("Search", "بحث"), pending)
+                .build()
+            manager.notify(8842, notification)
+        }
+        finish()
     }
 
     private fun local(en: String, ar: String): String =
@@ -152,6 +172,7 @@ class ScreenCaptureActivity : AppCompatActivity() {
 
     companion object {
         const val EXTRA_OCR = "ocr"
+        private const val OCR_CHANNEL = "screen_ocr"
     }
 }
 
@@ -193,7 +214,7 @@ class ScreenCaptureService : Service() {
             complete(null)
             return START_NOT_STICKY
         }
-        capture(resultCode, data)
+        Handler(Looper.getMainLooper()).postDelayed({ capture(resultCode, data) }, 650)
         return START_NOT_STICKY
     }
 
