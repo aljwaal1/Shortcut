@@ -31,6 +31,7 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateListOf
@@ -44,6 +45,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.core.os.LocaleListCompat
 import com.explapp.shortcut.R
+import com.explapp.shortcut.data.ShortcutStore
 import com.explapp.shortcut.domain.ScheduledAppShortcut
 import com.explapp.shortcut.scheduler.AndroidAlarmScheduler
 
@@ -60,12 +62,19 @@ private enum class MainTab(val label: Int, val icon: ImageVector) {
 @Composable
 fun ShortcutApp() {
     val context = LocalContext.current
+    val store = remember(context) { ShortcutStore(context.applicationContext) }
+    val scheduler = remember(context) { AndroidAlarmScheduler(context.applicationContext) }
+    val shortcuts = remember {
+        mutableStateListOf<ScheduledAppShortcut>().apply { addAll(store.load()) }
+    }
     var onboardingComplete by remember {
         mutableStateOf(context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).getBoolean(KEY_ONBOARDING, false))
     }
     var showBuilder by remember { mutableStateOf(false) }
-    val shortcuts = remember { mutableStateListOf<ScheduledAppShortcut>() }
-    val scheduler = remember(context) { AndroidAlarmScheduler(context.applicationContext) }
+
+    LaunchedEffect(Unit) {
+        shortcuts.forEach(scheduler::schedule)
+    }
 
     when {
         !onboardingComplete -> OnboardingScreen(
@@ -82,6 +91,7 @@ fun ShortcutApp() {
             onCancel = { showBuilder = false },
             onSave = { shortcut ->
                 shortcuts.add(shortcut)
+                store.save(shortcuts)
                 scheduler.schedule(shortcut)
                 showBuilder = false
             },
