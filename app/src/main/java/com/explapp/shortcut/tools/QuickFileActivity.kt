@@ -7,7 +7,6 @@ import android.net.Uri
 import android.os.Bundle
 import android.provider.OpenableColumns
 import android.widget.EditText
-import android.widget.Toast
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
 import com.google.zxing.BarcodeFormat
@@ -60,9 +59,10 @@ class QuickFileActivity : AppCompatActivity() {
                 check(bitmap.compress(Bitmap.CompressFormat.PNG, 100, out))
             }
             bitmap.recycle()
-        }.onSuccess { toast(local("QR code saved", "تم حفظ QR Code")) }
-            .onFailure(::showError)
-        finish()
+            output
+        }.onSuccess { output ->
+            ToolResultActions.show(this, listOf(output), ToolOutputResultPolicy.forTool(ToolId.QR_CREATE).mime)
+        }.onFailure(::showError)
     }
 
     private fun createZip(uris: List<Uri>) {
@@ -78,9 +78,10 @@ class QuickFileActivity : AppCompatActivity() {
             }
             val output = ToolOutputStore(this).create("Shortcut_${System.currentTimeMillis()}.zip", "application/zip", false)
             contentResolver.openOutputStream(output).use { out -> requireNotNull(out).write(bytes.toByteArray()) }
-        }.onSuccess { toast(local("ZIP saved", "تم حفظ ZIP")) }
-            .onFailure(::showError)
-        finish()
+            output
+        }.onSuccess { output ->
+            ToolResultActions.show(this, listOf(output), ToolOutputResultPolicy.forTool(ToolId.ZIP_FILES).mime)
+        }.onFailure(::showError)
     }
 
     private fun queryName(uri: Uri): String {
@@ -99,7 +100,6 @@ class QuickFileActivity : AppCompatActivity() {
             .show()
     }
 
-    private fun toast(text: String) = Toast.makeText(this, text, Toast.LENGTH_LONG).show()
     private fun local(en: String, ar: String): String = if (resources.configuration.locales[0].language == "ar") ar else en
 
     companion object { const val EXTRA_TOOL = "tool" }
