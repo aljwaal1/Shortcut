@@ -118,6 +118,7 @@ class BatterySetupActivity : AppCompatActivity() {
         store.direction = config.direction
         store.chargerNotifications = config.chargerNotifications
         store.previousLevel = currentBatteryLevel(this)
+        store.previousCharging = isDeviceCharging(this)
         store.enabled = true
         BatteryAutomationScheduler.schedule(this)
         Toast.makeText(this, local("Battery automation enabled", "تم تفعيل أتمتة البطارية"), Toast.LENGTH_SHORT).show()
