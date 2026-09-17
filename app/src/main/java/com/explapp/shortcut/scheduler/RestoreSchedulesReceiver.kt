@@ -12,15 +12,11 @@ class RestoreSchedulesReceiver : BroadcastReceiver() {
 
         val appContext = context.applicationContext
         val appScheduler = AndroidAlarmScheduler(appContext)
-        ShortcutStore(appContext)
-            .load()
-            .filter { it.isValid() }
+        RestorePolicy.shortcuts(ShortcutStore(appContext).load())
             .forEach(appScheduler::schedule)
 
         val messageScheduler = AndroidMessageScheduler(appContext)
-        MessageStore(appContext)
-            .load()
-            .filter { it.isValid() }
+        RestorePolicy.messages(MessageStore(appContext).load())
             .forEach(messageScheduler::schedule)
     }
 }
