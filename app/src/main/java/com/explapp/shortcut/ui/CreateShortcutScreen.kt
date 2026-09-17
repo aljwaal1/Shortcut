@@ -84,10 +84,12 @@ fun CreateShortcutScreen(
     var repeat by remember(initial?.id) { mutableStateOf(initial?.repeat ?: RepeatOption.ONCE) }
     var showAppPicker by remember { mutableStateOf(false) }
     var pendingSave by remember { mutableStateOf<ScheduledAppShortcut?>(null) }
+    var permissionError by remember { mutableStateOf(false) }
 
     fun finishPendingSave() {
         pendingSave?.let(onSave)
         pendingSave = null
+        permissionError = false
     }
 
     val exactAlarmLauncher = rememberLauncherForActivityResult(ActivityResultContracts.StartActivityForResult()) { finishPendingSave() }
@@ -99,7 +101,14 @@ fun CreateShortcutScreen(
         } else finishPendingSave()
     }
 
-    val notificationPermissionLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { requestExactAlarmOrSave() }
+    val notificationPermissionLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
+        if (granted) {
+            requestExactAlarmOrSave()
+        } else {
+            pendingSave = null
+            permissionError = true
+        }
+    }
 
     val model = ScheduledAppShortcut(
         id = stableId,
@@ -112,6 +121,7 @@ fun CreateShortcutScreen(
     )
 
     fun saveWithNeededPermissions() {
+        permissionError = false
         pendingSave = model
         val notificationsGranted = Build.VERSION.SDK_INT < 33 || ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) == PackageManager.PERMISSION_GRANTED
         val exactGranted = Build.VERSION.SDK_INT < Build.VERSION_CODES.S || alarmManager.canScheduleExactAlarms()
@@ -143,7 +153,7 @@ fun CreateShortcutScreen(
             }
         }
         item {
-            BuilderSectionCard(title = stringResource(R.string.time), subtitle = if (ar) "وقت تشغيل الاختصار" else "When the shortcut should run", accent = MaterialTheme.colorScheme.tertiary) {
+            BuilderSectionCard(title = stringResource(R.string.time), subtitle = if (ar) "وقت ظهور تنبيه فتح التطبيق" else "When the open-app notification should appear", accent = MaterialTheme.colorScheme.tertiary) {
                 Button(onClick = { TimePickerDialog(context, { _, h, m -> hour = h; minute = m }, hour, minute, true).show() }, modifier = Modifier.fillMaxWidth()) {
                     Text(String.format(Locale.getDefault(), "%02d:%02d", hour, minute), fontWeight = FontWeight.ExtraBold)
                 }
@@ -154,6 +164,25 @@ fun CreateShortcutScreen(
                 Column(verticalArrangement = Arrangement.spacedBy(7.dp)) {
                     RepeatOption.entries.forEach { option -> FilterChip(selected = repeat == option, onClick = { repeat = option }, label = { Text(repeatLabel(option)) }) }
                 }
+            }
+        }
+        item {
+            ElevatedCard(colors = CardDefaults.elevatedCardColors(containerColor = MaterialTheme.colorScheme.tertiaryContainer.copy(alpha = 0.55f)), elevation = CardDefaults.elevatedCardElevation(defaultElevation = 0.dp)) {
+                Text(
+                    if (ar) "عند الموعد يظهر إشعار موثوق. اضغط عليه لفتح التطبيق؛ أندرويد يقيّد فتح التطبيقات قسرًا من الخلفية." else "At the scheduled time Shortcut shows a reliable notification. Tap it to open the app; Android restricts forced background app launches.",
+                    modifier = Modifier.padding(15.dp),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+        }
+        if (permissionError) {
+            item {
+                Text(
+                    if (ar) "يلزم السماح بالإشعارات لحفظ هذه المهمة المجدولة." else "Notification permission is required to save this scheduled app task.",
+                    color = MaterialTheme.colorScheme.error,
+                    style = MaterialTheme.typography.bodySmall,
+                )
             }
         }
         item {
