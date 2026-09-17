@@ -25,19 +25,31 @@ class ScheduledAppLaunchReceiver : BroadcastReceiver() {
         val shortcut = StoredScheduleResolver.shortcut(payload.id, store.load()) ?: return
         val startedAt = System.currentTimeMillis()
 
-        val result = when {
-            context.packageManager.getLaunchIntentForPackage(shortcut.packageName) == null ->
-                TaskExecutionResult.failure(shortcut.name, "App not found", startedAt)
+        val launchIntent = context.packageManager.getLaunchIntentForPackage(shortcut.packageName)
+            ?.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
 
-            showOpenNowNotification(context, shortcut) ->
-                TaskExecutionResult.prepared(shortcut.name, startedAt)
+        var failureReason: String? = null
+        val launched = if (launchIntent != null) {
+            runCatching {
+                context.startActivity(launchIntent)
+                true
+            }.onFailure { failureReason = it.message ?: it.javaClass.simpleName }
+                .getOrDefault(false)
+        } else {
+            failureReason = "App not found"
+            false
+        }
 
-            else ->
-                TaskExecutionResult.failure(
-                    shortcut.name,
-                    "Notification permission is required for scheduled app launches",
-                    startedAt,
-                )
+        val result = if (launched) {
+            TaskExecutionResult.success(shortcut.name, startedAt)
+        } else if (showOpenNowNotification(context, shortcut)) {
+            TaskExecutionResult.prepared(shortcut.name, startedAt)
+        } else {
+            TaskExecutionResult.failure(
+                shortcut.name,
+                failureReason ?: "Could not open app and notification fallback is unavailable",
+                startedAt,
+            )
         }
         TaskExecutionReporter(context).report(result)
 
