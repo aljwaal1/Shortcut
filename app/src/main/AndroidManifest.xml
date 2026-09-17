@@ -84,6 +84,8 @@
         <activity android:name=".tools.MultiUrlPdfActivity" android:exported="false" />
         <activity android:name=".tools.ToolActivity" android:exported="false" />
         <activity android:name=".ui.MyAutomationsActivity" android:exported="false" />
+        <activity android:name=".ui.ScheduledTasksManagerActivity" android:exported="false" />
+        <activity android:name=".search.CommandPaletteActivity" android:exported="false" />
         <activity android:name=".backup.BackupTransferActivity" android:exported="false" />
 
         <activity android:name=".tools.NfcDispatchActivity" android:exported="true">
