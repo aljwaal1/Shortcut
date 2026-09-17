@@ -31,6 +31,8 @@ import com.explapp.shortcut.data.MessageStore
 import com.explapp.shortcut.data.ShortcutStore
 import com.explapp.shortcut.scheduler.AndroidAlarmScheduler
 import com.explapp.shortcut.scheduler.AndroidMessageScheduler
+import com.explapp.shortcut.tools.ToolId
+import com.explapp.shortcut.tools.ToolPreferencesStore
 import com.explapp.shortcut.ui.ShortcutTheme
 
 class BackupTransferActivity : AppCompatActivity() {
@@ -47,10 +49,13 @@ private fun BackupTransferScreen(onBack: () -> Unit) {
     var status by remember { mutableStateOf("") }
 
     fun write(uri: Uri) {
+        val toolPrefs = ToolPreferencesStore(context)
         val payload = BackupPayload(
             shortcuts = ShortcutStore(context).load(),
             messages = MessageStore(context).load(),
             routines = RoutineStore(context).load(),
+            favoriteToolIds = toolPrefs.favorites().map { it.name },
+            recentToolIds = toolPrefs.recents().map { it.name },
         )
         runCatching {
             context.contentResolver.openOutputStream(uri)?.bufferedWriter()?.use { it.write(BackupCodec.encode(payload)) }
@@ -68,6 +73,7 @@ private fun BackupTransferScreen(onBack: () -> Unit) {
             val shortcutStore = ShortcutStore(context)
             val messageStore = MessageStore(context)
             val routineStore = RoutineStore(context)
+            val toolPrefs = ToolPreferencesStore(context)
             val appScheduler = AndroidAlarmScheduler(context)
             val messageScheduler = AndroidMessageScheduler(context)
             val routineScheduler = RoutineScheduler(context)
@@ -84,10 +90,12 @@ private fun BackupTransferScreen(onBack: () -> Unit) {
             shortcutStore.save(payload.shortcuts)
             messageStore.save(payload.messages)
             routineStore.save(payload.routines)
+            toolPrefs.replaceFavorites(payload.favoriteToolIds.mapNotNull { runCatching { ToolId.valueOf(it) }.getOrNull() })
+            toolPrefs.replaceRecents(payload.recentToolIds.mapNotNull { runCatching { ToolId.valueOf(it) }.getOrNull() })
 
             payload.shortcuts.filter { it.isEnabled }.forEach(appScheduler::schedule)
             payload.messages.filter { it.isEnabled }.forEach(messageScheduler::schedule)
-            payload.routines.filter { it.isEnabled }.forEach(routineScheduler::schedule)
+            payload.routines.filter { it.isEnabled && it.isValid() }.forEach(routineScheduler::schedule)
             status = if (ar) "تم الاستيراد بنجاح" else "Backup imported"
         }.onFailure { status = it.message.orEmpty() }
     }
