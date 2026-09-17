@@ -20,8 +20,9 @@ import com.explapp.shortcut.execution.TaskExecutionResult
 
 class ScheduledAppLaunchReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent) {
-        val shortcut = intent.toShortcut() ?: return
-        if (!shortcut.isEnabled) return
+        val payload = intent.toShortcut() ?: return
+        val store = ShortcutStore(context)
+        val shortcut = StoredScheduleResolver.shortcut(payload.id, store.load()) ?: return
         val startedAt = System.currentTimeMillis()
         val launchIntent = context.packageManager.getLaunchIntentForPackage(shortcut.packageName)
             ?.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
@@ -46,7 +47,7 @@ class ScheduledAppLaunchReceiver : BroadcastReceiver() {
         if (!launched) showOpenNowNotification(context, shortcut)
 
         if (shortcut.repeat == RepeatOption.ONCE) {
-            ShortcutStore(context).removeById(shortcut.id)
+            store.removeById(shortcut.id)
         } else {
             AndroidAlarmScheduler(context).schedule(shortcut)
         }
