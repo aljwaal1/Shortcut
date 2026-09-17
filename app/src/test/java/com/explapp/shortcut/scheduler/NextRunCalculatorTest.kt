@@ -14,7 +14,13 @@ class NextRunCalculatorTest {
     @Test
     fun onceScheduleMovesToTomorrowWhenTimePassed() {
         val now = ZonedDateTime.of(2026, 9, 16, 9, 0, 0, 0, zone)
-        val shortcut = ScheduledAppShortcut("Maps", "pkg", 7, 30, RepeatOption.ONCE)
+        val shortcut = ScheduledAppShortcut(
+            name = "Maps",
+            packageName = "pkg",
+            hour = 7,
+            minute = 30,
+            repeat = RepeatOption.ONCE,
+        )
 
         val next = NextRunCalculator.nextRun(now, shortcut)
 
@@ -24,7 +30,13 @@ class NextRunCalculatorTest {
     @Test
     fun dailyScheduleMovesToTomorrowWhenTimePassed() {
         val now = ZonedDateTime.of(2026, 9, 16, 9, 0, 0, 0, zone)
-        val shortcut = ScheduledAppShortcut("Maps", "pkg", 7, 30, RepeatOption.DAILY)
+        val shortcut = ScheduledAppShortcut(
+            name = "Maps",
+            packageName = "pkg",
+            hour = 7,
+            minute = 30,
+            repeat = RepeatOption.DAILY,
+        )
 
         val next = NextRunCalculator.nextRun(now, shortcut)
 
@@ -34,7 +46,13 @@ class NextRunCalculatorTest {
     @Test
     fun weekdaysScheduleSkipsWeekend() {
         val friday = ZonedDateTime.of(2026, 9, 18, 20, 0, 0, 0, zone)
-        val shortcut = ScheduledAppShortcut("Maps", "pkg", 7, 30, RepeatOption.WEEKDAYS)
+        val shortcut = ScheduledAppShortcut(
+            name = "Maps",
+            packageName = "pkg",
+            hour = 7,
+            minute = 30,
+            repeat = RepeatOption.WEEKDAYS,
+        )
 
         val next = NextRunCalculator.nextRun(friday, shortcut)
 

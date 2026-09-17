@@ -5,7 +5,7 @@ import android.content.Intent
 import com.explapp.shortcut.automation.BatterySetupActivity
 import com.explapp.shortcut.automation.CarModeActivity
 import com.explapp.shortcut.automation.ParkedCarActivity
-import com.explapp.shortcut.usage.AppUsageActivity
+import com.explapp.shortcut.ui.MyAutomationsActivity
 
 object ToolRouter {
     fun intent(context: Context, tool: ToolId): Intent = when (tool) {
@@ -13,7 +13,7 @@ object ToolRouter {
         ToolId.PARKED_CAR -> Intent(context, ParkedCarActivity::class.java)
         ToolId.BATTERY_CHARGER -> Intent(context, BatterySetupActivity::class.java)
         ToolId.NFC_TRIGGER -> Intent(context, NfcSetupActivity::class.java)
-        ToolId.APP_OPEN_ROUTINE -> Intent(context, AppUsageActivity::class.java)
+        ToolId.APP_OPEN_ROUTINE -> Intent(context, MyAutomationsActivity::class.java)
         ToolId.MERGE_IMAGES,
         ToolId.IMAGES_TO_PDF,
         ToolId.GIF_CREATE,

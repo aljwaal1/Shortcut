@@ -61,6 +61,7 @@ import com.explapp.shortcut.domain.ScheduledAppShortcut
 import com.explapp.shortcut.permissions.SchedulingPermissionPlan
 import com.explapp.shortcut.permissions.SchedulingPermissionStep
 import java.util.Locale
+import java.util.UUID
 
 @Composable
 fun CreateShortcutScreen(
@@ -72,6 +73,7 @@ fun CreateShortcutScreen(
     val ar = LocalConfiguration.current.locales[0].language == "ar"
     val apps = remember { InstalledAppRepository(context).loadLaunchableApps() }
     val alarmManager = remember(context) { context.getSystemService(AlarmManager::class.java) }
+    val stableId = remember(initial?.id) { initial?.id ?: UUID.randomUUID().toString() }
 
     var name by remember(initial?.id) { mutableStateOf(initial?.name.orEmpty()) }
     var selectedApp by remember(initial?.id, apps) {
@@ -100,7 +102,7 @@ fun CreateShortcutScreen(
     val notificationPermissionLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { requestExactAlarmOrSave() }
 
     val model = ScheduledAppShortcut(
-        id = initial?.id ?: java.util.UUID.randomUUID().toString(),
+        id = stableId,
         name = name.ifBlank { selectedApp?.label.orEmpty() },
         packageName = selectedApp?.packageName.orEmpty(),
         hour = hour,

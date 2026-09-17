@@ -12,10 +12,24 @@ import org.junit.Test
 class BackupCodecTest {
     private val sample = BackupPayload(
         shortcuts = listOf(
-            ScheduledAppShortcut("Work", "com.example.work", 8, 30, RepeatOption.WEEKDAYS),
+            ScheduledAppShortcut(
+                name = "Work",
+                packageName = "com.example.work",
+                hour = 8,
+                minute = 30,
+                repeat = RepeatOption.WEEKDAYS,
+            ),
         ),
         messages = listOf(
-            ScheduledMessage("Morning", MessagePlatform.WHATSAPP, "+962700000000", "Good morning", 9, 0, RepeatOption.DAILY),
+            ScheduledMessage(
+                name = "Morning",
+                platform = MessagePlatform.WHATSAPP,
+                recipient = "+962700000000",
+                message = "Good morning",
+                hour = 9,
+                minute = 0,
+                repeat = RepeatOption.DAILY,
+            ),
         ),
         unlockWifiMapsEnabled = true,
     )
