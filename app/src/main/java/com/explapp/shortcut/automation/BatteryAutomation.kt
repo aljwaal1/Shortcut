@@ -18,6 +18,7 @@ private const val KEY_THRESHOLD = "threshold"
 private const val KEY_DIRECTION = "direction"
 private const val KEY_PREVIOUS = "previous"
 private const val KEY_CHARGER = "charger"
+private const val KEY_PREVIOUS_CHARGING = "previous_charging"
 private const val ACTION_CHECK = "com.explapp.shortcut.BATTERY_CHECK"
 private const val CHANNEL = "battery_automation"
 
@@ -44,6 +45,13 @@ class BatteryAutomationStore(private val context: Context) {
     var previousLevel: Int
         get() = prefs.getInt(KEY_PREVIOUS, -1)
         set(value) = prefs.edit().putInt(KEY_PREVIOUS, value).apply()
+
+    var previousCharging: Boolean?
+        get() = if (prefs.contains(KEY_PREVIOUS_CHARGING)) prefs.getBoolean(KEY_PREVIOUS_CHARGING, false) else null
+        set(value) {
+            if (value == null) prefs.edit().remove(KEY_PREVIOUS_CHARGING).apply()
+            else prefs.edit().putBoolean(KEY_PREVIOUS_CHARGING, value).apply()
+        }
 }
 
 object BatteryAutomationScheduler {
@@ -81,6 +89,7 @@ class BatteryCheckReceiver : BroadcastReceiver() {
         if (intent.action != ACTION_CHECK) return
         val store = BatteryAutomationStore(context)
         if (!store.enabled) return
+
         val current = currentBatteryLevel(context)
         val previous = store.previousLevel
         if (previous >= 0 && BatteryRule(store.threshold, store.direction).crossed(previous, current)) {
@@ -88,6 +97,15 @@ class BatteryCheckReceiver : BroadcastReceiver() {
             notify(context, "Battery $symbol ${store.threshold}%", "Battery is now $current%")
         }
         store.previousLevel = current
+
+        val charging = isDeviceCharging(context)
+        val previousCharging = store.previousCharging
+        if (store.chargerNotifications && previousCharging != null && previousCharging != charging) {
+            if (charging) notify(context, "Charger connected", "Charging started")
+            else notify(context, "Charger disconnected", "Charging stopped")
+        }
+        store.previousCharging = charging
+
         BatteryAutomationScheduler.schedule(context)
     }
 }
@@ -99,17 +117,8 @@ class ChargerEventReceiver : BroadcastReceiver() {
             Intent.ACTION_BOOT_COMPLETED, Intent.ACTION_MY_PACKAGE_REPLACED -> {
                 if (!store.enabled) return
                 store.previousLevel = currentBatteryLevel(context)
+                store.previousCharging = isDeviceCharging(context)
                 BatteryAutomationScheduler.schedule(context)
-            }
-            Intent.ACTION_POWER_CONNECTED -> {
-                if (store.enabled && store.chargerNotifications) {
-                    notify(context, "Charger connected", "Charging started")
-                }
-            }
-            Intent.ACTION_POWER_DISCONNECTED -> {
-                if (store.enabled && store.chargerNotifications) {
-                    notify(context, "Charger disconnected", "Charging stopped")
-                }
             }
         }
     }
@@ -122,6 +131,12 @@ fun currentBatteryLevel(context: Context): Int {
     return if (level >= 0 && scale > 0) (level * 100 / scale) else {
         context.getSystemService(BatteryManager::class.java).getIntProperty(BatteryManager.BATTERY_PROPERTY_CAPACITY)
     }.coerceIn(0, 100)
+}
+
+fun isDeviceCharging(context: Context): Boolean {
+    val status = context.registerReceiver(null, IntentFilter(Intent.ACTION_BATTERY_CHANGED))
+    val value = status?.getIntExtra(BatteryManager.EXTRA_STATUS, -1) ?: -1
+    return value == BatteryManager.BATTERY_STATUS_CHARGING || value == BatteryManager.BATTERY_STATUS_FULL
 }
 
 private fun notify(context: Context, title: String, text: String) {
