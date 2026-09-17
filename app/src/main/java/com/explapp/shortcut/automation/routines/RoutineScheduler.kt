@@ -25,7 +25,7 @@ private class BatteryThresholdState(context: Context) {
 
 class RoutineScheduler(private val context: Context) {
     fun schedule(routine: AutomationRoutine) {
-        if (!routine.isEnabled) return
+        if (!routine.isEnabled || !routine.isValid()) return
         when (routine.trigger.type) {
             RoutineTriggerType.TIME -> scheduleTime(routine)
             RoutineTriggerType.BATTERY_BELOW -> scheduleBattery(routine)
@@ -96,7 +96,7 @@ class RoutineScheduler(private val context: Context) {
 class RoutineAlarmReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent) {
         val id = intent.getStringExtra(RoutineScheduler.EXTRA_ID) ?: return
-        val routine = RoutineStore(context).load().firstOrNull { it.id == id && it.isEnabled } ?: return
+        val routine = RoutineStore(context).load().firstOrNull { it.id == id && it.isEnabled && it.isValid() } ?: return
         RoutineDispatcher(context).execute(routine, userInitiated = false)
         RoutineScheduler(context).schedule(routine)
     }
@@ -105,7 +105,7 @@ class RoutineAlarmReceiver : BroadcastReceiver() {
 class RoutineBatteryReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent) {
         val id = intent.getStringExtra(RoutineScheduler.EXTRA_ID) ?: return
-        val routine = RoutineStore(context).load().firstOrNull { it.id == id && it.isEnabled } ?: return
+        val routine = RoutineStore(context).load().firstOrNull { it.id == id && it.isEnabled && it.isValid() } ?: return
         val threshold = routine.trigger.value.toIntOrNull() ?: return
         val level = currentBatteryLevel(context)
         val state = BatteryThresholdState(context)
@@ -135,6 +135,6 @@ class RoutineSystemEventReceiver : BroadcastReceiver() {
 
     private fun reschedule(context: Context) {
         val scheduler = RoutineScheduler(context)
-        RoutineStore(context).load().filter { it.isEnabled }.forEach(scheduler::schedule)
+        RoutineStore(context).load().filter { it.isEnabled && it.isValid() }.forEach(scheduler::schedule)
     }
 }
