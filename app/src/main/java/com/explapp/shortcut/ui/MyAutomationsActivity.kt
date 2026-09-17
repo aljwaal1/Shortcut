@@ -1,8 +1,16 @@
 package com.explapp.shortcut.ui
 
+import android.Manifest
+import android.app.AlarmManager
 import android.content.Intent
+import android.content.pm.PackageManager
+import android.net.Uri
+import android.os.Build
 import android.os.Bundle
+import android.provider.Settings
+import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -33,10 +41,12 @@ import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.core.content.ContextCompat
 import com.explapp.shortcut.automation.routines.AutomationRoutine
 import com.explapp.shortcut.automation.routines.RoutineAction
 import com.explapp.shortcut.automation.routines.RoutineActionType
 import com.explapp.shortcut.automation.routines.RoutineDispatcher
+import com.explapp.shortcut.automation.routines.RoutinePermissionPolicy
 import com.explapp.shortcut.automation.routines.RoutineScheduler
 import com.explapp.shortcut.automation.routines.RoutineStore
 import com.explapp.shortcut.automation.routines.RoutineTemplateCatalog
@@ -88,7 +98,7 @@ private fun MyAutomationsScreen(onBack: () -> Unit) {
         )
         showTemplates -> RoutineTemplatesScreen(
             onBack = { showTemplates = false },
-            onUse = { template -> upsert(template.duplicate()); showTemplates = false },
+            onUse = { template -> editing = template.duplicate(); showTemplates = false },
         )
         else -> LazyColumn(
             modifier = Modifier.fillMaxSize(),
@@ -174,7 +184,9 @@ private fun RoutineBuilderScreen(
     onCancel: () -> Unit,
     onSave: (AutomationRoutine) -> Unit,
 ) {
+    val context = LocalContext.current
     val ar = LocalConfiguration.current.locales[0].language == "ar"
+    val alarmManager = remember(context) { context.getSystemService(AlarmManager::class.java) }
     val stableId = remember(initial?.id) { initial?.id ?: java.util.UUID.randomUUID().toString() }
     var name by remember(initial?.id) { mutableStateOf(initial?.name.orEmpty()) }
     var triggerType by remember(initial?.id) { mutableStateOf(initial?.trigger?.type ?: RoutineTriggerType.MANUAL) }
@@ -183,6 +195,41 @@ private fun RoutineBuilderScreen(
     var actionType by remember { mutableStateOf(RoutineActionType.OPEN_APP) }
     var value by remember { mutableStateOf("") }
     var secondary by remember { mutableStateOf("") }
+    var pendingRoutine by remember { mutableStateOf<AutomationRoutine?>(null) }
+    var permissionError by remember { mutableStateOf(false) }
+
+    fun finishPendingSave() { pendingRoutine?.let(onSave); pendingRoutine = null; permissionError = false }
+    val exactAlarmLauncher = rememberLauncherForActivityResult(ActivityResultContracts.StartActivityForResult()) { finishPendingSave() }
+    fun requestExactAlarmOrSave() {
+        val routine = pendingRoutine ?: return
+        val exactNeeded = RoutinePermissionPolicy.needsExactAlarm(routine.trigger.type)
+        val exactGranted = Build.VERSION.SDK_INT < Build.VERSION_CODES.S || alarmManager.canScheduleExactAlarms()
+        if (exactNeeded && !exactGranted && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            exactAlarmLauncher.launch(Intent(Settings.ACTION_REQUEST_SCHEDULE_EXACT_ALARM, Uri.parse("package:${context.packageName}")))
+        } else {
+            finishPendingSave()
+        }
+    }
+    val notificationPermissionLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
+        if (granted) {
+            requestExactAlarmOrSave()
+        } else {
+            pendingRoutine = null
+            permissionError = true
+        }
+    }
+
+    fun saveWithNeededPermissions(routine: AutomationRoutine) {
+        pendingRoutine = routine
+        permissionError = false
+        val notificationsNeeded = RoutinePermissionPolicy.needsNotifications(routine.trigger.type, routine.actions)
+        val notificationsGranted = Build.VERSION.SDK_INT < 33 || ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) == PackageManager.PERMISSION_GRANTED
+        if (notificationsNeeded && !notificationsGranted && Build.VERSION.SDK_INT >= 33) {
+            notificationPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
+        } else {
+            requestExactAlarmOrSave()
+        }
+    }
 
     LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(18.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
         item { Text(if (ar) "منشئ الأتمتة" else "Automation Builder", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.ExtraBold) }
@@ -232,9 +279,16 @@ private fun RoutineBuilderScreen(
                 trigger = RoutineTrigger(triggerType, triggerValue),
                 actions = actions.toList(),
             )
+            if (permissionError) {
+                Text(
+                    if (ar) "يلزم السماح بالإشعارات لهذا النوع من الأتمتة حتى يتمكن Shortcut من تنبيهك بدل محاولة فتح تطبيق من الخلفية." else "Notification permission is required for this automation so Shortcut can notify you instead of attempting to force an app open from the background.",
+                    color = MaterialTheme.colorScheme.error,
+                    style = MaterialTheme.typography.bodySmall,
+                )
+            }
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 TextButton(onClick = onCancel, modifier = Modifier.weight(1f)) { Text(if (ar) "إلغاء" else "Cancel") }
-                Button(onClick = { onSave(routine) }, enabled = routine.isValid(), modifier = Modifier.weight(1f)) { Text(if (ar) "حفظ" else "Save") }
+                Button(onClick = { saveWithNeededPermissions(routine) }, enabled = routine.isValid(), modifier = Modifier.weight(1f)) { Text(if (ar) "حفظ" else "Save") }
             }
         }
     }
