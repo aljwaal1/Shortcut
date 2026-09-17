@@ -33,7 +33,7 @@ class RoutineScheduler(private val context: Context) {
         val now = ZonedDateTime.now()
         var at = now.withHour(hour).withMinute(minute).withSecond(0).withNano(0)
         if (!at.isAfter(now)) at = at.plusDays(1)
-        val pending = timePending(routine.id, PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
+        val pending = timePending(routine.id, PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE) ?: return
         val alarm = context.getSystemService(AlarmManager::class.java)
         val millis = at.toInstant().toEpochMilli()
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.S || alarm.canScheduleExactAlarms()) {
@@ -46,7 +46,7 @@ class RoutineScheduler(private val context: Context) {
     private fun scheduleBattery(routine: AutomationRoutine) {
         val threshold = routine.trigger.value.toIntOrNull() ?: return
         if (threshold !in 1..100) return
-        val pending = batteryPending(routine.id, PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
+        val pending = batteryPending(routine.id, PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE) ?: return
         context.getSystemService(AlarmManager::class.java).setAndAllowWhileIdle(
             AlarmManager.ELAPSED_REALTIME_WAKEUP,
             SystemClock.elapsedRealtime() + BATTERY_INTERVAL_MS,
