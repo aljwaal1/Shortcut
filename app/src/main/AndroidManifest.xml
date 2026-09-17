@@ -52,18 +52,14 @@
         <receiver android:name=".automation.BatteryCheckReceiver" android:exported="false" />
         <receiver android:name=".automation.ChargerEventReceiver" android:enabled="true" android:exported="false">
             <intent-filter>
-                <action android:name="android.intent.action.ACTION_POWER_CONNECTED" />
-                <action android:name="android.intent.action.ACTION_POWER_DISCONNECTED" />
                 <action android:name="android.intent.action.BOOT_COMPLETED" />
                 <action android:name="android.intent.action.MY_PACKAGE_REPLACED" />
             </intent-filter>
         </receiver>
         <receiver android:name=".automation.routines.RoutineAlarmReceiver" android:exported="false" />
-        <receiver android:name=".automation.routines.RoutineBatteryReceiver" android:exported="false" />
+        <receiver android:name=".automation.routines.RoutineStateReceiver" android:exported="false" />
         <receiver android:name=".automation.routines.RoutineSystemEventReceiver" android:enabled="true" android:exported="false">
             <intent-filter>
-                <action android:name="android.intent.action.ACTION_POWER_CONNECTED" />
-                <action android:name="android.intent.action.ACTION_POWER_DISCONNECTED" />
                 <action android:name="android.intent.action.BOOT_COMPLETED" />
                 <action android:name="android.intent.action.MY_PACKAGE_REPLACED" />
             </intent-filter>
