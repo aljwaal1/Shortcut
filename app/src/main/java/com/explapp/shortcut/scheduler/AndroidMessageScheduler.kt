@@ -11,11 +11,12 @@ class AndroidMessageScheduler(
     private val context: Context,
 ) {
     fun schedule(message: ScheduledMessage) {
+        if (!message.isEnabled || !message.isValid()) return
         val alarmManager = context.getSystemService(AlarmManager::class.java)
         val triggerAt = NextRunCalculator.nextRun(ZonedDateTime.now(), message)
         val pendingIntent = PendingIntent.getBroadcast(
             context,
-            requestCode(message),
+            SchedulerIdentity.requestCode(message.id),
             ScheduledMessageReceiver.intent(context, message),
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
         )
@@ -38,19 +39,16 @@ class AndroidMessageScheduler(
         }
     }
 
-    fun cancel(message: ScheduledMessage) {
+    fun cancel(message: ScheduledMessage) = cancelById(message.id)
+
+    fun cancelById(id: String) {
         val existing = PendingIntent.getBroadcast(
             context,
-            requestCode(message),
-            ScheduledMessageReceiver.intent(context, message),
+            SchedulerIdentity.requestCode(id),
+            ScheduledMessageReceiver.identityIntent(context, id),
             PendingIntent.FLAG_NO_CREATE or PendingIntent.FLAG_IMMUTABLE,
         ) ?: return
         context.getSystemService(AlarmManager::class.java).cancel(existing)
         existing.cancel()
     }
-
-    private fun requestCode(message: ScheduledMessage): Int =
-        listOf(message.platform.name, message.recipient, message.hour, message.minute, message.name)
-            .joinToString("|")
-            .hashCode()
 }
