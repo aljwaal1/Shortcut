@@ -5,6 +5,7 @@ import android.content.Intent
 import android.content.pm.ShortcutInfo
 import android.content.pm.ShortcutManager
 import android.graphics.drawable.Icon
+import com.explapp.shortcut.search.CommandPaletteActivity
 import com.explapp.shortcut.tools.QuickFileActivity
 import com.explapp.shortcut.ui.MyAutomationsActivity
 import com.explapp.shortcut.usage.AppUsageActivity
@@ -17,6 +18,11 @@ object DynamicShortcutPublisher {
                 .setShortLabel("New automation")
                 .setIcon(Icon.createWithResource(context, android.R.drawable.ic_input_add))
                 .setIntent(Intent(context, MyAutomationsActivity::class.java).setAction(Intent.ACTION_VIEW))
+                .build(),
+            ShortcutInfo.Builder(context, "command_search")
+                .setShortLabel("Search")
+                .setIcon(Icon.createWithResource(context, android.R.drawable.ic_menu_search))
+                .setIntent(Intent(context, CommandPaletteActivity::class.java).setAction(Intent.ACTION_VIEW))
                 .build(),
             ShortcutInfo.Builder(context, "app_usage")
                 .setShortLabel("App usage")
