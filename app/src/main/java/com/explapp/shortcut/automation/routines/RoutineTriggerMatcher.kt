@@ -7,7 +7,7 @@ data class RoutineEvent(
 
 object RoutineTriggerMatcher {
     fun matches(routine: AutomationRoutine, event: RoutineEvent): Boolean =
-        routine.isEnabled && matches(routine.trigger, event)
+        routine.isEnabled && routine.isValid() && matches(routine.trigger, event)
 
     fun matches(trigger: RoutineTrigger, event: RoutineEvent): Boolean {
         if (trigger.type != event.type) return false
