@@ -7,12 +7,18 @@ object ScheduledEntityCollection {
     fun upsertShortcut(
         items: List<ScheduledAppShortcut>,
         item: ScheduledAppShortcut,
-    ): List<ScheduledAppShortcut> = upsert(items, item.id) { it.id }
+    ): List<ScheduledAppShortcut> = upsert(items, item) { it.id }
 
     fun upsertMessage(
         items: List<ScheduledMessage>,
         item: ScheduledMessage,
-    ): List<ScheduledMessage> = upsert(items, item.id) { it.id }
+    ): List<ScheduledMessage> = upsert(items, item) { it.id }
+
+    fun removeShortcut(items: List<ScheduledAppShortcut>, id: String): List<ScheduledAppShortcut> =
+        items.filterNot { it.id == id }
+
+    fun removeMessage(items: List<ScheduledMessage>, id: String): List<ScheduledMessage> =
+        items.filterNot { it.id == id }
 
     private fun <T> upsert(items: List<T>, replacement: T, idOf: (T) -> String): List<T> {
         val id = idOf(replacement)
@@ -20,7 +26,4 @@ object ScheduledEntityCollection {
         if (index == -1) return items + replacement
         return items.toMutableList().apply { this[index] = replacement }
     }
-
-    private fun <T> upsert(items: List<T>, id: String, idOf: (T) -> String): List<T> =
-        error("Use typed overload")
 }
