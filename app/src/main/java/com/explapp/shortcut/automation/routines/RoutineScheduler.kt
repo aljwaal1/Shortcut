@@ -5,11 +5,10 @@ import android.app.PendingIntent
 import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
-import android.content.IntentFilter
-import android.os.BatteryManager
 import android.os.Build
 import android.os.SystemClock
 import com.explapp.shortcut.automation.currentBatteryLevel
+import com.explapp.shortcut.automation.isDeviceCharging
 import java.time.ZonedDateTime
 
 object RoutineRequestCode {
@@ -148,13 +147,8 @@ class RoutineStateReceiver : BroadcastReceiver() {
             -> {
                 val connected = isDeviceCharging(context)
                 val previous = state.chargerState(id)
-                if (previous != null && previous != connected) {
-                    val shouldFire = when (routine.trigger.type) {
-                        RoutineTriggerType.CHARGER_CONNECTED -> connected
-                        RoutineTriggerType.CHARGER_DISCONNECTED -> !connected
-                        else -> false
-                    }
-                    if (shouldFire) RoutineDispatcher(context).execute(routine, userInitiated = false)
+                if (ChargerEdge.shouldFire(routine.trigger.type, previous, connected)) {
+                    RoutineDispatcher(context).execute(routine, userInitiated = false)
                 }
                 state.setChargerState(id, connected)
             }
@@ -182,10 +176,4 @@ class RoutineSystemEventReceiver : BroadcastReceiver() {
         val scheduler = RoutineScheduler(context)
         RoutineStore(context).load().filter { it.isEnabled && it.isValid() }.forEach(scheduler::schedule)
     }
-}
-
-private fun isDeviceCharging(context: Context): Boolean {
-    val status = context.registerReceiver(null, IntentFilter(Intent.ACTION_BATTERY_CHANGED))
-    val value = status?.getIntExtra(BatteryManager.EXTRA_STATUS, -1) ?: -1
-    return value == BatteryManager.BATTERY_STATUS_CHARGING || value == BatteryManager.BATTERY_STATUS_FULL
 }
