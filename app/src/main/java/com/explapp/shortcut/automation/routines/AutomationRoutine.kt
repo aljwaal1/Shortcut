@@ -25,14 +25,32 @@ enum class RoutineActionType {
 data class RoutineTrigger(
     val type: RoutineTriggerType,
     val value: String = "",
-)
+) {
+    fun isValid(): Boolean = when (type) {
+        RoutineTriggerType.TIME -> {
+            val parts = value.split(':')
+            val hour = parts.getOrNull(0)?.toIntOrNull()
+            val minute = parts.getOrNull(1)?.toIntOrNull()
+            parts.size == 2 && hour in 0..23 && minute in 0..59
+        }
+        RoutineTriggerType.BATTERY_BELOW -> value.toIntOrNull() in 1..100
+        else -> true
+    }
+}
 
 data class RoutineAction(
     val type: RoutineActionType,
     val value: String,
     val secondaryValue: String = "",
     val continueOnError: Boolean = false,
-)
+) {
+    fun isValid(): Boolean = when (type) {
+        RoutineActionType.PREPARE_WHATSAPP,
+        RoutineActionType.PREPARE_TELEGRAM,
+        -> value.isNotBlank() && secondaryValue.isNotBlank()
+        else -> value.isNotBlank()
+    }
+}
 
 data class AutomationRoutine(
     val id: String = UUID.randomUUID().toString(),
@@ -42,7 +60,12 @@ data class AutomationRoutine(
     val actions: List<RoutineAction>,
     val updatedAtMs: Long = System.currentTimeMillis(),
 ) {
-    fun isValid(): Boolean = id.isNotBlank() && name.isNotBlank() && actions.isNotEmpty()
+    fun isValid(): Boolean =
+        id.isNotBlank() &&
+            name.isNotBlank() &&
+            trigger.isValid() &&
+            actions.isNotEmpty() &&
+            actions.all(RoutineAction::isValid)
 
     fun duplicate(newId: String = UUID.randomUUID().toString()): AutomationRoutine =
         copy(id = newId, isEnabled = true, updatedAtMs = System.currentTimeMillis())
