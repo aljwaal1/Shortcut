@@ -44,7 +44,8 @@ class RoutineScheduler(private val context: Context) {
     }
 
     private fun scheduleBattery(routine: AutomationRoutine) {
-        if (routine.trigger.value.toIntOrNull() !in 1..100) return
+        val threshold = routine.trigger.value.toIntOrNull() ?: return
+        if (threshold !in 1..100) return
         val pending = batteryPending(routine.id, PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
         context.getSystemService(AlarmManager::class.java).setAndAllowWhileIdle(
             AlarmManager.ELAPSED_REALTIME_WAKEUP,
