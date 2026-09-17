@@ -69,6 +69,7 @@ fun ExecutionHistoryScreen(padding: PaddingValues) {
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 FilterChip(selected = filter == null, onClick = { filter = null }, label = { Text(if (ar) "الكل" else "All") })
                 FilterChip(selected = filter == TaskExecutionStatus.SUCCESS, onClick = { filter = TaskExecutionStatus.SUCCESS }, label = { Text(if (ar) "ناجح" else "Success") })
+                FilterChip(selected = filter == TaskExecutionStatus.PREPARED, onClick = { filter = TaskExecutionStatus.PREPARED }, label = { Text(if (ar) "جاهزة" else "Prepared") })
                 FilterChip(selected = filter == TaskExecutionStatus.FAILURE, onClick = { filter = TaskExecutionStatus.FAILURE }, label = { Text(if (ar) "فاشل" else "Failure") })
             }
         }
@@ -84,8 +85,11 @@ fun ExecutionHistoryScreen(padding: PaddingValues) {
             }
         }
         items(records, key = { "${it.finishedAtMs}-${it.taskName}-${it.status}" }) { result ->
-            val success = result.status == TaskExecutionStatus.SUCCESS
-            val accent = if (success) Color(0xFF1B9C68) else MaterialTheme.colorScheme.error
+            val (accent, prefix) = when (result.status) {
+                TaskExecutionStatus.SUCCESS -> Color(0xFF1B9C68) to "✅ "
+                TaskExecutionStatus.PREPARED -> MaterialTheme.colorScheme.tertiary to "📨 "
+                TaskExecutionStatus.FAILURE -> MaterialTheme.colorScheme.error to "❌ "
+            }
             ElevatedCard(
                 modifier = Modifier.fillMaxWidth(),
                 colors = CardDefaults.elevatedCardColors(containerColor = accent.copy(alpha = 0.08f)),
@@ -93,7 +97,7 @@ fun ExecutionHistoryScreen(padding: PaddingValues) {
                 Column(Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(5.dp)) {
                     Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
                         Text(
-                            (if (success) "✅ " else "❌ ") + result.taskName,
+                            prefix + result.taskName,
                             style = MaterialTheme.typography.titleMedium,
                             fontWeight = FontWeight.Bold,
                             modifier = Modifier.weight(1f),
@@ -102,6 +106,13 @@ fun ExecutionHistoryScreen(padding: PaddingValues) {
                             durationLabel(result.durationMs, ar),
                             style = MaterialTheme.typography.labelLarge,
                             color = accent,
+                        )
+                    }
+                    if (result.status == TaskExecutionStatus.PREPARED) {
+                        Text(
+                            if (ar) "تم تجهيز الرسالة؛ لم يتم تسجيلها كمرسلة." else "Message prepared; it was not recorded as sent.",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
                     }
                     result.reason?.takeIf { it.isNotBlank() }?.let {
