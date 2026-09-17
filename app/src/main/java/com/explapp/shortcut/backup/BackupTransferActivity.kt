@@ -65,14 +65,28 @@ private fun BackupTransferScreen(onBack: () -> Unit) {
                 ?: error("Cannot open backup")
             BackupCodec.decode(raw).getOrThrow()
         }.onSuccess { payload ->
-            ShortcutStore(context).save(payload.shortcuts)
-            MessageStore(context).save(payload.messages)
-            RoutineStore(context).save(payload.routines)
+            val shortcutStore = ShortcutStore(context)
+            val messageStore = MessageStore(context)
+            val routineStore = RoutineStore(context)
             val appScheduler = AndroidAlarmScheduler(context)
-            payload.shortcuts.filter { it.isEnabled }.forEach(appScheduler::schedule)
             val messageScheduler = AndroidMessageScheduler(context)
-            payload.messages.filter { it.isEnabled }.forEach(messageScheduler::schedule)
             val routineScheduler = RoutineScheduler(context)
+
+            val cancellation = RestoreCancellationPlan.from(
+                shortcutIds = shortcutStore.load().map { it.id },
+                messageIds = messageStore.load().map { it.id },
+                routineIds = routineStore.load().map { it.id },
+            )
+            cancellation.shortcutIds.forEach(appScheduler::cancelById)
+            cancellation.messageIds.forEach(messageScheduler::cancelById)
+            cancellation.routineIds.forEach(routineScheduler::cancel)
+
+            shortcutStore.save(payload.shortcuts)
+            messageStore.save(payload.messages)
+            routineStore.save(payload.routines)
+
+            payload.shortcuts.filter { it.isEnabled }.forEach(appScheduler::schedule)
+            payload.messages.filter { it.isEnabled }.forEach(messageScheduler::schedule)
             payload.routines.filter { it.isEnabled }.forEach(routineScheduler::schedule)
             status = if (ar) "تم الاستيراد بنجاح" else "Backup imported"
         }.onFailure { status = it.message.orEmpty() }
