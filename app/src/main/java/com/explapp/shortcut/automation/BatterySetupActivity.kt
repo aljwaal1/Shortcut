@@ -1,6 +1,9 @@
 package com.explapp.shortcut.automation
 
+import android.Manifest
 import android.app.AlertDialog
+import android.content.pm.PackageManager
+import android.os.Build
 import android.os.Bundle
 import android.text.InputType
 import android.view.ViewGroup
@@ -11,9 +14,34 @@ import android.widget.RadioButton
 import android.widget.RadioGroup
 import android.widget.TextView
 import android.widget.Toast
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
+import androidx.core.content.ContextCompat
 
 class BatterySetupActivity : AppCompatActivity() {
+    private data class PendingConfig(
+        val threshold: Int,
+        val direction: BatteryDirection,
+        val chargerNotifications: Boolean,
+    )
+
+    private var pendingConfig: PendingConfig? = null
+
+    private val notificationPermissionLauncher = registerForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
+        val config = pendingConfig
+        pendingConfig = null
+        if (granted && config != null) {
+            enableAutomation(config)
+        } else {
+            Toast.makeText(
+                this,
+                local("Notification permission is required for battery automation", "يلزم السماح بالإشعارات لتفعيل أتمتة البطارية"),
+                Toast.LENGTH_LONG,
+            ).show()
+            finish()
+        }
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         showSetup()
@@ -59,15 +87,19 @@ class BatterySetupActivity : AppCompatActivity() {
             .setTitle(local("Battery automation", "أتمتة البطارية"))
             .setView(container)
             .setPositiveButton(local("Enable", "تفعيل")) { _, _ ->
-                val value = threshold.text.toString().toIntOrNull()?.coerceIn(1, 100) ?: 20
-                store.threshold = value
-                store.direction = if (group.checkedRadioButtonId == above.id) BatteryDirection.ABOVE else BatteryDirection.BELOW
-                store.chargerNotifications = charger.isChecked
-                store.previousLevel = currentBatteryLevel(this)
-                store.enabled = true
-                BatteryAutomationScheduler.schedule(this)
-                Toast.makeText(this, local("Battery automation enabled", "تم تفعيل أتمتة البطارية"), Toast.LENGTH_SHORT).show()
-                finish()
+                val config = PendingConfig(
+                    threshold = threshold.text.toString().toIntOrNull()?.coerceIn(1, 100) ?: 20,
+                    direction = if (group.checkedRadioButtonId == above.id) BatteryDirection.ABOVE else BatteryDirection.BELOW,
+                    chargerNotifications = charger.isChecked,
+                )
+                val notificationsGranted = Build.VERSION.SDK_INT < 33 ||
+                    ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS) == PackageManager.PERMISSION_GRANTED
+                if (!notificationsGranted && Build.VERSION.SDK_INT >= 33) {
+                    pendingConfig = config
+                    notificationPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
+                } else {
+                    enableAutomation(config)
+                }
             }
             .setNeutralButton(local("Disable", "إيقاف")) { _, _ ->
                 store.enabled = false
@@ -78,6 +110,18 @@ class BatterySetupActivity : AppCompatActivity() {
             .setNegativeButton(local("Cancel", "إلغاء")) { _, _ -> finish() }
             .setOnCancelListener { finish() }
             .show()
+    }
+
+    private fun enableAutomation(config: PendingConfig) {
+        val store = BatteryAutomationStore(this)
+        store.threshold = config.threshold
+        store.direction = config.direction
+        store.chargerNotifications = config.chargerNotifications
+        store.previousLevel = currentBatteryLevel(this)
+        store.enabled = true
+        BatteryAutomationScheduler.schedule(this)
+        Toast.makeText(this, local("Battery automation enabled", "تم تفعيل أتمتة البطارية"), Toast.LENGTH_SHORT).show()
+        finish()
     }
 
     private fun local(en: String, ar: String): String =
