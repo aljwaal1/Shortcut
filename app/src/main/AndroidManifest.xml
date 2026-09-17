@@ -25,15 +25,21 @@
             android:authorities="${applicationId}.fileprovider"
             android:exported="false"
             android:grantUriPermissions="true">
-            <meta-data
-                android:name="android.support.FILE_PROVIDER_PATHS"
-                android:resource="@xml/file_paths" />
+            <meta-data android:name="android.support.FILE_PROVIDER_PATHS" android:resource="@xml/file_paths" />
         </provider>
 
         <service android:name="androidx.appcompat.app.AppLocalesMetadataHolderService" android:enabled="false" android:exported="false">
             <meta-data android:name="autoStoreLocales" android:value="true" />
         </service>
         <service android:name=".tools.ScreenCaptureService" android:exported="false" android:foregroundServiceType="mediaProjection" />
+        <service
+            android:name=".system.ShortcutTileService"
+            android:exported="true"
+            android:label="Shortcut"
+            android:icon="@android:drawable/ic_menu_manage"
+            android:permission="android.permission.BIND_QUICK_SETTINGS_TILE">
+            <intent-filter><action android:name="android.service.quicksettings.action.QS_TILE" /></intent-filter>
+        </service>
         <!-- Standard build intentionally does NOT register an AccessibilityService. -->
 
         <receiver android:name=".scheduler.ScheduledAppLaunchReceiver" android:exported="false" />
@@ -50,6 +56,19 @@
                 <action android:name="android.intent.action.MY_PACKAGE_REPLACED" />
             </intent-filter>
         </receiver>
+        <receiver android:name=".automation.routines.RoutineAlarmReceiver" android:exported="false" />
+        <receiver android:name=".automation.routines.RoutineSystemEventReceiver" android:enabled="true" android:exported="false">
+            <intent-filter>
+                <action android:name="android.intent.action.ACTION_POWER_CONNECTED" />
+                <action android:name="android.intent.action.ACTION_POWER_DISCONNECTED" />
+                <action android:name="android.intent.action.BOOT_COMPLETED" />
+                <action android:name="android.intent.action.MY_PACKAGE_REPLACED" />
+            </intent-filter>
+        </receiver>
+        <receiver android:name=".system.ShortcutWidgetProvider" android:exported="true">
+            <intent-filter><action android:name="android.appwidget.action.APPWIDGET_UPDATE" /></intent-filter>
+            <meta-data android:name="android.appwidget.provider" android:resource="@xml/shortcut_widget_info" />
+        </receiver>
 
         <activity android:name=".automation.BatterySetupActivity" android:exported="false" />
         <activity android:name=".automation.CarModeActivity" android:exported="false" />
@@ -63,6 +82,8 @@
         <activity android:name=".tools.JpegConvertActivity" android:exported="false" />
         <activity android:name=".tools.MultiUrlPdfActivity" android:exported="false" />
         <activity android:name=".tools.ToolActivity" android:exported="false" />
+        <activity android:name=".ui.MyAutomationsActivity" android:exported="false" />
+        <activity android:name=".backup.BackupTransferActivity" android:exported="false" />
 
         <activity android:name=".tools.NfcDispatchActivity" android:exported="true">
             <intent-filter>
