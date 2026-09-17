@@ -3,6 +3,8 @@ package com.explapp.shortcut.scheduler
 import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
+import com.explapp.shortcut.automation.routines.RoutineScheduler
+import com.explapp.shortcut.automation.routines.RoutineStore
 import com.explapp.shortcut.data.MessageStore
 import com.explapp.shortcut.data.ShortcutStore
 
@@ -18,5 +20,10 @@ class RestoreSchedulesReceiver : BroadcastReceiver() {
         val messageScheduler = AndroidMessageScheduler(appContext)
         RestorePolicy.messages(MessageStore(appContext).load())
             .forEach(messageScheduler::schedule)
+
+        val routineScheduler = RoutineScheduler(appContext)
+        RoutineStore(appContext).load()
+            .filter { it.isEnabled }
+            .forEach(routineScheduler::schedule)
     }
 }
