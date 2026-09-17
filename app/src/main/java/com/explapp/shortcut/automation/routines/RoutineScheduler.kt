@@ -5,6 +5,8 @@ import android.app.PendingIntent
 import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
+import android.content.IntentFilter
+import android.os.BatteryManager
 import android.os.Build
 import android.os.SystemClock
 import com.explapp.shortcut.automation.currentBatteryLevel
@@ -12,15 +14,31 @@ import java.time.ZonedDateTime
 
 object RoutineRequestCode {
     fun fromId(id: String): Int = ("routine:$id").hashCode()
-    fun batteryFromId(id: String): Int = ("routine-battery:$id").hashCode()
+    fun batteryFromId(id: String): Int = ("routine-state:$id").hashCode()
 }
 
-private class BatteryThresholdState(context: Context) {
-    private val prefs = context.getSharedPreferences("routine_battery_edges", Context.MODE_PRIVATE)
+private class RoutineEdgeState(context: Context) {
+    private val prefs = context.getSharedPreferences("routine_edges", Context.MODE_PRIVATE)
 
-    fun wasBelow(id: String): Boolean = prefs.getBoolean(id, false)
-    fun setBelow(id: String, below: Boolean) { prefs.edit().putBoolean(id, below).apply() }
-    fun clear(id: String) { prefs.edit().remove(id).apply() }
+    fun wasBelow(id: String): Boolean = prefs.getBoolean("battery:$id", false)
+    fun setBelow(id: String, below: Boolean) { prefs.edit().putBoolean("battery:$id", below).apply() }
+
+    fun chargerState(id: String): Boolean? {
+        val key = "charger:$id"
+        if (!prefs.contains(key)) return null
+        return prefs.getBoolean(key, false)
+    }
+
+    fun setChargerState(id: String, connected: Boolean) {
+        prefs.edit().putBoolean("charger:$id", connected).apply()
+    }
+
+    fun clear(id: String) {
+        prefs.edit()
+            .remove("battery:$id")
+            .remove("charger:$id")
+            .apply()
+    }
 }
 
 class RoutineScheduler(private val context: Context) {
@@ -28,7 +46,16 @@ class RoutineScheduler(private val context: Context) {
         if (!routine.isEnabled || !routine.isValid()) return
         when (routine.trigger.type) {
             RoutineTriggerType.TIME -> scheduleTime(routine)
-            RoutineTriggerType.BATTERY_BELOW -> scheduleBattery(routine)
+            RoutineTriggerType.BATTERY_BELOW -> scheduleStatePoll(routine)
+            RoutineTriggerType.CHARGER_CONNECTED,
+            RoutineTriggerType.CHARGER_DISCONNECTED,
+            -> {
+                val state = RoutineEdgeState(context)
+                if (state.chargerState(routine.id) == null) {
+                    state.setChargerState(routine.id, isDeviceCharging(context))
+                }
+                scheduleStatePoll(routine)
+            }
             else -> Unit
         }
     }
@@ -41,7 +68,7 @@ class RoutineScheduler(private val context: Context) {
         val now = ZonedDateTime.now()
         var at = now.withHour(hour).withMinute(minute).withSecond(0).withNano(0)
         if (!at.isAfter(now)) at = at.plusDays(1)
-        val pending = timePending(routine.id, PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE) ?: return
+        val pending = statePending(routine.id, PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE, time = true) ?: return
         val alarm = context.getSystemService(AlarmManager::class.java)
         val millis = at.toInstant().toEpochMilli()
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.S || alarm.canScheduleExactAlarms()) {
@@ -51,45 +78,41 @@ class RoutineScheduler(private val context: Context) {
         }
     }
 
-    private fun scheduleBattery(routine: AutomationRoutine) {
-        val threshold = routine.trigger.value.toIntOrNull() ?: return
-        if (threshold !in 1..100) return
-        val pending = batteryPending(routine.id, PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE) ?: return
+    private fun scheduleStatePoll(routine: AutomationRoutine) {
+        val pending = statePending(routine.id, PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE, time = false) ?: return
         context.getSystemService(AlarmManager::class.java).setAndAllowWhileIdle(
             AlarmManager.ELAPSED_REALTIME_WAKEUP,
-            SystemClock.elapsedRealtime() + BATTERY_INTERVAL_MS,
+            SystemClock.elapsedRealtime() + STATE_POLL_INTERVAL_MS,
             pending,
         )
     }
 
     fun cancel(id: String) {
         val alarm = context.getSystemService(AlarmManager::class.java)
-        timePending(id, PendingIntent.FLAG_NO_CREATE or PendingIntent.FLAG_IMMUTABLE)?.let {
+        statePending(id, PendingIntent.FLAG_NO_CREATE or PendingIntent.FLAG_IMMUTABLE, time = true)?.let {
             alarm.cancel(it); it.cancel()
         }
-        batteryPending(id, PendingIntent.FLAG_NO_CREATE or PendingIntent.FLAG_IMMUTABLE)?.let {
+        statePending(id, PendingIntent.FLAG_NO_CREATE or PendingIntent.FLAG_IMMUTABLE, time = false)?.let {
             alarm.cancel(it); it.cancel()
         }
-        BatteryThresholdState(context).clear(id)
+        RoutineEdgeState(context).clear(id)
     }
 
-    private fun timePending(id: String, flags: Int): PendingIntent? = PendingIntent.getBroadcast(
-        context,
-        RoutineRequestCode.fromId(id),
-        Intent(context, RoutineAlarmReceiver::class.java).setAction("routine-time:$id").putExtra(EXTRA_ID, id),
-        flags,
-    )
-
-    private fun batteryPending(id: String, flags: Int): PendingIntent? = PendingIntent.getBroadcast(
-        context,
-        RoutineRequestCode.batteryFromId(id),
-        Intent(context, RoutineBatteryReceiver::class.java).setAction("routine-battery:$id").putExtra(EXTRA_ID, id),
-        flags,
-    )
+    private fun statePending(id: String, flags: Int, time: Boolean): PendingIntent? {
+        val requestCode = if (time) RoutineRequestCode.fromId(id) else RoutineRequestCode.batteryFromId(id)
+        val receiver = if (time) RoutineAlarmReceiver::class.java else RoutineStateReceiver::class.java
+        val action = if (time) "routine-time:$id" else "routine-state:$id"
+        return PendingIntent.getBroadcast(
+            context,
+            requestCode,
+            Intent(context, receiver).setAction(action).putExtra(EXTRA_ID, id),
+            flags,
+        )
+    }
 
     companion object {
         const val EXTRA_ID = "routine_id"
-        private const val BATTERY_INTERVAL_MS = 15 * 60 * 1000L
+        private const val STATE_POLL_INTERVAL_MS = 15 * 60 * 1000L
     }
 }
 
@@ -102,19 +125,43 @@ class RoutineAlarmReceiver : BroadcastReceiver() {
     }
 }
 
-class RoutineBatteryReceiver : BroadcastReceiver() {
+class RoutineStateReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent) {
         val id = intent.getStringExtra(RoutineScheduler.EXTRA_ID) ?: return
         val routine = RoutineStore(context).load().firstOrNull { it.id == id && it.isEnabled && it.isValid() } ?: return
-        val threshold = routine.trigger.value.toIntOrNull() ?: return
-        val level = currentBatteryLevel(context)
-        val state = BatteryThresholdState(context)
-        val wasBelow = state.wasBelow(id)
-        val isBelow = BatteryThresholdEdge.isBelow(level, threshold)
-        if (BatteryThresholdEdge.shouldFire(wasBelow, level, threshold)) {
-            RoutineDispatcher(context).execute(routine, userInitiated = false)
+        val state = RoutineEdgeState(context)
+
+        when (routine.trigger.type) {
+            RoutineTriggerType.BATTERY_BELOW -> {
+                val threshold = routine.trigger.value.toIntOrNull() ?: return
+                val level = currentBatteryLevel(context)
+                val wasBelow = state.wasBelow(id)
+                val isBelow = BatteryThresholdEdge.isBelow(level, threshold)
+                if (BatteryThresholdEdge.shouldFire(wasBelow, level, threshold)) {
+                    RoutineDispatcher(context).execute(routine, userInitiated = false)
+                }
+                state.setBelow(id, isBelow)
+            }
+
+            RoutineTriggerType.CHARGER_CONNECTED,
+            RoutineTriggerType.CHARGER_DISCONNECTED,
+            -> {
+                val connected = isDeviceCharging(context)
+                val previous = state.chargerState(id)
+                if (previous != null && previous != connected) {
+                    val shouldFire = when (routine.trigger.type) {
+                        RoutineTriggerType.CHARGER_CONNECTED -> connected
+                        RoutineTriggerType.CHARGER_DISCONNECTED -> !connected
+                        else -> false
+                    }
+                    if (shouldFire) RoutineDispatcher(context).execute(routine, userInitiated = false)
+                }
+                state.setChargerState(id, connected)
+            }
+
+            else -> return
         }
-        state.setBelow(id, isBelow)
+
         RoutineScheduler(context).schedule(routine)
     }
 }
@@ -123,8 +170,6 @@ class RoutineSystemEventReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent) {
         val dispatcher = RoutineDispatcher(context)
         when (intent.action) {
-            Intent.ACTION_POWER_CONNECTED -> dispatcher.dispatch(RoutineEvent(RoutineTriggerType.CHARGER_CONNECTED))
-            Intent.ACTION_POWER_DISCONNECTED -> dispatcher.dispatch(RoutineEvent(RoutineTriggerType.CHARGER_DISCONNECTED))
             Intent.ACTION_BOOT_COMPLETED -> {
                 dispatcher.dispatch(RoutineEvent(RoutineTriggerType.BOOT))
                 reschedule(context)
@@ -137,4 +182,10 @@ class RoutineSystemEventReceiver : BroadcastReceiver() {
         val scheduler = RoutineScheduler(context)
         RoutineStore(context).load().filter { it.isEnabled && it.isValid() }.forEach(scheduler::schedule)
     }
+}
+
+private fun isDeviceCharging(context: Context): Boolean {
+    val status = context.registerReceiver(null, IntentFilter(Intent.ACTION_BATTERY_CHANGED))
+    val value = status?.getIntExtra(BatteryManager.EXTRA_STATUS, -1) ?: -1
+    return value == BatteryManager.BATTERY_STATUS_CHARGING || value == BatteryManager.BATTERY_STATUS_FULL
 }
