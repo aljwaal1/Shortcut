@@ -21,6 +21,7 @@ import com.explapp.shortcut.execution.TaskExecutionResult
 class ScheduledAppLaunchReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent) {
         val shortcut = intent.toShortcut() ?: return
+        if (!shortcut.isEnabled) return
         val startedAt = System.currentTimeMillis()
         val launchIntent = context.packageManager.getLaunchIntentForPackage(shortcut.packageName)
             ?.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
@@ -45,7 +46,7 @@ class ScheduledAppLaunchReceiver : BroadcastReceiver() {
         if (!launched) showOpenNowNotification(context, shortcut)
 
         if (shortcut.repeat == RepeatOption.ONCE) {
-            ShortcutStore(context).remove(shortcut)
+            ShortcutStore(context).removeById(shortcut.id)
         } else {
             AndroidAlarmScheduler(context).schedule(shortcut)
         }
@@ -65,7 +66,7 @@ class ScheduledAppLaunchReceiver : BroadcastReceiver() {
         }
         val openPendingIntent = PendingIntent.getActivity(
             context,
-            shortcut.packageName.hashCode(),
+            SchedulerIdentity.requestCode(shortcut.id),
             launchIntent,
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
         )
@@ -77,32 +78,48 @@ class ScheduledAppLaunchReceiver : BroadcastReceiver() {
             .setAutoCancel(true)
             .setContentIntent(openPendingIntent)
             .build()
-        notificationManager.notify(shortcut.packageName.hashCode(), notification)
+        notificationManager.notify(SchedulerIdentity.requestCode(shortcut.id), notification)
     }
 
     companion object {
+        private const val EXTRA_ID = "id"
         private const val EXTRA_NAME = "name"
         private const val EXTRA_PACKAGE = "package"
         private const val EXTRA_HOUR = "hour"
         private const val EXTRA_MINUTE = "minute"
         private const val EXTRA_REPEAT = "repeat"
+        private const val EXTRA_ENABLED = "enabled"
+
+        fun identityIntent(context: Context, id: String): Intent =
+            Intent(context, ScheduledAppLaunchReceiver::class.java).setAction("scheduled-app:$id")
 
         fun intent(context: Context, shortcut: ScheduledAppShortcut): Intent =
-            Intent(context, ScheduledAppLaunchReceiver::class.java).apply {
+            identityIntent(context, shortcut.id).apply {
+                putExtra(EXTRA_ID, shortcut.id)
                 putExtra(EXTRA_NAME, shortcut.name)
                 putExtra(EXTRA_PACKAGE, shortcut.packageName)
                 putExtra(EXTRA_HOUR, shortcut.hour)
                 putExtra(EXTRA_MINUTE, shortcut.minute)
                 putExtra(EXTRA_REPEAT, shortcut.repeat.name)
+                putExtra(EXTRA_ENABLED, shortcut.isEnabled)
             }
 
         private fun Intent.toShortcut(): ScheduledAppShortcut? {
+            val id = getStringExtra(EXTRA_ID) ?: return null
             val name = getStringExtra(EXTRA_NAME) ?: return null
             val packageName = getStringExtra(EXTRA_PACKAGE) ?: return null
             val hour = getIntExtra(EXTRA_HOUR, -1)
             val minute = getIntExtra(EXTRA_MINUTE, -1)
             val repeat = runCatching { RepeatOption.valueOf(getStringExtra(EXTRA_REPEAT).orEmpty()) }.getOrNull() ?: return null
-            return ScheduledAppShortcut(name, packageName, hour, minute, repeat).takeIf { it.isValid() }
+            return ScheduledAppShortcut(
+                id = id,
+                name = name,
+                packageName = packageName,
+                hour = hour,
+                minute = minute,
+                repeat = repeat,
+                isEnabled = getBooleanExtra(EXTRA_ENABLED, true),
+            ).takeIf { it.isValid() }
         }
     }
 }
