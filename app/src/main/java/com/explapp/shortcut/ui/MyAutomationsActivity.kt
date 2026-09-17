@@ -1,5 +1,6 @@
 package com.explapp.shortcut.ui
 
+import android.content.Intent
 import android.os.Bundle
 import androidx.activity.compose.setContent
 import androidx.appcompat.app.AppCompatActivity
@@ -41,6 +42,8 @@ import com.explapp.shortcut.automation.routines.RoutineStore
 import com.explapp.shortcut.automation.routines.RoutineTemplateCatalog
 import com.explapp.shortcut.automation.routines.RoutineTrigger
 import com.explapp.shortcut.automation.routines.RoutineTriggerType
+import com.explapp.shortcut.backup.BackupTransferActivity
+import com.explapp.shortcut.tools.NfcSetupActivity
 
 class MyAutomationsActivity : AppCompatActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -107,6 +110,18 @@ private fun MyAutomationsScreen(onBack: () -> Unit) {
                     TextButton(onClick = { showTemplates = true }, modifier = Modifier.weight(1f)) { Text(if (ar) "القوالب" else "Templates") }
                 }
             }
+            item {
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    TextButton(
+                        onClick = { context.startActivity(Intent(context, ScheduledTasksManagerActivity::class.java)) },
+                        modifier = Modifier.weight(1f),
+                    ) { Text(if (ar) "المهام المجدولة" else "Scheduled tasks") }
+                    TextButton(
+                        onClick = { context.startActivity(Intent(context, BackupTransferActivity::class.java)) },
+                        modifier = Modifier.weight(1f),
+                    ) { Text(if (ar) "نسخ احتياطي" else "Backup") }
+                }
+            }
             lastDeleted?.let { deleted ->
                 item {
                     ElevatedCard(Modifier.fillMaxWidth()) {
@@ -132,14 +147,19 @@ private fun MyAutomationsScreen(onBack: () -> Unit) {
                             Switch(checked = routine.isEnabled, onCheckedChange = { enabled -> upsert(routine.copy(isEnabled = enabled)) })
                         }
                         Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                            TextButton(onClick = { RoutineDispatcher(context).execute(routine, userInitiated = true) }) { Text(if (ar) "تشغيل الآن" else "Run now") }
+                            TextButton(onClick = { RoutineDispatcher(context).execute(routine, userInitiated = true) }) { Text(if (ar) "تشغيل" else "Run") }
                             TextButton(onClick = { editing = routine }) { Text(if (ar) "تعديل" else "Edit") }
-                            TextButton(onClick = { upsert(routine.duplicate()) }) { Text(if (ar) "نسخ" else "Duplicate") }
+                            TextButton(onClick = { upsert(routine.duplicate()) }) { Text(if (ar) "نسخ" else "Copy") }
                             TextButton(onClick = {
                                 scheduler.cancel(routine.id)
                                 lastDeleted = routine
                                 persist(itemsState.filterNot { it.id == routine.id })
                             }) { Text(if (ar) "حذف" else "Delete") }
+                        }
+                        if (routine.trigger.type == RoutineTriggerType.NFC) {
+                            TextButton(onClick = {
+                                context.startActivity(Intent(context, NfcSetupActivity::class.java).putExtra(NfcSetupActivity.EXTRA_ROUTINE_ID, routine.id))
+                            }) { Text(if (ar) "كتابة وسم NFC لهذا الروتين" else "Write NFC tag for this routine") }
                         }
                     }
                 }
