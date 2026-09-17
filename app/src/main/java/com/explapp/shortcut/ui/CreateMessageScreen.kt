@@ -47,6 +47,7 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
 import com.explapp.shortcut.R
+import com.explapp.shortcut.domain.MessageDeliveryMode
 import com.explapp.shortcut.domain.MessagePlatform
 import com.explapp.shortcut.domain.RepeatOption
 import com.explapp.shortcut.domain.ScheduledMessage
@@ -64,6 +65,7 @@ fun CreateMessageScreen(
     val context = LocalContext.current
     val ar = LocalConfiguration.current.locales[0].language == "ar"
     val alarmManager = remember(context) { context.getSystemService(AlarmManager::class.java) }
+    val stableId = remember(initial?.id) { initial?.id ?: UUID.randomUUID().toString() }
     var name by remember(initial?.id) { mutableStateOf(initial?.name.orEmpty()) }
     var platform by remember(initial?.id) { mutableStateOf(initial?.platform ?: initialPlatform) }
     var recipient by remember(initial?.id) { mutableStateOf(initial?.recipient.orEmpty()) }
@@ -88,7 +90,7 @@ fun CreateMessageScreen(
         MessagePlatform.TELEGRAM -> stringResource(R.string.template_telegram)
     }
     val model = ScheduledMessage(
-        id = initial?.id ?: UUID.randomUUID().toString(),
+        id = stableId,
         name = name.ifBlank { defaultName },
         platform = platform,
         recipient = recipient,
@@ -97,7 +99,7 @@ fun CreateMessageScreen(
         minute = minute.toIntOrNull() ?: -1,
         repeat = repeat,
         isEnabled = initial?.isEnabled ?: true,
-        deliveryMode = initial?.deliveryMode ?: com.explapp.shortcut.domain.MessageDeliveryMode.PREPARED,
+        deliveryMode = initial?.deliveryMode ?: MessageDeliveryMode.PREPARED,
     )
 
     fun saveWithNeededPermissions() {
