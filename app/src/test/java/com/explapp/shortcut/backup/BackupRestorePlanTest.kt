@@ -9,7 +9,13 @@ import org.junit.Test
 class BackupRestorePlanTest {
     @Test
     fun importedBackupReplacesLocalCollectionsAndKeepsAdvancedDisabled() {
-        val importedShortcut = ScheduledAppShortcut("Imported", "com.example.imported", 7, 15, RepeatOption.DAILY)
+        val importedShortcut = ScheduledAppShortcut(
+            name = "Imported",
+            packageName = "com.example.imported",
+            hour = 7,
+            minute = 15,
+            repeat = RepeatOption.DAILY,
+        )
         val payload = BackupPayload(
             shortcuts = listOf(importedShortcut),
             messages = emptyList(),
