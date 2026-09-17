@@ -11,11 +11,12 @@ class AndroidAlarmScheduler(
     private val context: Context,
 ) {
     fun schedule(shortcut: ScheduledAppShortcut) {
+        if (!shortcut.isEnabled || !shortcut.isValid()) return
         val alarmManager = context.getSystemService(AlarmManager::class.java)
         val triggerAt = NextRunCalculator.nextRun(ZonedDateTime.now(), shortcut)
         val pendingIntent = PendingIntent.getBroadcast(
             context,
-            requestCode(shortcut),
+            SchedulerIdentity.requestCode(shortcut.id),
             ScheduledAppLaunchReceiver.intent(context, shortcut),
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
         )
@@ -38,19 +39,16 @@ class AndroidAlarmScheduler(
         }
     }
 
-    fun cancel(shortcut: ScheduledAppShortcut) {
+    fun cancel(shortcut: ScheduledAppShortcut) = cancelById(shortcut.id)
+
+    fun cancelById(id: String) {
         val existing = PendingIntent.getBroadcast(
             context,
-            requestCode(shortcut),
-            ScheduledAppLaunchReceiver.intent(context, shortcut),
+            SchedulerIdentity.requestCode(id),
+            ScheduledAppLaunchReceiver.identityIntent(context, id),
             PendingIntent.FLAG_NO_CREATE or PendingIntent.FLAG_IMMUTABLE,
         ) ?: return
         context.getSystemService(AlarmManager::class.java).cancel(existing)
         existing.cancel()
     }
-
-    private fun requestCode(shortcut: ScheduledAppShortcut): Int =
-        listOf(shortcut.packageName, shortcut.hour, shortcut.minute, shortcut.name)
-            .joinToString("|")
-            .hashCode()
 }
