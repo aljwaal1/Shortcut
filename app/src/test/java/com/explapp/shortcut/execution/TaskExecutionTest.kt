@@ -1,6 +1,7 @@
 package com.explapp.shortcut.execution
 
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -12,6 +13,17 @@ class TaskExecutionTest {
         assertEquals(1_650L, result.durationMs)
         assertTrue(result.summaryEn.contains("Completed"))
         assertTrue(result.summaryAr.contains("تم"))
+    }
+
+    @Test
+    fun preparedMessageIsNotReportedAsSentOrCompleted() {
+        val result = TaskExecutionResult.prepared("Telegram reminder", startedAtMs = 100L, finishedAtMs = 300L)
+
+        assertEquals(TaskExecutionStatus.PREPARED, result.status)
+        assertTrue(result.summaryEn.contains("Prepared"))
+        assertTrue(result.summaryAr.contains("جاهزة"))
+        assertFalse(result.summaryEn.contains("Sent", ignoreCase = true))
+        assertFalse(result.summaryEn.contains("Completed", ignoreCase = true))
     }
 
     @Test
