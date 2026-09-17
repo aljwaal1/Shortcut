@@ -15,6 +15,14 @@ object RoutineRequestCode {
     fun batteryFromId(id: String): Int = ("routine-battery:$id").hashCode()
 }
 
+private class BatteryThresholdState(context: Context) {
+    private val prefs = context.getSharedPreferences("routine_battery_edges", Context.MODE_PRIVATE)
+
+    fun wasBelow(id: String): Boolean = prefs.getBoolean(id, false)
+    fun setBelow(id: String, below: Boolean) { prefs.edit().putBoolean(id, below).apply() }
+    fun clear(id: String) { prefs.edit().remove(id).apply() }
+}
+
 class RoutineScheduler(private val context: Context) {
     fun schedule(routine: AutomationRoutine) {
         if (!routine.isEnabled) return
@@ -62,6 +70,7 @@ class RoutineScheduler(private val context: Context) {
         batteryPending(id, PendingIntent.FLAG_NO_CREATE or PendingIntent.FLAG_IMMUTABLE)?.let {
             alarm.cancel(it); it.cancel()
         }
+        BatteryThresholdState(context).clear(id)
     }
 
     private fun timePending(id: String, flags: Int): PendingIntent? = PendingIntent.getBroadcast(
@@ -97,10 +106,15 @@ class RoutineBatteryReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent) {
         val id = intent.getStringExtra(RoutineScheduler.EXTRA_ID) ?: return
         val routine = RoutineStore(context).load().firstOrNull { it.id == id && it.isEnabled } ?: return
-        val event = RoutineEvent(RoutineTriggerType.BATTERY_BELOW, currentBatteryLevel(context).toString())
-        if (RoutineTriggerMatcher.matches(routine, event)) {
+        val threshold = routine.trigger.value.toIntOrNull() ?: return
+        val level = currentBatteryLevel(context)
+        val state = BatteryThresholdState(context)
+        val wasBelow = state.wasBelow(id)
+        val isBelow = BatteryThresholdEdge.isBelow(level, threshold)
+        if (BatteryThresholdEdge.shouldFire(wasBelow, level, threshold)) {
             RoutineDispatcher(context).execute(routine, userInitiated = false)
         }
+        state.setBelow(id, isBelow)
         RoutineScheduler(context).schedule(routine)
     }
 }
@@ -111,11 +125,16 @@ class RoutineSystemEventReceiver : BroadcastReceiver() {
         when (intent.action) {
             Intent.ACTION_POWER_CONNECTED -> dispatcher.dispatch(RoutineEvent(RoutineTriggerType.CHARGER_CONNECTED))
             Intent.ACTION_POWER_DISCONNECTED -> dispatcher.dispatch(RoutineEvent(RoutineTriggerType.CHARGER_DISCONNECTED))
-            Intent.ACTION_BOOT_COMPLETED, Intent.ACTION_MY_PACKAGE_REPLACED -> {
+            Intent.ACTION_BOOT_COMPLETED -> {
                 dispatcher.dispatch(RoutineEvent(RoutineTriggerType.BOOT))
-                val scheduler = RoutineScheduler(context)
-                RoutineStore(context).load().filter { it.isEnabled }.forEach(scheduler::schedule)
+                reschedule(context)
             }
+            Intent.ACTION_MY_PACKAGE_REPLACED -> reschedule(context)
         }
+    }
+
+    private fun reschedule(context: Context) {
+        val scheduler = RoutineScheduler(context)
+        RoutineStore(context).load().filter { it.isEnabled }.forEach(scheduler::schedule)
     }
 }
