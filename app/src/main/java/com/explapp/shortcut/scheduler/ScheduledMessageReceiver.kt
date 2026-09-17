@@ -24,8 +24,9 @@ import com.explapp.shortcut.messages.MessageDeepLinkFactory
 
 class ScheduledMessageReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent) {
-        val message = intent.toScheduledMessage() ?: return
-        if (!message.isEnabled) return
+        val payload = intent.toScheduledMessage() ?: return
+        val store = MessageStore(context)
+        val message = StoredScheduleResolver.message(payload.id, store.load()) ?: return
         val startedAt = System.currentTimeMillis()
 
         val openIntent = Intent(
@@ -60,7 +61,7 @@ class ScheduledMessageReceiver : BroadcastReceiver() {
         TaskExecutionReporter(context).report(result)
 
         if (message.repeat == RepeatOption.ONCE) {
-            MessageStore(context).removeById(message.id)
+            store.removeById(message.id)
         } else {
             AndroidMessageScheduler(context).schedule(message)
         }
