@@ -24,27 +24,22 @@ class ScheduledAppLaunchReceiver : BroadcastReceiver() {
         val store = ShortcutStore(context)
         val shortcut = StoredScheduleResolver.shortcut(payload.id, store.load()) ?: return
         val startedAt = System.currentTimeMillis()
-        val launchIntent = context.packageManager.getLaunchIntentForPackage(shortcut.packageName)
-            ?.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
 
-        var failureReason: String? = null
-        val launched = if (launchIntent != null) {
-            runCatching {
-                context.startActivity(launchIntent)
-                true
-            }.onFailure { failureReason = it.message ?: it.javaClass.simpleName }
-                .getOrDefault(false)
-        } else {
-            failureReason = "App not found"
-            false
+        val result = when {
+            context.packageManager.getLaunchIntentForPackage(shortcut.packageName) == null ->
+                TaskExecutionResult.failure(shortcut.name, "App not found", startedAt)
+
+            showOpenNowNotification(context, shortcut) ->
+                TaskExecutionResult.prepared(shortcut.name, startedAt)
+
+            else ->
+                TaskExecutionResult.failure(
+                    shortcut.name,
+                    "Notification permission is required for scheduled app launches",
+                    startedAt,
+                )
         }
-
-        TaskExecutionReporter(context).report(
-            if (launched) TaskExecutionResult.success(shortcut.name, startedAt)
-            else TaskExecutionResult.failure(shortcut.name, failureReason ?: "Could not open app", startedAt),
-        )
-
-        if (!launched) showOpenNowNotification(context, shortcut)
+        TaskExecutionReporter(context).report(result)
 
         if (shortcut.repeat == RepeatOption.ONCE) {
             store.removeById(shortcut.id)
@@ -53,11 +48,14 @@ class ScheduledAppLaunchReceiver : BroadcastReceiver() {
         }
     }
 
-    private fun showOpenNowNotification(context: Context, shortcut: ScheduledAppShortcut) {
+    private fun showOpenNowNotification(context: Context, shortcut: ScheduledAppShortcut): Boolean {
         if (Build.VERSION.SDK_INT >= 33 &&
             ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED
-        ) return
-        val launchIntent = context.packageManager.getLaunchIntentForPackage(shortcut.packageName) ?: return
+        ) return false
+
+        val launchIntent = context.packageManager.getLaunchIntentForPackage(shortcut.packageName)
+            ?.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            ?: return false
         val notificationManager = context.getSystemService(NotificationManager::class.java)
         val channelId = "scheduled_app_launch"
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
@@ -80,6 +78,7 @@ class ScheduledAppLaunchReceiver : BroadcastReceiver() {
             .setContentIntent(openPendingIntent)
             .build()
         notificationManager.notify(SchedulerIdentity.requestCode(shortcut.id), notification)
+        return true
     }
 
     companion object {
