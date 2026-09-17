@@ -1,10 +1,8 @@
 package com.explapp.shortcut.ui
 
-import android.Manifest
 import android.app.AlarmManager
 import android.app.TimePickerDialog
 import android.content.Intent
-import android.content.pm.PackageManager
 import android.net.Uri
 import android.os.Build
 import android.provider.Settings
@@ -51,15 +49,12 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import androidx.core.content.ContextCompat
 import androidx.core.graphics.drawable.toBitmap
 import com.explapp.shortcut.R
 import com.explapp.shortcut.data.InstalledApp
 import com.explapp.shortcut.data.InstalledAppRepository
 import com.explapp.shortcut.domain.RepeatOption
 import com.explapp.shortcut.domain.ScheduledAppShortcut
-import com.explapp.shortcut.permissions.SchedulingPermissionPlan
-import com.explapp.shortcut.permissions.SchedulingPermissionStep
 import java.util.Locale
 import java.util.UUID
 
@@ -84,12 +79,10 @@ fun CreateShortcutScreen(
     var repeat by remember(initial?.id) { mutableStateOf(initial?.repeat ?: RepeatOption.ONCE) }
     var showAppPicker by remember { mutableStateOf(false) }
     var pendingSave by remember { mutableStateOf<ScheduledAppShortcut?>(null) }
-    var permissionError by remember { mutableStateOf(false) }
 
     fun finishPendingSave() {
         pendingSave?.let(onSave)
         pendingSave = null
-        permissionError = false
     }
 
     val exactAlarmLauncher = rememberLauncherForActivityResult(ActivityResultContracts.StartActivityForResult()) { finishPendingSave() }
@@ -98,15 +91,8 @@ fun CreateShortcutScreen(
         val exactGranted = Build.VERSION.SDK_INT < Build.VERSION_CODES.S || alarmManager.canScheduleExactAlarms()
         if (!exactGranted && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
             exactAlarmLauncher.launch(Intent(Settings.ACTION_REQUEST_SCHEDULE_EXACT_ALARM, Uri.parse("package:${context.packageName}")))
-        } else finishPendingSave()
-    }
-
-    val notificationPermissionLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
-        if (granted) {
-            requestExactAlarmOrSave()
         } else {
-            pendingSave = null
-            permissionError = true
+            finishPendingSave()
         }
     }
 
@@ -121,15 +107,8 @@ fun CreateShortcutScreen(
     )
 
     fun saveWithNeededPermissions() {
-        permissionError = false
         pendingSave = model
-        val notificationsGranted = Build.VERSION.SDK_INT < 33 || ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) == PackageManager.PERMISSION_GRANTED
-        val exactGranted = Build.VERSION.SDK_INT < Build.VERSION_CODES.S || alarmManager.canScheduleExactAlarms()
-        when (SchedulingPermissionPlan.steps(Build.VERSION.SDK_INT, notificationsGranted, exactGranted).firstOrNull()) {
-            SchedulingPermissionStep.NOTIFICATIONS -> notificationPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
-            SchedulingPermissionStep.EXACT_ALARM -> requestExactAlarmOrSave()
-            null -> finishPendingSave()
-        }
+        requestExactAlarmOrSave()
     }
 
     LazyColumn(modifier = Modifier.fillMaxSize(), contentPadding = androidx.compose.foundation.layout.PaddingValues(18.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
@@ -153,7 +132,7 @@ fun CreateShortcutScreen(
             }
         }
         item {
-            BuilderSectionCard(title = stringResource(R.string.time), subtitle = if (ar) "وقت ظهور تنبيه فتح التطبيق" else "When the open-app notification should appear", accent = MaterialTheme.colorScheme.tertiary) {
+            BuilderSectionCard(title = stringResource(R.string.time), subtitle = if (ar) "وقت محاولة فتح التطبيق تلقائيًا" else "When Shortcut should try to open the app automatically", accent = MaterialTheme.colorScheme.tertiary) {
                 Button(onClick = { TimePickerDialog(context, { _, h, m -> hour = h; minute = m }, hour, minute, true).show() }, modifier = Modifier.fillMaxWidth()) {
                     Text(String.format(Locale.getDefault(), "%02d:%02d", hour, minute), fontWeight = FontWeight.ExtraBold)
                 }
@@ -169,19 +148,10 @@ fun CreateShortcutScreen(
         item {
             ElevatedCard(colors = CardDefaults.elevatedCardColors(containerColor = MaterialTheme.colorScheme.tertiaryContainer.copy(alpha = 0.55f)), elevation = CardDefaults.elevatedCardElevation(defaultElevation = 0.dp)) {
                 Text(
-                    if (ar) "عند الموعد يظهر إشعار موثوق. اضغط عليه لفتح التطبيق؛ أندرويد يقيّد فتح التطبيقات قسرًا من الخلفية." else "At the scheduled time Shortcut shows a reliable notification. Tap it to open the app; Android restricts forced background app launches.",
+                    if (ar) "عند الموعد سيحاول Shortcut فتح التطبيق تلقائيًا. إذا منع النظام ذلك، يستخدم إشعارًا كخطة بديلة عند توفر صلاحية الإشعارات." else "At the scheduled time Shortcut will try to open the app automatically. If Android blocks it, a notification is used as a fallback when notification permission is available.",
                     modifier = Modifier.padding(15.dp),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            }
-        }
-        if (permissionError) {
-            item {
-                Text(
-                    if (ar) "يلزم السماح بالإشعارات لحفظ هذه المهمة المجدولة." else "Notification permission is required to save this scheduled app task.",
-                    color = MaterialTheme.colorScheme.error,
-                    style = MaterialTheme.typography.bodySmall,
                 )
             }
         }
