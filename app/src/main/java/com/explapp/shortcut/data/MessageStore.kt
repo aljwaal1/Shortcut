@@ -6,8 +6,12 @@ import com.explapp.shortcut.domain.ScheduledMessage
 class MessageStore(context: Context) {
     private val preferences = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
 
-    fun load(): List<ScheduledMessage> =
-        MessageCodec.decode(preferences.getString(KEY_MESSAGES, "").orEmpty())
+    fun load(): List<ScheduledMessage> {
+        val raw = preferences.getString(KEY_MESSAGES, "").orEmpty()
+        val decoded = MessageCodec.decode(raw)
+        if (raw.isNotBlank() && MessageCodec.needsMigration(raw)) save(decoded)
+        return decoded
+    }
 
     fun save(messages: List<ScheduledMessage>) {
         preferences.edit()
@@ -15,9 +19,16 @@ class MessageStore(context: Context) {
             .apply()
     }
 
-    fun remove(message: ScheduledMessage) {
-        save(load().filterNot { it == message })
+    fun upsert(message: ScheduledMessage): List<ScheduledMessage> =
+        ScheduledEntityCollection.upsertMessage(load(), message).also(::save)
+
+    fun remove(message: ScheduledMessage) = removeById(message.id)
+
+    fun removeById(id: String) {
+        save(ScheduledEntityCollection.removeMessage(load(), id))
     }
+
+    fun findById(id: String): ScheduledMessage? = load().firstOrNull { it.id == id }
 
     private companion object {
         const val PREFS_NAME = "message_store"
