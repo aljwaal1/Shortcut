@@ -1,15 +1,18 @@
 package com.explapp.shortcut.automation.routines
 
+import android.Manifest
 import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.PendingIntent
 import android.content.Context
 import android.content.Intent
+import android.content.pm.PackageManager
 import android.net.Uri
 import android.os.Build
 import androidx.core.app.NotificationCompat
-import com.explapp.shortcut.messages.MessageDeepLinkFactory
+import androidx.core.content.ContextCompat
 import com.explapp.shortcut.domain.MessagePlatform
+import com.explapp.shortcut.messages.MessageDeepLinkFactory
 import com.explapp.shortcut.usage.AppUsageActivity
 
 class AndroidRoutineActionRunner(
@@ -30,8 +33,8 @@ class AndroidRoutineActionRunner(
             else RoutineActionResult.failure(action, "Unknown tool: ${action.value}")
         }
         RoutineActionType.SHOW_NOTIFICATION -> {
-            showNotification("Shortcut", action.value, null)
-            RoutineActionResult.success(action)
+            if (showNotification("Shortcut", action.value, null)) RoutineActionResult.success(action)
+            else RoutineActionResult.failure(action, "Notification permission is required")
         }
     }
 
@@ -40,12 +43,13 @@ class AndroidRoutineActionRunner(
         val uri = Uri.parse(MessageDeepLinkFactory.build(platform, action.value, action.secondaryValue))
         val intent = Intent(Intent.ACTION_VIEW, uri).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
         return if (userInitiated) openExternal(action, intent) else {
-            showNotification(
-                title = if (platform == MessagePlatform.WHATSAPP) "WhatsApp message ready" else "Telegram message ready",
-                text = action.secondaryValue,
-                intent = intent,
-            )
-            RoutineActionResult.prepared(action, "User action required")
+            if (showNotification(
+                    title = if (platform == MessagePlatform.WHATSAPP) "WhatsApp message ready" else "Telegram message ready",
+                    text = action.secondaryValue,
+                    intent = intent,
+                )
+            ) RoutineActionResult.prepared(action, "User action required")
+            else RoutineActionResult.failure(action, "Notification permission is required")
         }
     }
 
@@ -53,8 +57,11 @@ class AndroidRoutineActionRunner(
         val intent = rawIntent ?: return RoutineActionResult.failure(action, "Target is unavailable")
         intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
         if (!userInitiated) {
-            showNotification("Shortcut action ready", action.value.ifBlank { action.type.name }, intent)
-            return RoutineActionResult.prepared(action, "User action required")
+            return if (showNotification("Shortcut action ready", action.value.ifBlank { action.type.name }, intent)) {
+                RoutineActionResult.prepared(action, "User action required")
+            } else {
+                RoutineActionResult.failure(action, "Notification permission is required")
+            }
         }
         return runCatching {
             context.startActivity(intent)
@@ -62,7 +69,11 @@ class AndroidRoutineActionRunner(
         }.getOrElse { RoutineActionResult.failure(action, it.message ?: it.javaClass.simpleName) }
     }
 
-    private fun showNotification(title: String, text: String, intent: Intent?) {
+    private fun showNotification(title: String, text: String, intent: Intent?): Boolean {
+        if (Build.VERSION.SDK_INT >= 33 &&
+            ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED
+        ) return false
+
         val manager = context.getSystemService(NotificationManager::class.java)
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             manager.createNotificationChannel(NotificationChannel(CHANNEL, "Automation routines", NotificationManager.IMPORTANCE_DEFAULT))
@@ -82,7 +93,10 @@ class AndroidRoutineActionRunner(
                 ),
             )
         }
-        manager.notify((System.currentTimeMillis() % Int.MAX_VALUE).toInt(), builder.build())
+        return runCatching {
+            manager.notify((System.currentTimeMillis() % Int.MAX_VALUE).toInt(), builder.build())
+            true
+        }.getOrDefault(false)
     }
 
     companion object { private const val CHANNEL = "automation_routines" }
