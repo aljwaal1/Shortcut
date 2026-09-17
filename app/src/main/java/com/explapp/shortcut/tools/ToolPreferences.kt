@@ -30,14 +30,23 @@ class ToolPreferencesStore(context: Context) {
 
     fun toggleFavorite(toolId: ToolId): Set<ToolId> {
         val updated = ToolPreferenceLogic.toggleFavorite(favorites(), toolId)
-        prefs.edit().putStringSet(KEY_FAVORITES, updated.map { it.name }.toSet()).apply()
+        replaceFavorites(updated)
         return updated
     }
 
     fun recordRecent(toolId: ToolId): List<ToolId> {
         val updated = ToolPreferenceLogic.recordRecent(recents(), toolId)
-        prefs.edit().putString(KEY_RECENTS, updated.joinToString(",") { it.name }).apply()
+        replaceRecents(updated)
         return updated
+    }
+
+    fun replaceFavorites(items: Collection<ToolId>) {
+        prefs.edit().putStringSet(KEY_FAVORITES, items.map { it.name }.toSet()).apply()
+    }
+
+    fun replaceRecents(items: List<ToolId>) {
+        val normalized = items.distinct().take(8)
+        prefs.edit().putString(KEY_RECENTS, normalized.joinToString(",") { it.name }).apply()
     }
 
     companion object {
