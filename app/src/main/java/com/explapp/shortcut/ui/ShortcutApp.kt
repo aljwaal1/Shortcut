@@ -29,6 +29,7 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.Language
@@ -104,11 +105,13 @@ fun ShortcutApp(onOpenTools: () -> Unit = {}) {
     }
     var showBuilder by remember { mutableStateOf(false) }
     var showMessageBuilder by remember { mutableStateOf<MessagePlatform?>(null) }
+    var editingShortcut by remember { mutableStateOf<ScheduledAppShortcut?>(null) }
+    var editingMessage by remember { mutableStateOf<ScheduledMessage?>(null) }
     var showPermissions by remember { mutableStateOf(false) }
 
     LaunchedEffect(Unit) {
-        shortcuts.forEach(scheduler::schedule)
-        messages.forEach(messageScheduler::schedule)
+        shortcuts.filter { it.isEnabled }.forEach(scheduler::schedule)
+        messages.filter { it.isEnabled }.forEach(messageScheduler::schedule)
     }
 
     when {
@@ -120,6 +123,33 @@ fun ShortcutApp(onOpenTools: () -> Unit = {}) {
             },
         )
         showPermissions -> PermissionsScreen(onBack = { showPermissions = false })
+        editingShortcut != null -> CreateShortcutScreen(
+            initial = editingShortcut,
+            onCancel = { editingShortcut = null },
+            onSave = { saved ->
+                val old = editingShortcut
+                if (old != null) scheduler.cancelById(old.id)
+                val index = shortcuts.indexOfFirst { it.id == saved.id }
+                if (index >= 0) shortcuts[index] = saved else shortcuts.add(saved)
+                store.save(shortcuts)
+                if (saved.isEnabled) scheduler.schedule(saved)
+                editingShortcut = null
+            },
+        )
+        editingMessage != null -> CreateMessageScreen(
+            initial = editingMessage,
+            initialPlatform = editingMessage?.platform ?: MessagePlatform.WHATSAPP,
+            onCancel = { editingMessage = null },
+            onSave = { saved ->
+                val old = editingMessage
+                if (old != null) messageScheduler.cancelById(old.id)
+                val index = messages.indexOfFirst { it.id == saved.id }
+                if (index >= 0) messages[index] = saved else messages.add(saved)
+                messageStore.save(messages)
+                if (saved.isEnabled) messageScheduler.schedule(saved)
+                editingMessage = null
+            },
+        )
         showBuilder -> CreateShortcutScreen(
             onCancel = { showBuilder = false },
             onSave = { shortcut ->
@@ -145,6 +175,8 @@ fun ShortcutApp(onOpenTools: () -> Unit = {}) {
             onCreateShortcut = { showBuilder = true },
             onOpenTools = onOpenTools,
             onCreateMessage = { showMessageBuilder = it },
+            onEditShortcut = { editingShortcut = it },
+            onEditMessage = { editingMessage = it },
             onDeleteShortcut = { shortcut ->
                 scheduler.cancel(shortcut)
                 val updated = ShortcutCollection.remove(shortcuts, shortcut)
@@ -219,6 +251,8 @@ private fun MainShell(
     onCreateShortcut: () -> Unit,
     onOpenTools: () -> Unit,
     onCreateMessage: (MessagePlatform) -> Unit,
+    onEditShortcut: (ScheduledAppShortcut) -> Unit,
+    onEditMessage: (ScheduledMessage) -> Unit,
     onDeleteShortcut: (ScheduledAppShortcut) -> Unit,
     onDeleteMessage: (ScheduledMessage) -> Unit,
     onOpenPermissions: () -> Unit,
@@ -260,6 +294,8 @@ private fun MainShell(
                 messages = messages,
                 onCreateShortcut = onCreateShortcut,
                 onOpenTools = onOpenTools,
+                onEditShortcut = onEditShortcut,
+                onEditMessage = onEditMessage,
                 onDeleteShortcut = onDeleteShortcut,
                 onDeleteMessage = onDeleteMessage,
             )
@@ -277,6 +313,8 @@ private fun HomeScreen(
     messages: List<ScheduledMessage>,
     onCreateShortcut: () -> Unit,
     onOpenTools: () -> Unit,
+    onEditShortcut: (ScheduledAppShortcut) -> Unit,
+    onEditMessage: (ScheduledMessage) -> Unit,
     onDeleteShortcut: (ScheduledAppShortcut) -> Unit,
     onDeleteMessage: (ScheduledMessage) -> Unit,
 ) {
@@ -354,14 +392,14 @@ private fun HomeScreen(
                     subtitle = if (ar) "مهامك المجدولة الجاهزة للعمل" else "Your scheduled actions, ready to run",
                 )
             }
-            items(shortcuts) { shortcut ->
+            items(shortcuts, key = { it.id }) { shortcut ->
                 ElevatedCard(
                     modifier = Modifier.fillMaxWidth(),
                     colors = CardDefaults.elevatedCardColors(containerColor = MaterialTheme.colorScheme.surface),
                 ) {
                     Row(
                         Modifier.fillMaxWidth().padding(16.dp),
-                        horizontalArrangement = Arrangement.spacedBy(14.dp),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
                         AccentIcon(Icons.Default.AutoAwesome, MaterialTheme.colorScheme.primary)
@@ -373,6 +411,9 @@ private fun HomeScreen(
                                 style = MaterialTheme.typography.bodyMedium,
                                 color = MaterialTheme.colorScheme.primary,
                             )
+                        }
+                        IconButton(onClick = { onEditShortcut(shortcut) }) {
+                            Icon(Icons.Default.Edit, contentDescription = if (ar) "تعديل المهمة" else "Edit task", tint = MaterialTheme.colorScheme.primary)
                         }
                         IconButton(onClick = { onDeleteShortcut(shortcut) }) {
                             Icon(Icons.Default.Delete, contentDescription = stringResource(R.string.delete_shortcut), tint = MaterialTheme.colorScheme.error)
@@ -389,11 +430,11 @@ private fun HomeScreen(
                     subtitle = if (ar) "رسائل مجهزة تفتح في الوقت الذي اخترته" else "Prepared messages opened at your chosen time",
                 )
             }
-            items(messages) { message ->
+            items(messages, key = { it.id }) { message ->
                 ElevatedCard(modifier = Modifier.fillMaxWidth()) {
                     Row(
                         Modifier.fillMaxWidth().padding(16.dp),
-                        horizontalArrangement = Arrangement.spacedBy(14.dp),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
                         AccentIcon(Icons.Default.Language, MaterialTheme.colorScheme.secondary)
@@ -409,6 +450,9 @@ private fun HomeScreen(
                                 "%02d:%02d • %s".format(message.hour, message.minute, message.repeat.name),
                                 style = MaterialTheme.typography.bodyMedium,
                             )
+                        }
+                        IconButton(onClick = { onEditMessage(message) }) {
+                            Icon(Icons.Default.Edit, contentDescription = if (ar) "تعديل الرسالة" else "Edit message", tint = MaterialTheme.colorScheme.secondary)
                         }
                         IconButton(onClick = { onDeleteMessage(message) }) {
                             Icon(Icons.Default.Delete, contentDescription = stringResource(R.string.delete_message), tint = MaterialTheme.colorScheme.error)
