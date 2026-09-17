@@ -57,6 +57,7 @@
             </intent-filter>
         </receiver>
         <receiver android:name=".automation.routines.RoutineAlarmReceiver" android:exported="false" />
+        <receiver android:name=".automation.routines.RoutineBatteryReceiver" android:exported="false" />
         <receiver android:name=".automation.routines.RoutineSystemEventReceiver" android:enabled="true" android:exported="false">
             <intent-filter>
                 <action android:name="android.intent.action.ACTION_POWER_CONNECTED" />
@@ -91,6 +92,12 @@
                 <category android:name="android.intent.category.DEFAULT" />
                 <category android:name="android.intent.category.BROWSABLE" />
                 <data android:scheme="shortcut" android:host="tool" />
+            </intent-filter>
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="shortcut" android:host="routine" />
             </intent-filter>
         </activity>
 
