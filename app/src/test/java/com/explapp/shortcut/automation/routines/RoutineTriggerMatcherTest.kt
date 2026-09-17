@@ -24,4 +24,15 @@ class RoutineTriggerMatcherTest {
         )
         assertFalse(RoutineTriggerMatcher.matches(routine, RoutineEvent(RoutineTriggerType.CHARGER_CONNECTED)))
     }
+
+    @Test
+    fun enabledButInvalidRoutineNeverMatches() {
+        val routine = AutomationRoutine(
+            name = "Incomplete template",
+            isEnabled = true,
+            trigger = RoutineTrigger(RoutineTriggerType.CHARGER_CONNECTED),
+            actions = listOf(RoutineAction(RoutineActionType.OPEN_APP, "")),
+        )
+        assertFalse(RoutineTriggerMatcher.matches(routine, RoutineEvent(RoutineTriggerType.CHARGER_CONNECTED)))
+    }
 }
