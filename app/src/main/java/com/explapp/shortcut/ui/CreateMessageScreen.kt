@@ -74,8 +74,9 @@ fun CreateMessageScreen(
     var minute by remember(initial?.id) { mutableStateOf("%02d".format(initial?.minute ?: 0)) }
     var repeat by remember(initial?.id) { mutableStateOf(initial?.repeat ?: RepeatOption.ONCE) }
     var pendingSave by remember { mutableStateOf<ScheduledMessage?>(null) }
+    var permissionError by remember { mutableStateOf(false) }
 
-    fun finishPendingSave() { pendingSave?.let(onSave); pendingSave = null }
+    fun finishPendingSave() { pendingSave?.let(onSave); pendingSave = null; permissionError = false }
     val exactAlarmLauncher = rememberLauncherForActivityResult(ActivityResultContracts.StartActivityForResult()) { finishPendingSave() }
     fun requestExactAlarmOrSave() {
         val exactGranted = Build.VERSION.SDK_INT < Build.VERSION_CODES.S || alarmManager.canScheduleExactAlarms()
@@ -83,7 +84,14 @@ fun CreateMessageScreen(
             exactAlarmLauncher.launch(Intent(Settings.ACTION_REQUEST_SCHEDULE_EXACT_ALARM, Uri.parse("package:${context.packageName}")))
         } else finishPendingSave()
     }
-    val notificationPermissionLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { requestExactAlarmOrSave() }
+    val notificationPermissionLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
+        if (granted) {
+            requestExactAlarmOrSave()
+        } else {
+            pendingSave = null
+            permissionError = true
+        }
+    }
 
     val defaultName = when (platform) {
         MessagePlatform.WHATSAPP -> stringResource(R.string.template_whatsapp)
@@ -103,6 +111,7 @@ fun CreateMessageScreen(
     )
 
     fun saveWithNeededPermissions() {
+        permissionError = false
         pendingSave = model
         val notificationsGranted = Build.VERSION.SDK_INT < 33 || ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) == PackageManager.PERMISSION_GRANTED
         val exactGranted = Build.VERSION.SDK_INT < Build.VERSION_CODES.S || alarmManager.canScheduleExactAlarms()
@@ -155,6 +164,15 @@ fun CreateMessageScreen(
         item {
             ElevatedCard(colors = CardDefaults.elevatedCardColors(containerColor = MaterialTheme.colorScheme.tertiaryContainer.copy(alpha = 0.55f)), elevation = CardDefaults.elevatedCardElevation(defaultElevation = 0.dp)) {
                 Text(if (ar) "الوضع القياسي: عند الموعد يظهر إشعار. اضغط عليه لفتح المحادثة والنص جاهز. لا نسجل الرسالة كمرسلة تلقائيًا." else "Standard mode: a notification appears at the scheduled time. Tap it to open the chat with the text prepared. Shortcut does not claim it was auto-sent.", modifier = Modifier.padding(15.dp), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+        }
+        if (permissionError) {
+            item {
+                Text(
+                    if (ar) "يلزم السماح بالإشعارات لحفظ رسالة مجدولة، لأن التنبيه هو الطريقة الموثوقة لفتح الرسالة الجاهزة في الموعد." else "Notification permission is required to save a scheduled prepared message, because the notification is the reliable way to open it at the scheduled time.",
+                    color = MaterialTheme.colorScheme.error,
+                    style = MaterialTheme.typography.bodySmall,
+                )
             }
         }
         item {
