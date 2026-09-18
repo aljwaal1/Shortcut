@@ -51,6 +51,7 @@ enum class RoutineActionType {
     SET_VARIABLE,
     READ_CLIPBOARD,
     COPY_TO_CLIPBOARD,
+    STOP_SHORTCUT,
     OPEN_TOOL,
     SHOW_NOTIFICATION,
 }
@@ -104,6 +105,7 @@ data class RoutineAction(
         RoutineActionType.SET_VARIABLE -> value.isNotBlank()
         RoutineActionType.READ_CLIPBOARD -> value.isNotBlank()
         RoutineActionType.COPY_TO_CLIPBOARD -> value.isNotBlank()
+        RoutineActionType.STOP_SHORTCUT -> true
         else -> value.isNotBlank()
     }
 }
