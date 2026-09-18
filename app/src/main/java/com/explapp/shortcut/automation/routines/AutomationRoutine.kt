@@ -12,13 +12,42 @@ enum class RoutineTriggerType {
     BOOT,
 }
 
+enum class RoutineConditionType {
+    BATTERY_ABOVE,
+    BATTERY_BELOW,
+    DAY_OF_WEEK,
+    VARIABLE_EQUALS,
+    VARIABLE_CONTAINS,
+}
+
+data class RoutineCondition(
+    val type: RoutineConditionType,
+    val value: String,
+    val secondaryValue: String = "",
+) {
+    fun isValid(): Boolean = when (type) {
+        RoutineConditionType.BATTERY_ABOVE,
+        RoutineConditionType.BATTERY_BELOW,
+        -> value.toIntOrNull() in 0..100
+
+        RoutineConditionType.DAY_OF_WEEK -> value.toIntOrNull() in 1..7
+        RoutineConditionType.VARIABLE_EQUALS,
+        RoutineConditionType.VARIABLE_CONTAINS,
+        -> value.isNotBlank()
+    }
+}
+
 enum class RoutineActionType {
     OPEN_APP,
     OPEN_APP_SCREENSHOT,
+    TAKE_SCREENSHOT,
+    WAIT,
     OPEN_URL,
     OPEN_MAPS,
     PREPARE_WHATSAPP,
     PREPARE_TELEGRAM,
+    SEND_TELEGRAM_BOT,
+    CUSTOM_SCRIPT,
     OPEN_TOOL,
     SHOW_NOTIFICATION,
 }
@@ -44,6 +73,7 @@ data class RoutineAction(
     val value: String,
     val secondaryValue: String = "",
     val continueOnError: Boolean = false,
+    val parameters: Map<String, String> = emptyMap(),
 ) {
     fun isValid(): Boolean = when (type) {
         RoutineActionType.PREPARE_WHATSAPP,
@@ -51,10 +81,23 @@ data class RoutineAction(
         -> value.isNotBlank() && secondaryValue.isNotBlank()
 
         RoutineActionType.OPEN_APP_SCREENSHOT -> {
-            val delayMs = secondaryValue.takeIf { it.isNotBlank() }?.toLongOrNull() ?: 2_000L
+            val delayMs = secondaryValue.takeIf { it.isNotBlank() }?.toLongOrNull() ?: 3_000L
             value.isNotBlank() && delayMs in 500L..10_000L
         }
 
+        RoutineActionType.TAKE_SCREENSHOT -> {
+            val delayMs = value.takeIf { it.isNotBlank() }?.toLongOrNull() ?: 3_000L
+            delayMs in 500L..10_000L
+        }
+
+        RoutineActionType.WAIT -> value.toLongOrNull()?.let { it in 100L..60_000L } == true
+
+        RoutineActionType.SEND_TELEGRAM_BOT ->
+            parameters["botToken"].orEmpty().isNotBlank() &&
+                parameters["chatId"].orEmpty().isNotBlank() &&
+                (secondaryValue.isNotBlank() || parameters["attachment"].orEmpty().isNotBlank())
+
+        RoutineActionType.CUSTOM_SCRIPT -> value.isNotBlank()
         else -> value.isNotBlank()
     }
 }
@@ -64,6 +107,7 @@ data class AutomationRoutine(
     val name: String,
     val isEnabled: Boolean = true,
     val trigger: RoutineTrigger,
+    val conditions: List<RoutineCondition> = emptyList(),
     val actions: List<RoutineAction>,
     val updatedAtMs: Long = System.currentTimeMillis(),
 ) {
@@ -71,6 +115,7 @@ data class AutomationRoutine(
         id.isNotBlank() &&
             name.isNotBlank() &&
             trigger.isValid() &&
+            conditions.all(RoutineCondition::isValid) &&
             actions.isNotEmpty() &&
             actions.all(RoutineAction::isValid)
 
