@@ -48,6 +48,9 @@ enum class RoutineActionType {
     PREPARE_TELEGRAM,
     SEND_TELEGRAM_BOT,
     CUSTOM_SCRIPT,
+    SET_VARIABLE,
+    READ_CLIPBOARD,
+    COPY_TO_CLIPBOARD,
     OPEN_TOOL,
     SHOW_NOTIFICATION,
 }
@@ -98,6 +101,9 @@ data class RoutineAction(
                 (secondaryValue.isNotBlank() || parameters["attachment"].orEmpty().isNotBlank())
 
         RoutineActionType.CUSTOM_SCRIPT -> value.isNotBlank()
+        RoutineActionType.SET_VARIABLE -> value.isNotBlank()
+        RoutineActionType.READ_CLIPBOARD -> value.isNotBlank()
+        RoutineActionType.COPY_TO_CLIPBOARD -> value.isNotBlank()
         else -> value.isNotBlank()
     }
 }
