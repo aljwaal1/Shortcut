@@ -117,10 +117,13 @@ class AndroidRoutineActionRunner(
         if (context.packageManager.getLaunchIntentForPackage(action.value) == null) {
             return RoutineActionResult.failure(action, "Target app is unavailable")
         }
-        val delayMs = action.secondaryValue.toLongOrNull()?.coerceIn(500L, 10_000L) ?: 2_000L
+        val delayMs = action.secondaryValue.toLongOrNull()?.coerceIn(500L, 10_000L) ?: 3_000L
         val workflowIntent = Intent(context, ScreenCaptureActivity::class.java)
             .putExtra(ScreenCaptureActivity.EXTRA_LAUNCH_PACKAGE, action.value)
             .putExtra(ScreenCaptureActivity.EXTRA_CAPTURE_DELAY_MS, delayMs)
+            .putExtra(ScreenCaptureActivity.EXTRA_TELEGRAM_BOT_TOKEN, action.parameters["telegramBotToken"].orEmpty())
+            .putExtra(ScreenCaptureActivity.EXTRA_TELEGRAM_CHAT_ID, action.parameters["telegramChatId"].orEmpty())
+            .putExtra(ScreenCaptureActivity.EXTRA_TELEGRAM_CAPTION, resolve(action.parameters["telegramCaption"].orEmpty()))
             .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
 
         if (userInitiated) {
