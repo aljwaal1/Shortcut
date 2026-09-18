@@ -248,6 +248,7 @@ private fun DailyScreenshotTelegramWizard(
     var botToken by remember { mutableStateOf("") }
     var chatId by remember { mutableStateOf("") }
     var caption by remember { mutableStateOf("") }
+    var keepCaptureSession by remember { mutableStateOf(true) }
     var showAppPicker by remember { mutableStateOf(false) }
     var pendingRoutine by remember { mutableStateOf<AutomationRoutine?>(null) }
     var permissionMessage by remember { mutableStateOf<String?>(null) }
@@ -355,6 +356,56 @@ private fun DailyScreenshotTelegramWizard(
         }
 
         item {
+            Text(if (ar) "وضع تصوير الشاشة" else "Screen-capture mode", fontWeight = FontWeight.Bold)
+            LazyRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                item {
+                    FilterChip(
+                        selected = !keepCaptureSession,
+                        onClick = { keepCaptureSession = false },
+                        label = { Text(if (ar) "موافقة في كل مرة" else "Approve each time") },
+                    )
+                }
+                item {
+                    FilterChip(
+                        selected = keepCaptureSession,
+                        onClick = { keepCaptureSession = true },
+                        label = { Text(if (ar) "جلسة تصوير مستمرة" else "Keep capture session active") },
+                    )
+                }
+            }
+            if (keepCaptureSession) {
+                ClearHint(
+                    if (ar) "توافق مرة واحدة الآن، ثم تبقى جلسة تصوير الشاشة نشطة في خدمة أمامية. يمكن للاختصار استخدام الجلسة لاحقًا دون طلب موافقة جديدة ما دامت الجلسة لم تتوقف ولم يُعاد تشغيل الهاتف."
+                    else "Approve once now, then Shortcut keeps one foreground screen-capture session active. Scheduled captures can reuse it without asking again while the session remains active.",
+                    ar,
+                )
+                Button(
+                    onClick = {
+                        context.startActivity(
+                            Intent(context, ScreenCaptureActivity::class.java)
+                                .putExtra(ScreenCaptureActivity.EXTRA_PERSISTENT_START_ONLY, true),
+                        )
+                    },
+                    modifier = Modifier.fillMaxWidth(),
+                ) {
+                    Text(
+                        if (PersistentScreenCaptureService.isSessionActive(context)) {
+                            if (ar) "جلسة التصوير نشطة" else "Capture session is active"
+                        } else {
+                            if (ar) "تفعيل جلسة التصوير الآن" else "Activate capture session now"
+                        },
+                    )
+                }
+            } else {
+                ClearHint(
+                    if (ar) "عند كل موعد سيظهر إشعار لتأكيد إذن تصوير الشاشة قبل أن يكمل الاختصار."
+                    else "At each scheduled run, a notification asks you to approve screen capture before the shortcut continues.",
+                    ar,
+                )
+            }
+        }
+
+        item {
             Text(if (ar) "3. تيليجرام" else "3. Telegram", fontWeight = FontWeight.Bold)
             OutlinedTextField(
                 value = botToken,
@@ -386,8 +437,13 @@ private fun DailyScreenshotTelegramWizard(
 
         item {
             ClearHint(
-                if (ar) "مهم: أندرويد لا يسمح للتطبيق بأخذ لقطة شاشة سرًا في الخلفية. عند حلول الوقت سيظهر إشعار؛ اضغط عليه ووافق على إذن تصوير الشاشة، ثم يكمل التطبيق الفتح والتصوير والإرسال مباشرة."
-                else "Important: Android does not allow silent background screen capture. At the scheduled time you will get a notification; tap it and approve screen capture, then Shortcut opens the app, captures, and sends immediately.",
+                if (keepCaptureSession) {
+                    if (ar) "إذا كانت الجلسة المستمرة نشطة فلن تحتاج لموافقة جديدة عند كل موعد. إذا توقفت الجلسة أو أُعيد تشغيل الهاتف، سيظهر إشعار لإعادة تفعيلها."
+                    else "While the persistent session is active, scheduled runs do not need fresh capture approval. If the session stops or the phone restarts, Shortcut will ask you to reactivate it."
+                } else {
+                    if (ar) "عند حلول الوقت سيظهر إشعار؛ اضغط عليه ووافق على إذن تصوير الشاشة، ثم يكمل التطبيق الفتح والتصوير والإرسال."
+                    else "At the scheduled time you will get a notification; tap it and approve screen capture, then Shortcut continues with opening, capture, and sending."
+                },
                 ar,
             )
         }
@@ -417,6 +473,9 @@ private fun DailyScreenshotTelegramWizard(
                                     type = RoutineActionType.OPEN_APP_SCREENSHOT,
                                     value = appPackage,
                                     secondaryValue = delayMs,
+                                    parameters = mapOf(
+                                        "persistentCapture" to keepCaptureSession.toString(),
+                                    ),
                                 ),
                                 RoutineAction(
                                     type = RoutineActionType.SEND_TELEGRAM_BOT,
