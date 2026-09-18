@@ -22,6 +22,7 @@ import androidx.core.content.ContextCompat
 import com.explapp.shortcut.domain.MessagePlatform
 import com.explapp.shortcut.messages.MessageDeepLinkFactory
 import com.explapp.shortcut.tools.ScreenCaptureActivity
+import com.explapp.shortcut.tools.PersistentScreenCaptureService
 import com.explapp.shortcut.tools.ToolId
 import com.explapp.shortcut.tools.ToolRouter
 import com.explapp.shortcut.usage.AppUsageActivity
@@ -233,6 +234,46 @@ class AndroidRoutineActionRunner(
             return RoutineActionResult.failure(action, local("Target app is unavailable", "التطبيق المطلوب غير متاح"))
         }
         val delayMs = action.secondaryValue.toLongOrNull()?.coerceIn(500L, 10_000L) ?: 3_000L
+        val usePersistentSession = action.parameters["persistentCapture"].toBoolean()
+
+        if (usePersistentSession) {
+            if (PersistentScreenCaptureService.isSessionActive(context)) {
+                val captureIntent = Intent(context, PersistentScreenCaptureService::class.java)
+                    .setAction(PersistentScreenCaptureService.ACTION_CAPTURE)
+                    .putExtra(PersistentScreenCaptureService.EXTRA_LAUNCH_PACKAGE, action.value)
+                    .putExtra(PersistentScreenCaptureService.EXTRA_CAPTURE_DELAY_MS, delayMs)
+                    .putExtra(PersistentScreenCaptureService.EXTRA_TELEGRAM_BOT_TOKEN, action.parameters["telegramBotToken"].orEmpty())
+                    .putExtra(PersistentScreenCaptureService.EXTRA_TELEGRAM_CHAT_ID, action.parameters["telegramChatId"].orEmpty())
+                    .putExtra(PersistentScreenCaptureService.EXTRA_TELEGRAM_CAPTION, resolve(action.parameters["telegramCaption"].orEmpty()))
+                return runCatching {
+                    ContextCompat.startForegroundService(context, captureIntent)
+                    RoutineActionResult.success(action)
+                }.getOrElse {
+                    RoutineActionResult.failure(action, it.message ?: local("Persistent capture failed", "فشل التصوير المستمر"))
+                }
+            }
+
+            val reactivate = Intent(context, ScreenCaptureActivity::class.java)
+                .putExtra(ScreenCaptureActivity.EXTRA_PERSISTENT_START_ONLY, true)
+                .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            return if (userInitiated) {
+                runCatching {
+                    context.startActivity(reactivate)
+                    RoutineActionResult.prepared(action, local("Start the persistent capture session", "شغّل جلسة تصوير الشاشة المستمرة"))
+                }.getOrElse { RoutineActionResult.failure(action, it.message ?: it.javaClass.simpleName) }
+            } else if (
+                showNotification(
+                    title = local("Screen-capture session needs approval", "جلسة تصوير الشاشة تحتاج موافقة"),
+                    text = local("Tap once to reactivate persistent capture.", "اضغط مرة واحدة لإعادة تفعيل جلسة التصوير المستمرة."),
+                    intent = reactivate,
+                )
+            ) {
+                RoutineActionResult.prepared(action, local("Persistent capture session is inactive", "جلسة التصوير المستمرة غير نشطة"))
+            } else {
+                RoutineActionResult.failure(action, local("Notification permission is required", "يلزم السماح بالإشعارات"))
+            }
+        }
+
         val workflowIntent = Intent(context, ScreenCaptureActivity::class.java)
             .putExtra(ScreenCaptureActivity.EXTRA_LAUNCH_PACKAGE, action.value)
             .putExtra(ScreenCaptureActivity.EXTRA_CAPTURE_DELAY_MS, delayMs)
@@ -255,9 +296,9 @@ class AndroidRoutineActionRunner(
                 intent = workflowIntent,
             )
         ) {
-            RoutineActionResult.prepared(action, "Screen-capture consent required")
+            RoutineActionResult.prepared(action, local("Screen-capture consent required", "يلزم تأكيد إذن تصوير الشاشة"))
         } else {
-            RoutineActionResult.failure(action, "Notification permission is required")
+            RoutineActionResult.failure(action, local("Notification permission is required", "يلزم السماح بالإشعارات"))
         }
     }
 
