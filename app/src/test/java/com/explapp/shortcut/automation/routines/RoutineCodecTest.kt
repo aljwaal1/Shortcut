@@ -24,6 +24,24 @@ class RoutineCodecTest {
     }
 
     @Test
+    fun routineRoundTripPreservesRecurrenceAndOldDataDefaultsDaily() {
+        val recurring = listOf(
+            AutomationRoutine(
+                id = "weekly",
+                name = "Weekly",
+                trigger = RoutineTrigger(RoutineTriggerType.TIME, "09:15", RoutineRepeat.WEEKLY, "5"),
+                actions = listOf(RoutineAction(RoutineActionType.SHOW_NOTIFICATION, "Done")),
+            ),
+        )
+        assertEquals(recurring, RoutineCodec.decode(RoutineCodec.encode(recurring)))
+
+        val legacy = """[{"id":"old","name":"Old","isEnabled":true,"updatedAtMs":0,"trigger":{"type":"TIME","value":"07:00"},"actions":[{"type":"SHOW_NOTIFICATION","value":"Hi","secondaryValue":""}]}]"""
+        val decoded = RoutineCodec.decode(legacy).single()
+        assertEquals(RoutineRepeat.DAILY, decoded.trigger.repeat)
+        assertEquals("", decoded.trigger.repeatValue)
+    }
+
+    @Test
     fun duplicateCreatesNewIdAndEnablesRoutine() {
         val original = AutomationRoutine(
             id = "r-1",
