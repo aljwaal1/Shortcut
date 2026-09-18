@@ -27,7 +27,9 @@ import android.os.Bundle
 import android.os.Handler
 import android.os.IBinder
 import android.os.Looper
+import android.os.SystemClock
 import android.widget.Toast
+import androidx.appcompat.app.AlertDialog
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.app.NotificationCompat
@@ -90,6 +92,60 @@ class ScreenCaptureActivity : AppCompatActivity() {
             IntentFilter(ScreenCaptureService.ACTION_COMPLETE),
             ContextCompat.RECEIVER_NOT_EXPORTED,
         )
+        showCaptureInstructions()
+    }
+
+    private fun showCaptureInstructions() {
+        val packageNameToOpen = launchPackage
+        if (!packageNameToOpen.isNullOrBlank()) {
+            val appLabel = runCatching {
+                val info = packageManager.getApplicationInfo(packageNameToOpen, 0)
+                packageManager.getApplicationLabel(info).toString()
+            }.getOrDefault(packageNameToOpen)
+
+            AlertDialog.Builder(this)
+                .setTitle(local("Open app + screenshot", "فتح تطبيق + لقطة شاشة"))
+                .setMessage(
+                    local(
+                        "Shortcut will ask Android for screen-capture permission, open $appLabel, wait ${captureDelayMs / 1000.0} seconds, take ONE screenshot of the whole visible screen, then stop automatically.",
+                        "سيطلب Shortcut موافقة Android على تصوير الشاشة، ثم يفتح $appLabel، وينتظر ${captureDelayMs / 1000.0} ثانية، ثم يلتقط صورة شاشة واحدة كاملة ويتوقف تلقائيًا.",
+                    ),
+                )
+                .setPositiveButton(local("Continue", "متابعة")) { _, _ -> launchConsent() }
+                .setNegativeButton(local("Cancel", "إلغاء")) { _, _ -> finish() }
+                .setOnCancelListener { finish() }
+                .show()
+            return
+        }
+
+        val choices = arrayOf(
+            local("3 seconds", "3 ثوانٍ"),
+            local("5 seconds", "5 ثوانٍ"),
+            local("10 seconds", "10 ثوانٍ"),
+        )
+        val delays = longArrayOf(3_000L, 5_000L, 10_000L)
+        var selected = 0
+        captureDelayMs = delays[selected]
+
+        AlertDialog.Builder(this)
+            .setTitle(local("Take one screenshot", "التقاط لقطة شاشة واحدة"))
+            .setMessage(
+                local(
+                    "What happens:\n1. Android asks for screen-capture permission.\n2. Shortcut moves to the background.\n3. You open the screen you want to capture.\n4. After the selected delay, ONE screenshot of the entire visible screen is taken.\n5. Capture stops automatically and the result opens.\n\nChoose how much time you need to reach the screen:",
+                    "ماذا سيحدث:\n1. سيطلب Android موافقة تصوير الشاشة.\n2. سينتقل Shortcut إلى الخلفية.\n3. افتح الشاشة التي تريد تصويرها.\n4. بعد المدة التي تختارها ستؤخذ لقطة واحدة للشاشة الظاهرة بالكامل.\n5. يتوقف التصوير تلقائيًا وتظهر النتيجة.\n\nاختر الوقت الذي تحتاجه للوصول إلى الشاشة:",
+                ),
+            )
+            .setSingleChoiceItems(choices, selected) { _, which ->
+                selected = which
+                captureDelayMs = delays[which]
+            }
+            .setPositiveButton(local("Start", "ابدأ")) { _, _ -> launchConsent() }
+            .setNegativeButton(local("Cancel", "إلغاء")) { _, _ -> finish() }
+            .setOnCancelListener { finish() }
+            .show()
+    }
+
+    private fun launchConsent() {
         consent.launch(getSystemService(MediaProjectionManager::class.java).createScreenCaptureIntent())
     }
 
@@ -188,7 +244,7 @@ class ScreenCaptureActivity : AppCompatActivity() {
         const val EXTRA_OCR = "ocr"
         const val EXTRA_LAUNCH_PACKAGE = "launch_package"
         const val EXTRA_CAPTURE_DELAY_MS = "capture_delay_ms"
-        private const val DEFAULT_CAPTURE_DELAY_MS = 2_000L
+        private const val DEFAULT_CAPTURE_DELAY_MS = 3_000L
         private const val OCR_CHANNEL = "screen_ocr"
     }
 }
@@ -248,9 +304,11 @@ class ScreenCaptureService : Service() {
         val metrics = resources.displayMetrics
         val width = metrics.widthPixels
         val height = metrics.heightPixels
-        val reader = ImageReader.newInstance(width, height, PixelFormat.RGBA_8888, 2)
+        val reader = ImageReader.newInstance(width, height, PixelFormat.RGBA_8888, 3)
         var display: android.hardware.display.VirtualDisplay? = null
         var completed = false
+        val readyAtMs = SystemClock.uptimeMillis() + 350L
+        var framesSeen = 0
 
         fun cleanup() {
             runCatching { display?.release() }
@@ -272,6 +330,11 @@ class ScreenCaptureService : Service() {
         reader.setOnImageAvailableListener({ imageReader ->
             if (completed) return@setOnImageAvailableListener
             val image = imageReader.acquireLatestImage() ?: return@setOnImageAvailableListener
+            framesSeen++
+            if (framesSeen == 1 || SystemClock.uptimeMillis() < readyAtMs) {
+                image.close()
+                return@setOnImageAvailableListener
+            }
             completed = true
             val plane = image.planes[0]
             val pixelStride = plane.pixelStride
