@@ -113,19 +113,38 @@ class PersistentScreenCaptureService : Service() {
                 cropped.recycle()
                 file
             }.onSuccess { file ->
+                val saved = runCatching {
+                    val output = ToolOutputStore(this).create(
+                        "Screenshot_" + System.currentTimeMillis() + ".png",
+                        "image/png",
+                        true,
+                    )
+                    contentResolver.openOutputStream(output).use { out ->
+                        requireNotNull(out)
+                        file.inputStream().use { it.copyTo(out) }
+                    }
+                    output
+                }
+
                 val token = pendingToken
                 val chatId = pendingChatId
                 val caption = pendingCaption
                 if (token.isNotBlank() && chatId.isNotBlank()) {
                     Thread {
-                        TelegramBotSender().sendPhoto(token, chatId, caption, file)
+                        val sent = TelegramBotSender().sendPhoto(token, chatId, caption, file)
                         file.delete()
+                        notifyResult(
+                            saved = saved.isSuccess,
+                            sent = sent.isSuccess,
+                        )
                     }.start()
                 } else {
                     file.delete()
+                    notifyResult(saved = saved.isSuccess, sent = false)
                 }
             }.onFailure {
                 runCatching { image.close() }
+                notifyResult(saved = false, sent = false)
             }
         }, handler)
 
@@ -218,6 +237,28 @@ class PersistentScreenCaptureService : Service() {
             .build()
     }
 
+    private fun notifyResult(saved: Boolean, sent: Boolean) {
+        val title = when {
+            saved && sent -> local("Screenshot sent to Telegram", "تم إرسال لقطة الشاشة إلى تيليجرام")
+            saved -> local("Screenshot saved", "تم حفظ لقطة الشاشة")
+            else -> local("Screenshot failed", "فشل التقاط لقطة الشاشة")
+        }
+        val text = when {
+            saved && sent -> local("The screenshot was saved and sent to the selected Telegram chat.", "تم حفظ لقطة الشاشة وإرسالها إلى محادثة تيليجرام المحددة.")
+            saved -> local("The screenshot was saved, but Telegram sending did not complete.", "تم حفظ لقطة الشاشة، لكن لم يكتمل الإرسال إلى تيليجرام.")
+            else -> local("Shortcut could not create the scheduled screenshot.", "تعذر على التطبيق إنشاء لقطة الشاشة المجدولة.")
+        }
+        getSystemService(NotificationManager::class.java).notify(
+            RESULT_NOTIFICATION_ID,
+            NotificationCompat.Builder(this, CHANNEL)
+                .setSmallIcon(android.R.drawable.ic_menu_camera)
+                .setContentTitle(title)
+                .setContentText(text)
+                .setAutoCancel(true)
+                .build(),
+        )
+    }
+
     private fun createChannel() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             getSystemService(NotificationManager::class.java).createNotificationChannel(
@@ -248,6 +289,7 @@ class PersistentScreenCaptureService : Service() {
 
         private const val CHANNEL = "persistent_screen_capture"
         private const val NOTIFICATION_ID = 9200
+        private const val RESULT_NOTIFICATION_ID = 9202
         private const val PREFS = "persistent_screen_capture_state"
         private const val KEY_ACTIVE = "active"
 
