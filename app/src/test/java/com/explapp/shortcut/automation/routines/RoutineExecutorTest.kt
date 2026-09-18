@@ -36,6 +36,32 @@ class RoutineExecutorTest {
     }
 
     @Test
+    fun stopShortcutPreventsLaterActions() {
+        val seen = mutableListOf<RoutineActionType>()
+        val runner = object : RoutineActionRunner {
+            override fun run(action: RoutineAction): RoutineActionResult {
+                seen += action.type
+                return RoutineActionResult.success(action)
+            }
+        }
+        val routine = AutomationRoutine(
+            name = "Stop flow",
+            trigger = RoutineTrigger(RoutineTriggerType.MANUAL),
+            actions = listOf(
+                RoutineAction(RoutineActionType.SET_VARIABLE, "name", "value"),
+                RoutineAction(RoutineActionType.STOP_SHORTCUT, ""),
+                RoutineAction(RoutineActionType.SHOW_NOTIFICATION, "must not run"),
+            ),
+        )
+
+        val result = RoutineExecutor(runner).execute(routine)
+
+        assertEquals(listOf(RoutineActionType.SET_VARIABLE, RoutineActionType.STOP_SHORTCUT), seen)
+        assertEquals(RoutineRunStatus.SUCCESS, result.status)
+        assertEquals(2, result.actionResults.size)
+    }
+
+    @Test
     fun fatalFailureStopsUnlessContinueOnErrorIsEnabled() {
         val seen = mutableListOf<RoutineActionType>()
         val runner = object : RoutineActionRunner {
