@@ -10,7 +10,10 @@ class RoutineDispatcher(private val context: Context) {
         .map { execute(it, userInitiated = false) }
 
     fun execute(routine: AutomationRoutine, userInitiated: Boolean): RoutineRunResult {
-        val result = RoutineExecutor(AndroidRoutineActionRunner(context, userInitiated)).execute(routine)
+        val result = RoutineExecutor(
+            AndroidRoutineActionRunner(context, userInitiated),
+            AndroidRoutineConditionEvaluator(context),
+        ).execute(routine)
         TaskExecutionReporter(context).report(result.toTaskExecutionResult())
         return result
     }
