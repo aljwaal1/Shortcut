@@ -9,7 +9,11 @@ import android.os.Build
 import android.os.SystemClock
 import com.explapp.shortcut.automation.currentBatteryLevel
 import com.explapp.shortcut.automation.isDeviceCharging
+import java.time.DayOfWeek
+import java.time.LocalDate
+import java.time.MonthDay
 import java.time.ZonedDateTime
+import java.time.temporal.TemporalAdjusters
 
 object RoutineRequestCode {
     fun fromId(id: String): Int = ("routine:$id").hashCode()
@@ -65,8 +69,7 @@ class RoutineScheduler(private val context: Context) {
         val minute = parts.getOrNull(1)?.toIntOrNull() ?: return
         if (hour !in 0..23 || minute !in 0..59) return
         val now = ZonedDateTime.now()
-        var at = now.withHour(hour).withMinute(minute).withSecond(0).withNano(0)
-        if (!at.isAfter(now)) at = at.plusDays(1)
+        val at = nextOccurrence(routine.trigger, now, hour, minute) ?: return
         val pending = statePending(routine.id, PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE, time = true) ?: return
         val alarm = context.getSystemService(AlarmManager::class.java)
         val millis = at.toInstant().toEpochMilli()
@@ -74,6 +77,62 @@ class RoutineScheduler(private val context: Context) {
             alarm.setExactAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, millis, pending)
         } else {
             alarm.setAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, millis, pending)
+        }
+    }
+
+    private fun nextOccurrence(
+        trigger: RoutineTrigger,
+        now: ZonedDateTime,
+        hour: Int,
+        minute: Int,
+    ): ZonedDateTime? {
+        fun at(date: LocalDate): ZonedDateTime =
+            date.atTime(hour, minute).atZone(now.zone).withSecond(0).withNano(0)
+
+        return when (trigger.repeat) {
+            RoutineRepeat.DAILY -> {
+                var candidate = at(now.toLocalDate())
+                if (!candidate.isAfter(now)) candidate = candidate.plusDays(1)
+                candidate
+            }
+
+            RoutineRepeat.WEEKLY -> {
+                val isoDay = trigger.repeatValue.toIntOrNull() ?: return null
+                val target = DayOfWeek.of(isoDay)
+                var date = now.toLocalDate().with(TemporalAdjusters.nextOrSame(target))
+                var candidate = at(date)
+                if (!candidate.isAfter(now)) {
+                    date = date.plusWeeks(1)
+                    candidate = at(date)
+                }
+                candidate
+            }
+
+            RoutineRepeat.MONTHLY -> {
+                val day = trigger.repeatValue.toIntOrNull() ?: return null
+                var cursor = now.toLocalDate().withDayOfMonth(1)
+                repeat(24) {
+                    if (day <= cursor.lengthOfMonth()) {
+                        val candidate = at(cursor.withDayOfMonth(day))
+                        if (candidate.isAfter(now)) return candidate
+                    }
+                    cursor = cursor.plusMonths(1)
+                }
+                null
+            }
+
+            RoutineRepeat.YEARLY -> {
+                val monthDay = runCatching { MonthDay.parse("--" + trigger.repeatValue) }.getOrNull() ?: return null
+                var year = now.year
+                repeat(8) {
+                    if (monthDay.isValidYear(year)) {
+                        val candidate = at(monthDay.atYear(year))
+                        if (candidate.isAfter(now)) return candidate
+                    }
+                    year++
+                }
+                null
+            }
         }
     }
 
