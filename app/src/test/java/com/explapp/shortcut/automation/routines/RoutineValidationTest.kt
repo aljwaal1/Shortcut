@@ -62,6 +62,8 @@ class RoutineValidationTest {
 
     @Test
     fun validatesTimeRecurrenceValues() {
+        assertTrue(RoutineTrigger(RoutineTriggerType.TIME, "08:00", RoutineRepeat.ONCE, "2026-09-20").isValid())
+        assertFalse(RoutineTrigger(RoutineTriggerType.TIME, "08:00", RoutineRepeat.ONCE, "2026-02-30").isValid())
         assertTrue(RoutineTrigger(RoutineTriggerType.TIME, "08:00", RoutineRepeat.DAILY).isValid())
         assertTrue(RoutineTrigger(RoutineTriggerType.TIME, "08:00", RoutineRepeat.WEEKLY, "1").isValid())
         assertFalse(RoutineTrigger(RoutineTriggerType.TIME, "08:00", RoutineRepeat.WEEKLY, "8").isValid())
