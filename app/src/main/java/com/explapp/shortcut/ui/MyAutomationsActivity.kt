@@ -2,6 +2,7 @@ package com.explapp.shortcut.ui
 
 import android.Manifest
 import android.app.AlarmManager
+import android.app.DatePickerDialog
 import android.app.TimePickerDialog
 import android.content.Intent
 import android.content.pm.PackageManager
@@ -62,6 +63,7 @@ import com.explapp.shortcut.automation.routines.RoutineCondition
 import com.explapp.shortcut.automation.routines.RoutineConditionType
 import com.explapp.shortcut.automation.routines.RoutineDispatcher
 import com.explapp.shortcut.automation.routines.RoutinePermissionPolicy
+import com.explapp.shortcut.automation.routines.RoutineRepeat
 import com.explapp.shortcut.automation.routines.RoutineScheduler
 import com.explapp.shortcut.automation.routines.RoutineStore
 import com.explapp.shortcut.automation.routines.RoutineTemplateCatalog
@@ -163,7 +165,11 @@ private fun MyAutomationsScreen(onBack: () -> Unit) {
                         Row(verticalAlignment = Alignment.CenterVertically) {
                             Column(Modifier.weight(1f)) {
                                 Text(routine.name, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
-                                Text(triggerTitle(routine.trigger.type, ar) + " " + routine.trigger.value, style = MaterialTheme.typography.bodySmall)
+                                Text(
+                                    triggerTitle(routine.trigger.type, ar) + " " + routine.trigger.value +
+                                        if (routine.trigger.type == RoutineTriggerType.TIME) " • " + repeatSummary(routine.trigger, ar) else "",
+                                    style = MaterialTheme.typography.bodySmall,
+                                )
                                 Text(
                                     if (ar) "${routine.conditions.size} شروط • ${routine.actions.size} خطوات"
                                     else "${routine.conditions.size} conditions • ${routine.actions.size} steps",
@@ -209,6 +215,8 @@ private fun RoutineBuilderScreen(
     var name by remember(initial?.id) { mutableStateOf(initial?.name.orEmpty()) }
     var triggerType by remember(initial?.id) { mutableStateOf(initial?.trigger?.type ?: RoutineTriggerType.MANUAL) }
     var triggerValue by remember(initial?.id) { mutableStateOf(initial?.trigger?.value.orEmpty()) }
+    var triggerRepeat by remember(initial?.id) { mutableStateOf(initial?.trigger?.repeat ?: RoutineRepeat.DAILY) }
+    var triggerRepeatValue by remember(initial?.id) { mutableStateOf(initial?.trigger?.repeatValue.orEmpty()) }
     val conditions = remember(initial?.id) { mutableStateListOf<RoutineCondition>().apply { addAll(initial?.conditions.orEmpty()) } }
     val actions = remember(initial?.id) { mutableStateListOf<RoutineAction>().apply { addAll(initial?.actions.orEmpty()) } }
 
@@ -355,9 +363,119 @@ private fun RoutineBuilderScreen(
                         },
                     )
                 }
+
+                Text(if (ar) "التكرار" else "Repeat", fontWeight = FontWeight.Bold)
+                LazyRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    items(RoutineRepeat.entries) { repeat ->
+                        FilterChip(
+                            selected = triggerRepeat == repeat,
+                            onClick = {
+                                triggerRepeat = repeat
+                                triggerRepeatValue = when (repeat) {
+                                    RoutineRepeat.DAILY -> ""
+                                    RoutineRepeat.WEEKLY -> {
+                                        val iso = now.get(Calendar.DAY_OF_WEEK)
+                                        if (iso == Calendar.SUNDAY) "7" else (iso - 1).toString()
+                                    }
+                                    RoutineRepeat.MONTHLY -> now.get(Calendar.DAY_OF_MONTH).toString()
+                                    RoutineRepeat.YEARLY -> String.format(
+                                        Locale.US,
+                                        "%02d-%02d",
+                                        now.get(Calendar.MONTH) + 1,
+                                        now.get(Calendar.DAY_OF_MONTH),
+                                    )
+                                }
+                            },
+                            label = { Text(repeatLabel(repeat, ar)) },
+                        )
+                    }
+                }
+
+                when (triggerRepeat) {
+                    RoutineRepeat.DAILY -> ClearHint(
+                        if (ar) "سيعمل الاختصار كل يوم في الوقت المحدد."
+                        else "The shortcut will run every day at the selected time.",
+                        ar,
+                    )
+
+                    RoutineRepeat.WEEKLY -> {
+                        Text(if (ar) "اختر يوم الأسبوع" else "Choose weekday", fontWeight = FontWeight.Bold)
+                        val days = if (ar) {
+                            listOf("1" to "الاثنين", "2" to "الثلاثاء", "3" to "الأربعاء", "4" to "الخميس", "5" to "الجمعة", "6" to "السبت", "7" to "الأحد")
+                        } else {
+                            listOf("1" to "Monday", "2" to "Tuesday", "3" to "Wednesday", "4" to "Thursday", "5" to "Friday", "6" to "Saturday", "7" to "Sunday")
+                        }
+                        LazyRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                            items(days) { (stored, label) ->
+                                FilterChip(
+                                    selected = triggerRepeatValue == stored,
+                                    onClick = { triggerRepeatValue = stored },
+                                    label = { Text(label) },
+                                )
+                            }
+                        }
+                        ClearHint(
+                            if (ar) "سيعمل مرة كل أسبوع في اليوم والوقت اللذين اخترتهما."
+                            else "The shortcut will run once each week on the selected weekday and time.",
+                            ar,
+                        )
+                    }
+
+                    RoutineRepeat.MONTHLY -> {
+                        Text(if (ar) "اختر يوم الشهر" else "Choose day of month", fontWeight = FontWeight.Bold)
+                        LazyRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                            items((1..31).toList()) { day ->
+                                FilterChip(
+                                    selected = triggerRepeatValue == day.toString(),
+                                    onClick = { triggerRepeatValue = day.toString() },
+                                    label = { Text(day.toString()) },
+                                )
+                            }
+                        }
+                        ClearHint(
+                            if (ar) "سيعمل مرة كل شهر في هذا اليوم. إذا لم يوجد هذا اليوم في شهر معيّن، ينتقل إلى الشهر التالي الذي يحتويه."
+                            else "Runs once each month on this day. If a month does not contain that day, it skips to the next month that does.",
+                            ar,
+                        )
+                    }
+
+                    RoutineRepeat.YEARLY -> {
+                        val monthDay = triggerRepeatValue.split("-")
+                        val month = monthDay.getOrNull(0)?.toIntOrNull() ?: (now.get(Calendar.MONTH) + 1)
+                        val day = monthDay.getOrNull(1)?.toIntOrNull() ?: now.get(Calendar.DAY_OF_MONTH)
+                        Button(
+                            onClick = {
+                                DatePickerDialog(
+                                    context,
+                                    { _, _, pickedMonth, pickedDay ->
+                                        triggerRepeatValue = String.format(Locale.US, "%02d-%02d", pickedMonth + 1, pickedDay)
+                                    },
+                                    now.get(Calendar.YEAR),
+                                    month - 1,
+                                    day,
+                                ).show()
+                            },
+                            modifier = Modifier.fillMaxWidth(),
+                        ) {
+                            Text(
+                                if (triggerRepeatValue.isBlank()) {
+                                    if (ar) "اختر التاريخ السنوي" else "Choose yearly date"
+                                } else {
+                                    (if (ar) "التاريخ السنوي: " else "Yearly date: ") + triggerRepeatValue
+                                },
+                            )
+                        }
+                        ClearHint(
+                            if (ar) "سيعمل مرة كل سنة في هذا التاريخ والوقت."
+                            else "The shortcut will run once each year on this date and time.",
+                            ar,
+                        )
+                    }
+                }
+
                 ClearHint(
-                    if (ar) "اضغط لاختيار الوقت من الساعة بدل كتابته يدويًا. يمكنك تغييره في أي وقت قبل الحفظ."
-                    else "Tap to choose the time from a clock instead of typing it manually. You can change it any time before saving.",
+                    if (ar) "اضغط لاختيار الوقت من الساعة بدل كتابته يدويًا."
+                    else "Tap to choose the time from a clock instead of typing it manually.",
                     ar,
                 )
             }
@@ -810,7 +928,12 @@ private fun RoutineBuilderScreen(
                 id = stableId,
                 name = name.ifBlank { if (ar) "اختصار جديد" else "New shortcut" },
                 isEnabled = initial?.isEnabled ?: true,
-                trigger = RoutineTrigger(triggerType, triggerValue),
+                trigger = RoutineTrigger(
+                    type = triggerType,
+                    value = triggerValue,
+                    repeat = if (triggerType == RoutineTriggerType.TIME) triggerRepeat else RoutineRepeat.DAILY,
+                    repeatValue = if (triggerType == RoutineTriggerType.TIME) triggerRepeatValue else "",
+                ),
                 conditions = conditions.toList(),
                 actions = actions.toList(),
             )
@@ -1036,6 +1159,26 @@ private fun conditionDisplay(condition: RoutineCondition, ar: Boolean): String {
 @Composable
 private fun SectionTitle(text: String) {
     Text(text, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.ExtraBold)
+}
+
+private fun repeatLabel(repeat: RoutineRepeat, ar: Boolean): String = when (repeat) {
+    RoutineRepeat.DAILY -> if (ar) "يومي" else "Daily"
+    RoutineRepeat.WEEKLY -> if (ar) "أسبوعي" else "Weekly"
+    RoutineRepeat.MONTHLY -> if (ar) "شهري" else "Monthly"
+    RoutineRepeat.YEARLY -> if (ar) "سنوي" else "Yearly"
+}
+
+private fun repeatSummary(trigger: RoutineTrigger, ar: Boolean): String = when (trigger.repeat) {
+    RoutineRepeat.DAILY -> if (ar) "يومي" else "Daily"
+    RoutineRepeat.WEEKLY -> {
+        val day = trigger.repeatValue.toIntOrNull()
+        val namesAr = listOf("", "الاثنين", "الثلاثاء", "الأربعاء", "الخميس", "الجمعة", "السبت", "الأحد")
+        val namesEn = listOf("", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday")
+        if (ar) "أسبوعي • " + (namesAr.getOrNull(day ?: 0) ?: "")
+        else "Weekly • " + (namesEn.getOrNull(day ?: 0) ?: "")
+    }
+    RoutineRepeat.MONTHLY -> if (ar) "شهري • يوم " + trigger.repeatValue else "Monthly • day " + trigger.repeatValue
+    RoutineRepeat.YEARLY -> if (ar) "سنوي • " + trigger.repeatValue else "Yearly • " + trigger.repeatValue
 }
 
 private fun triggerTitle(type: RoutineTriggerType, ar: Boolean): String = when (type) {
