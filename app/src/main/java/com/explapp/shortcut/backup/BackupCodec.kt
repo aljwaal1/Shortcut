@@ -47,7 +47,20 @@ object BackupCodec {
             put("schemaVersion", SCHEMA_VERSION)
             put("shortcuts", buildJsonArray { payload.shortcuts.forEach { add(it.toJson()) } })
             put("messages", buildJsonArray { payload.messages.forEach { add(it.toJson()) } })
-            put("routines", json.parseToJsonElement(RoutineCodec.encode(payload.routines)))
+            put(
+                "routines",
+                json.parseToJsonElement(
+                    RoutineCodec.encode(
+                        payload.routines.map { routine ->
+                            routine.copy(
+                                actions = routine.actions.map { action ->
+                                    action.copy(parameters = action.parameters - "botToken" - "telegramBotToken")
+                                },
+                            )
+                        },
+                    ),
+                ),
+            )
             put("favoriteToolIds", buildJsonArray { payload.favoriteToolIds.forEach { add(JsonPrimitive(it)) } })
             put("recentToolIds", buildJsonArray { payload.recentToolIds.forEach { add(JsonPrimitive(it)) } })
             put("unlockWifiMapsEnabled", payload.unlockWifiMapsEnabled)
