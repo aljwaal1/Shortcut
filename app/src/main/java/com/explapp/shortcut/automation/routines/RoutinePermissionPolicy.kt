@@ -8,7 +8,13 @@ object RoutinePermissionPolicy {
             RoutineTriggerType.CHARGER_DISCONNECTED,
             RoutineTriggerType.BATTERY_BELOW,
             RoutineTriggerType.BOOT,
-        ) || actions.any { it.type == RoutineActionType.SHOW_NOTIFICATION }
+        ) || actions.any {
+            it.type in setOf(
+                RoutineActionType.SHOW_NOTIFICATION,
+                RoutineActionType.OPEN_APP_SCREENSHOT,
+                RoutineActionType.TAKE_SCREENSHOT,
+            )
+        }
 
     fun needsExactAlarm(triggerType: RoutineTriggerType): Boolean =
         triggerType == RoutineTriggerType.TIME
