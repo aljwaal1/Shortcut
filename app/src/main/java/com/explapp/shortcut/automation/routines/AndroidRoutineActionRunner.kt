@@ -13,6 +13,7 @@ import androidx.core.app.NotificationCompat
 import androidx.core.content.ContextCompat
 import com.explapp.shortcut.domain.MessagePlatform
 import com.explapp.shortcut.messages.MessageDeepLinkFactory
+import com.explapp.shortcut.tools.ScreenCaptureActivity
 import com.explapp.shortcut.usage.AppUsageActivity
 
 class AndroidRoutineActionRunner(
@@ -21,6 +22,7 @@ class AndroidRoutineActionRunner(
 ) : RoutineActionRunner {
     override fun run(action: RoutineAction): RoutineActionResult = when (action.type) {
         RoutineActionType.OPEN_APP -> openExternal(action, context.packageManager.getLaunchIntentForPackage(action.value))
+        RoutineActionType.OPEN_APP_SCREENSHOT -> openAppScreenshot(action)
         RoutineActionType.OPEN_URL -> openExternal(action, Intent(Intent.ACTION_VIEW, Uri.parse(action.value)))
         RoutineActionType.OPEN_MAPS -> {
             val query = Uri.encode(action.value)
@@ -35,6 +37,36 @@ class AndroidRoutineActionRunner(
         RoutineActionType.SHOW_NOTIFICATION -> {
             if (showNotification("Shortcut", action.value, null)) RoutineActionResult.success(action)
             else RoutineActionResult.failure(action, "Notification permission is required")
+        }
+    }
+
+    private fun openAppScreenshot(action: RoutineAction): RoutineActionResult {
+        if (context.packageManager.getLaunchIntentForPackage(action.value) == null) {
+            return RoutineActionResult.failure(action, "Target app is unavailable")
+        }
+        val delayMs = action.secondaryValue.toLongOrNull()?.coerceIn(500L, 10_000L) ?: 2_000L
+        val workflowIntent = Intent(context, ScreenCaptureActivity::class.java)
+            .putExtra(ScreenCaptureActivity.EXTRA_LAUNCH_PACKAGE, action.value)
+            .putExtra(ScreenCaptureActivity.EXTRA_CAPTURE_DELAY_MS, delayMs)
+            .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+
+        if (userInitiated) {
+            return runCatching {
+                context.startActivity(workflowIntent)
+                RoutineActionResult.success(action)
+            }.getOrElse { RoutineActionResult.failure(action, it.message ?: it.javaClass.simpleName) }
+        }
+
+        return if (
+            showNotification(
+                title = "Open app + screenshot",
+                text = "Tap to approve screen capture and continue",
+                intent = workflowIntent,
+            )
+        ) {
+            RoutineActionResult.prepared(action, "Screen-capture consent required")
+        } else {
+            RoutineActionResult.failure(action, "Notification permission is required")
         }
     }
 
