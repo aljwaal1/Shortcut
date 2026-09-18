@@ -282,6 +282,7 @@ class AndroidRoutineActionRunner(
             .putExtra(ScreenCaptureActivity.EXTRA_TELEGRAM_BOT_TOKEN, action.parameters["telegramBotToken"].orEmpty())
             .putExtra(ScreenCaptureActivity.EXTRA_TELEGRAM_CHAT_ID, action.parameters["telegramChatId"].orEmpty())
             .putExtra(ScreenCaptureActivity.EXTRA_TELEGRAM_CAPTION, resolve(action.parameters["telegramCaption"].orEmpty()))
+            .putExtra(ScreenCaptureActivity.EXTRA_NORMAL_TELEGRAM_SHARE, action.parameters["normalTelegramShare"].toBoolean())
             .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
 
         if (userInitiated) {
