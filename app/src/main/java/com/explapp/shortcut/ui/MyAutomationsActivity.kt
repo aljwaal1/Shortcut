@@ -885,6 +885,7 @@ private fun RoutineBuilderScreen(
     var secondary by remember { mutableStateOf("") }
     var params by remember { mutableStateOf<Map<String, String>>(emptyMap()) }
     var continueOnError by remember { mutableStateOf(false) }
+    var editingActionRef by remember { mutableStateOf<RoutineAction?>(null) }
     var actionSearch by remember { mutableStateOf("") }
 
     var pendingRoutine by remember { mutableStateOf<AutomationRoutine?>(null) }
@@ -900,6 +901,7 @@ private fun RoutineBuilderScreen(
         secondary = ""
         params = emptyMap()
         continueOnError = false
+        editingActionRef = null
     }
 
     fun finishPendingSave() {
@@ -1573,12 +1575,26 @@ private fun RoutineBuilderScreen(
                     val draft = RoutineAction(actionType, value, secondary, continueOnError, params)
                     Button(
                         onClick = {
-                            actions += draft
+                            val editing = editingActionRef
+                            if (editing == null) {
+                                actions += draft
+                            } else {
+                                val editIndex = actions.indexOfFirst { it === editing }
+                                if (editIndex >= 0) actions[editIndex] = draft else actions += draft
+                            }
                             resetActionEditor()
                         },
                         enabled = draft.isValid(),
                         modifier = Modifier.fillMaxWidth(),
-                    ) { Text(if (ar) "إضافة الخطوة" else "Add step") }
+                    ) {
+                        Text(
+                            if (editingActionRef != null) {
+                                if (ar) "حفظ تعديل الخطوة" else "Save step changes"
+                            } else {
+                                if (ar) "إضافة الخطوة" else "Add step"
+                            },
+                        )
+                    }
                 }
             }
         }
@@ -1607,9 +1623,12 @@ private fun RoutineBuilderScreen(
                             secondary = action.secondaryValue
                             params = action.parameters
                             continueOnError = action.continueOnError
-                            actions.remove(action)
+                            editingActionRef = action
                         }) { Text(if (ar) "تعديل" else "Edit") }
-                        TextButton(onClick = { actions.remove(action) }) { Text(if (ar) "حذف" else "Remove") }
+                        TextButton(onClick = {
+                            if (editingActionRef === action) resetActionEditor()
+                            actions.remove(action)
+                        }) { Text(if (ar) "حذف" else "Remove") }
                     }
                 }
             }
