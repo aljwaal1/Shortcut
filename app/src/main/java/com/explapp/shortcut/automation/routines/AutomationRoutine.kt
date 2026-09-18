@@ -52,6 +52,10 @@ enum class RoutineActionType {
     READ_CLIPBOARD,
     COPY_TO_CLIPBOARD,
     STOP_SHORTCUT,
+    SAVE_TEXT_FILE,
+    SHARE_TEXT,
+    SHARE_FILE,
+    WEB_SEARCH,
     OPEN_TOOL,
     SHOW_NOTIFICATION,
 }
@@ -106,6 +110,10 @@ data class RoutineAction(
         RoutineActionType.READ_CLIPBOARD -> value.isNotBlank()
         RoutineActionType.COPY_TO_CLIPBOARD -> value.isNotBlank()
         RoutineActionType.STOP_SHORTCUT -> true
+        RoutineActionType.SAVE_TEXT_FILE -> value.isNotBlank()
+        RoutineActionType.SHARE_TEXT -> value.isNotBlank()
+        RoutineActionType.SHARE_FILE -> value.isNotBlank()
+        RoutineActionType.WEB_SEARCH -> value.isNotBlank()
         else -> value.isNotBlank()
     }
 }
