@@ -21,6 +21,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ElevatedCard
 import androidx.compose.material3.FilterChip
@@ -53,6 +54,7 @@ import com.explapp.shortcut.automation.routines.RoutineTemplateCatalog
 import com.explapp.shortcut.automation.routines.RoutineTrigger
 import com.explapp.shortcut.automation.routines.RoutineTriggerType
 import com.explapp.shortcut.backup.BackupTransferActivity
+import com.explapp.shortcut.data.InstalledAppRepository
 import com.explapp.shortcut.tools.NfcSetupActivity
 
 class MyAutomationsActivity : AppCompatActivity() {
@@ -187,6 +189,7 @@ private fun RoutineBuilderScreen(
     val context = LocalContext.current
     val ar = LocalConfiguration.current.locales[0].language == "ar"
     val alarmManager = remember(context) { context.getSystemService(AlarmManager::class.java) }
+    val installedApps = remember(context) { InstalledAppRepository(context).loadLaunchableApps() }
     val stableId = remember(initial?.id) { initial?.id ?: java.util.UUID.randomUUID().toString() }
     var name by remember(initial?.id) { mutableStateOf(initial?.name.orEmpty()) }
     var triggerType by remember(initial?.id) { mutableStateOf(initial?.trigger?.type ?: RoutineTriggerType.MANUAL) }
@@ -197,6 +200,7 @@ private fun RoutineBuilderScreen(
     var secondary by remember { mutableStateOf("") }
     var pendingRoutine by remember { mutableStateOf<AutomationRoutine?>(null) }
     var permissionError by remember { mutableStateOf(false) }
+    var showAppPicker by remember { mutableStateOf(false) }
 
     fun finishPendingSave() { pendingRoutine?.let(onSave); pendingRoutine = null; permissionError = false }
     val exactAlarmLauncher = rememberLauncherForActivityResult(ActivityResultContracts.StartActivityForResult()) { finishPendingSave() }
@@ -253,9 +257,37 @@ private fun RoutineBuilderScreen(
                 }
             }
         }
-        item { OutlinedTextField(value = value, onValueChange = { value = it }, label = { Text(if (ar) "القيمة / التطبيق / الرابط / المستلم" else "Value / app / URL / recipient") }, modifier = Modifier.fillMaxWidth()) }
+        if (actionType == RoutineActionType.OPEN_APP || actionType == RoutineActionType.OPEN_APP_SCREENSHOT) {
+            item {
+                val selectedLabel = installedApps.firstOrNull { it.packageName == value }?.label
+                Button(onClick = { showAppPicker = true }, modifier = Modifier.fillMaxWidth()) {
+                    Text(selectedLabel ?: if (ar) "اختر التطبيق" else "Choose app")
+                }
+            }
+        } else {
+            item { OutlinedTextField(value = value, onValueChange = { value = it }, label = { Text(if (ar) "القيمة / الرابط / المستلم" else "Value / URL / recipient") }, modifier = Modifier.fillMaxWidth()) }
+        }
         if (actionType == RoutineActionType.PREPARE_WHATSAPP || actionType == RoutineActionType.PREPARE_TELEGRAM) {
             item { OutlinedTextField(value = secondary, onValueChange = { secondary = it }, label = { Text(if (ar) "نص الرسالة" else "Message text") }, modifier = Modifier.fillMaxWidth()) }
+        }
+        if (actionType == RoutineActionType.OPEN_APP_SCREENSHOT) {
+            item {
+                Text(if (ar) "الانتظار قبل التقاط الصورة" else "Wait before screenshot", fontWeight = FontWeight.Bold)
+                Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    listOf(1000L, 2000L, 3000L, 5000L).forEach { delay ->
+                        FilterChip(
+                            selected = (secondary.toLongOrNull() ?: 2000L) == delay,
+                            onClick = { secondary = delay.toString() },
+                            label = { Text("${delay / 1000} ${if (ar) "ث" else "s"}") },
+                        )
+                    }
+                }
+                Text(
+                    if (ar) "سيطلب Android موافقة التقاط الشاشة، ثم يفتح التطبيق ويلتقط الصورة بعد المدة المحددة."
+                    else "Android asks for screen-capture consent, then opens the app and captures it after the selected delay.",
+                    style = MaterialTheme.typography.bodySmall,
+                )
+            }
         }
         item {
             Button(onClick = {
@@ -266,7 +298,14 @@ private fun RoutineBuilderScreen(
         items(actions) { action ->
             ElevatedCard(Modifier.fillMaxWidth()) {
                 Row(Modifier.fillMaxWidth().padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
-                    Text("${action.type.name}: ${action.value}", modifier = Modifier.weight(1f))
+                    val appLabel = installedApps.firstOrNull { it.packageName == action.value }?.label
+                    Text("${action.type.name}: ${appLabel ?: action.value}", modifier = Modifier.weight(1f))
+                    TextButton(onClick = {
+                        actionType = action.type
+                        value = action.value
+                        secondary = action.secondaryValue
+                        actions.remove(action)
+                    }) { Text(if (ar) "تعديل" else "Edit") }
                     TextButton(onClick = { actions.remove(action) }) { Text(if (ar) "إزالة" else "Remove") }
                 }
             }
@@ -291,6 +330,30 @@ private fun RoutineBuilderScreen(
                 Button(onClick = { saveWithNeededPermissions(routine) }, enabled = routine.isValid(), modifier = Modifier.weight(1f)) { Text(if (ar) "حفظ" else "Save") }
             }
         }
+    }
+
+    if (showAppPicker) {
+        AlertDialog(
+            onDismissRequest = { showAppPicker = false },
+            title = { Text(if (ar) "اختر التطبيق" else "Choose app") },
+            text = {
+                LazyColumn {
+                    items(installedApps, key = { it.packageName }) { app ->
+                        TextButton(
+                            onClick = {
+                                value = app.packageName
+                                if (actionType == RoutineActionType.OPEN_APP_SCREENSHOT && secondary.isBlank()) secondary = "2000"
+                                showAppPicker = false
+                            },
+                            modifier = Modifier.fillMaxWidth(),
+                        ) { Text(app.label) }
+                    }
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = { showAppPicker = false }) { Text(if (ar) "إلغاء" else "Cancel") }
+            },
+        )
     }
 }
 
