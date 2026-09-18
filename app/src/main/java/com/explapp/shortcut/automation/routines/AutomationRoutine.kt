@@ -2,6 +2,13 @@ package com.explapp.shortcut.automation.routines
 
 import java.util.UUID
 
+enum class RoutineRepeat {
+    DAILY,
+    WEEKLY,
+    MONTHLY,
+    YEARLY,
+}
+
 enum class RoutineTriggerType {
     MANUAL,
     TIME,
@@ -63,13 +70,24 @@ enum class RoutineActionType {
 data class RoutineTrigger(
     val type: RoutineTriggerType,
     val value: String = "",
+    val repeat: RoutineRepeat = RoutineRepeat.DAILY,
+    val repeatValue: String = "",
 ) {
     fun isValid(): Boolean = when (type) {
         RoutineTriggerType.TIME -> {
             val parts = value.split(':')
             val hour = parts.getOrNull(0)?.toIntOrNull()
             val minute = parts.getOrNull(1)?.toIntOrNull()
-            parts.size == 2 && hour in 0..23 && minute in 0..59
+            val timeValid = parts.size == 2 && hour in 0..23 && minute in 0..59
+            val repeatValid = when (repeat) {
+                RoutineRepeat.DAILY -> true
+                RoutineRepeat.WEEKLY -> repeatValue.toIntOrNull() in 1..7
+                RoutineRepeat.MONTHLY -> repeatValue.toIntOrNull() in 1..31
+                RoutineRepeat.YEARLY -> runCatching {
+                    java.time.MonthDay.parse("--" + repeatValue)
+                }.isSuccess
+            }
+            timeValid && repeatValid
         }
         RoutineTriggerType.BATTERY_BELOW -> value.toIntOrNull() in 1..100
         else -> true
