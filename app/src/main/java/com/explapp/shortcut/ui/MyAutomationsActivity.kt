@@ -2,6 +2,7 @@ package com.explapp.shortcut.ui
 
 import android.Manifest
 import android.app.AlarmManager
+import android.app.TimePickerDialog
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.net.Uri
@@ -17,8 +18,10 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
@@ -49,6 +52,8 @@ import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
 import kotlin.math.abs
+import java.util.Calendar
+import java.util.Locale
 import com.explapp.shortcut.automation.routines.AutomationRoutine
 import com.explapp.shortcut.automation.routines.RoutineAction
 import com.explapp.shortcut.automation.routines.RoutineActionType
@@ -219,6 +224,8 @@ private fun RoutineBuilderScreen(
     var pendingRoutine by remember { mutableStateOf<AutomationRoutine?>(null) }
     var permissionError by remember { mutableStateOf(false) }
     var showAppPicker by remember { mutableStateOf(false) }
+    var showActionPicker by remember { mutableStateOf(false) }
+    var actionPickerSearch by remember { mutableStateOf("") }
 
     fun resetActionEditor() {
         value = ""
@@ -318,7 +325,39 @@ private fun RoutineBuilderScreen(
             ClearHint(RoutineCatalog.triggerHint(triggerType, ar), ar)
         }
 
-        if (triggerType == RoutineTriggerType.TIME || triggerType == RoutineTriggerType.BATTERY_BELOW || triggerType == RoutineTriggerType.NFC) {
+        if (triggerType == RoutineTriggerType.TIME) {
+            item {
+                val now = Calendar.getInstance()
+                val parts = triggerValue.split(":")
+                val selectedHour = parts.getOrNull(0)?.toIntOrNull() ?: now.get(Calendar.HOUR_OF_DAY)
+                val selectedMinute = parts.getOrNull(1)?.toIntOrNull() ?: now.get(Calendar.MINUTE)
+                Button(
+                    onClick = {
+                        TimePickerDialog(
+                            context,
+                            { _, hour, minute -> triggerValue = String.format(Locale.US, "%02d:%02d", hour, minute) },
+                            selectedHour,
+                            selectedMinute,
+                            true,
+                        ).show()
+                    },
+                    modifier = Modifier.fillMaxWidth(),
+                ) {
+                    Text(
+                        if (triggerValue.isBlank()) {
+                            if (ar) "اختر الوقت" else "Choose time"
+                        } else {
+                            (if (ar) "الوقت المختار: " else "Selected time: ") + triggerValue
+                        },
+                    )
+                }
+                ClearHint(
+                    if (ar) "اضغط لاختيار الوقت من الساعة بدل كتابته يدويًا. يمكنك تغييره في أي وقت قبل الحفظ."
+                    else "Tap to choose the time from a clock instead of typing it manually. You can change it any time before saving.",
+                    ar,
+                )
+            }
+        } else if (triggerType == RoutineTriggerType.BATTERY_BELOW || triggerType == RoutineTriggerType.NFC) {
             item {
                 OutlinedTextField(
                     value = triggerValue,
@@ -432,11 +471,17 @@ private fun RoutineBuilderScreen(
                     }
                 }
             }
+            Button(
+                onClick = { showActionPicker = true },
+                modifier = Modifier.fillMaxWidth(),
+            ) {
+                Text(if (ar) "بحث وتصفح جميع الإجراءات" else "Search and browse all actions")
+            }
             OutlinedTextField(
                 value = actionSearch,
                 onValueChange = { actionSearch = it },
-                label = { Text(if (ar) "ابحث عن إجراء" else "Search actions") },
-                placeholder = { Text(if (ar) "تطبيق، صورة، رسالة، انتظار، سكربت..." else "App, image, message, wait, script...") },
+                label = { Text(if (ar) "بحث سريع" else "Quick search") },
+                placeholder = { Text(if (ar) "ملف، مشاركة، نص، صورة، ويب، متغير..." else "File, share, text, image, web, variable...") },
                 modifier = Modifier.fillMaxWidth(),
             )
         }
@@ -608,6 +653,64 @@ private fun RoutineBuilderScreen(
                             )
                         }
 
+                        RoutineActionType.SAVE_TEXT_FILE -> {
+                            OutlinedTextField(
+                                value = value,
+                                onValueChange = { value = it },
+                                label = { Text(if (ar) "النص المراد حفظه" else "Text to save") },
+                                placeholder = { Text(if (ar) "اكتب نصًا أو استخدم متغيرًا سابقًا" else "Enter text or use a previous variable") },
+                                modifier = Modifier.fillMaxWidth(),
+                            )
+                            OutlinedTextField(
+                                value = secondary,
+                                onValueChange = { secondary = it },
+                                label = { Text(if (ar) "اسم الملف" else "File name") },
+                                placeholder = { Text(if (ar) "مثال: تقرير اليوم" else "Example: Daily report") },
+                                supportingText = { Text(if (ar) "سيُحفظ الملف بصيغة TXT داخل مجلد Shortcut في التنزيلات." else "The TXT file is saved in the Shortcut folder inside Downloads.") },
+                                modifier = Modifier.fillMaxWidth(),
+                            )
+                        }
+
+                        RoutineActionType.SHARE_TEXT -> {
+                            OutlinedTextField(
+                                value = value,
+                                onValueChange = { value = it },
+                                label = { Text(if (ar) "النص المراد مشاركته" else "Text to share") },
+                                placeholder = { Text(if (ar) "اكتب النص أو استخدم نتيجة سابقة" else "Enter text or use a previous result") },
+                                modifier = Modifier.fillMaxWidth(),
+                            )
+                            ClearHint(
+                                if (ar) "عند التنفيذ سيظهر لك اختيار تطبيق المشاركة مثل الرسائل أو البريد أو تيليجرام."
+                                else "When this step runs, Android opens the share sheet so you can choose an app such as messaging, email, or Telegram.",
+                                ar,
+                            )
+                        }
+
+                        RoutineActionType.SHARE_FILE -> {
+                            OutlinedTextField(
+                                value = value,
+                                onValueChange = { value = it },
+                                label = { Text(if (ar) "الملف المراد مشاركته" else "File to share") },
+                                placeholder = { Text(if (ar) "يمكن استخدام ملف ناتج من خطوة حفظ سابقة" else "You can use a file created by an earlier save step") },
+                                modifier = Modifier.fillMaxWidth(),
+                            )
+                            ClearHint(
+                                if (ar) "إذا جاءت هذه الخطوة بعد «حفظ النص كملف»، يمكنك استخدام {{lastFile}} لمشاركة الملف الناتج."
+                                else "If this comes after Save text as file, use {{lastFile}} to share the file that was created.",
+                                ar,
+                            )
+                        }
+
+                        RoutineActionType.WEB_SEARCH -> {
+                            OutlinedTextField(
+                                value = value,
+                                onValueChange = { value = it },
+                                label = { Text(if (ar) "ما الذي تريد البحث عنه؟" else "What do you want to search for?") },
+                                placeholder = { Text(if (ar) "نص ثابت أو متغير سابق" else "Fixed text or a previous variable") },
+                                modifier = Modifier.fillMaxWidth(),
+                            )
+                        }
+
                         RoutineActionType.STOP_SHORTCUT -> {
                             ClearHint(
                                 if (ar) "عندما يصل التنفيذ إلى هذه الخطوة، يتوقف الاختصار فورًا ولا ينفذ أي خطوة بعدها."
@@ -716,6 +819,58 @@ private fun RoutineBuilderScreen(
                 ) { Text(if (ar) "حفظ" else "Save") }
             }
         }
+    }
+
+    if (showActionPicker) {
+        val pickerItems = RoutineCatalog.actions.filter {
+            actionPickerSearch.isBlank() ||
+                (if (ar) it.titleAr else it.titleEn).contains(actionPickerSearch, ignoreCase = true) ||
+                (if (ar) it.categoryAr else it.categoryEn).contains(actionPickerSearch, ignoreCase = true) ||
+                (if (ar) it.hintAr else it.hintEn).contains(actionPickerSearch, ignoreCase = true)
+        }
+        AlertDialog(
+            onDismissRequest = { showActionPicker = false },
+            title = { Text(if (ar) "اختيار إجراء" else "Choose an action") },
+            text = {
+                Column {
+                    OutlinedTextField(
+                        value = actionPickerSearch,
+                        onValueChange = { actionPickerSearch = it },
+                        label = { Text(if (ar) "ابحث بالاسم أو الفئة أو الوظيفة" else "Search by name, category, or purpose") },
+                        placeholder = { Text(if (ar) "مثال: حفظ، مشاركة، ملف، متغير، صورة..." else "Example: save, share, file, variable, image...") },
+                        modifier = Modifier.fillMaxWidth(),
+                    )
+                    Spacer(Modifier.height(8.dp))
+                    LazyColumn {
+                        items(pickerItems) { meta ->
+                            TextButton(
+                                onClick = {
+                                    actionType = meta.type
+                                    resetActionEditor()
+                                    showActionPicker = false
+                                    actionPickerSearch = ""
+                                },
+                                modifier = Modifier.fillMaxWidth(),
+                            ) {
+                                Column(Modifier.fillMaxWidth()) {
+                                    Text(if (ar) meta.titleAr else meta.titleEn, fontWeight = FontWeight.Bold)
+                                    Text(
+                                        (if (ar) meta.categoryAr else meta.categoryEn) + " • " + (if (ar) meta.hintAr else meta.hintEn),
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = { showActionPicker = false }) {
+                    Text(if (ar) "إغلاق" else "Close")
+                }
+            },
+        )
     }
 
     if (showAppPicker) {
@@ -896,6 +1051,10 @@ private fun actionSummary(action: RoutineAction, appLabel: String?, ar: Boolean)
     RoutineActionType.READ_CLIPBOARD -> (if (ar) "يحفظ في: " else "Stores in: ") + action.value
     RoutineActionType.COPY_TO_CLIPBOARD -> action.value.take(100)
     RoutineActionType.STOP_SHORTCUT -> if (ar) "يتوقف التنفيذ هنا" else "Execution stops here"
+    RoutineActionType.SAVE_TEXT_FILE -> if (ar) "حفظ ملف نصي" else "Save text file"
+    RoutineActionType.SHARE_TEXT -> if (ar) "مشاركة نص" else "Share text"
+    RoutineActionType.SHARE_FILE -> if (ar) "مشاركة ملف" else "Share file"
+    RoutineActionType.WEB_SEARCH -> if (ar) "بحث: " + action.value.take(70) else "Search: " + action.value.take(70)
     else -> action.value.take(100)
 }
 
