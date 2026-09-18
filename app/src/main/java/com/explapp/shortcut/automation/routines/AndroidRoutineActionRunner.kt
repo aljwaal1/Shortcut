@@ -9,6 +9,9 @@ import android.content.Intent
 import android.content.pm.PackageManager
 import android.net.Uri
 import android.os.Build
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
 import androidx.core.app.NotificationCompat
 import androidx.core.content.ContextCompat
 import com.explapp.shortcut.domain.MessagePlatform
@@ -20,9 +23,12 @@ class AndroidRoutineActionRunner(
     private val context: Context,
     private val userInitiated: Boolean,
 ) : RoutineActionRunner {
+    private val variables = mutableMapOf<String, String>()
     override fun run(action: RoutineAction): RoutineActionResult = when (action.type) {
         RoutineActionType.OPEN_APP -> openExternal(action, context.packageManager.getLaunchIntentForPackage(action.value))
         RoutineActionType.OPEN_APP_SCREENSHOT -> openAppScreenshot(action)
+        RoutineActionType.TAKE_SCREENSHOT -> takeScreenshot(action)
+        RoutineActionType.WAIT -> waitAction(action)
         RoutineActionType.OPEN_URL -> openExternal(action, Intent(Intent.ACTION_VIEW, Uri.parse(action.value)))
         RoutineActionType.OPEN_MAPS -> {
             val query = Uri.encode(action.value)
@@ -30,6 +36,8 @@ class AndroidRoutineActionRunner(
         }
         RoutineActionType.PREPARE_WHATSAPP -> preparedMessage(action, MessagePlatform.WHATSAPP)
         RoutineActionType.PREPARE_TELEGRAM -> preparedMessage(action, MessagePlatform.TELEGRAM)
+        RoutineActionType.SEND_TELEGRAM_BOT -> sendTelegramBot(action)
+        RoutineActionType.CUSTOM_SCRIPT -> runCustomScript(action)
         RoutineActionType.OPEN_TOOL -> {
             if (action.value == "app_usage") openExternal(action, Intent(context, AppUsageActivity::class.java))
             else RoutineActionResult.failure(action, "Unknown tool: ${action.value}")
@@ -38,6 +46,71 @@ class AndroidRoutineActionRunner(
             if (showNotification("Shortcut", action.value, null)) RoutineActionResult.success(action)
             else RoutineActionResult.failure(action, "Notification permission is required")
         }
+    }
+
+    private fun waitAction(action: RoutineAction): RoutineActionResult {
+        val delay = action.value.toLongOrNull()?.coerceIn(100L, 60_000L)
+            ?: return RoutineActionResult.failure(action, "Invalid wait time")
+        return runCatching {
+            Thread.sleep(delay)
+            RoutineActionResult.success(action)
+        }.getOrElse { RoutineActionResult.failure(action, it.message ?: "Wait failed") }
+    }
+
+    private fun takeScreenshot(action: RoutineAction): RoutineActionResult {
+        val delayMs = action.value.toLongOrNull()?.coerceIn(500L, 10_000L) ?: 3_000L
+        val workflowIntent = Intent(context, ScreenCaptureActivity::class.java)
+            .putExtra(ScreenCaptureActivity.EXTRA_CAPTURE_DELAY_MS, delayMs)
+            .putExtra(ScreenCaptureActivity.EXTRA_TELEGRAM_BOT_TOKEN, action.parameters["telegramBotToken"].orEmpty())
+            .putExtra(ScreenCaptureActivity.EXTRA_TELEGRAM_CHAT_ID, action.parameters["telegramChatId"].orEmpty())
+            .putExtra(ScreenCaptureActivity.EXTRA_TELEGRAM_CAPTION, resolve(action.parameters["telegramCaption"].orEmpty()))
+            .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        return runCatching {
+            context.startActivity(workflowIntent)
+            RoutineActionResult.prepared(action, "Screen-capture consent required")
+        }.getOrElse { RoutineActionResult.failure(action, it.message ?: it.javaClass.simpleName) }
+    }
+
+    private fun sendTelegramBot(action: RoutineAction): RoutineActionResult {
+        val token = resolve(action.parameters["botToken"].orEmpty())
+        val chatId = resolve(action.parameters["chatId"].orEmpty())
+        val text = resolve(action.secondaryValue)
+        val attachment = resolve(action.parameters["attachment"].orEmpty())
+        if (token.isBlank() || chatId.isBlank()) return RoutineActionResult.failure(action, "Bot token and chat ID are required")
+        var error: Throwable? = null
+        val thread = Thread {
+            val result = if (attachment.isNotBlank()) {
+                TelegramBotSender().sendPhoto(token, chatId, text, java.io.File(attachment))
+            } else {
+                TelegramBotSender().sendText(token, chatId, text)
+            }
+            error = result.exceptionOrNull()
+        }
+        thread.start()
+        thread.join(20_000L)
+        return if (thread.isAlive) RoutineActionResult.failure(action, "Telegram request timed out")
+        else error?.let { RoutineActionResult.failure(action, it.message ?: "Telegram send failed") }
+            ?: RoutineActionResult.success(action)
+    }
+
+    private fun runCustomScript(action: RoutineAction): RoutineActionResult {
+        val inputs = variables + mapOf(
+            "input" to resolve(action.secondaryValue),
+            "currentDate" to SimpleDateFormat("yyyy-MM-dd", Locale.US).format(Date()),
+            "currentTime" to SimpleDateFormat("HH:mm:ss", Locale.US).format(Date()),
+        )
+        val result = CustomScriptRunner().run(action.value, inputs)
+        return result.fold(
+            onSuccess = { output ->
+                variables["lastResult"] = output
+                RoutineActionResult.success(action)
+            },
+            onFailure = { RoutineActionResult.failure(action, it.message ?: "Script failed") },
+        )
+    }
+
+    private fun resolve(raw: String): String = variables.entries.fold(raw) { acc, (key, value) ->
+        acc.replace("{{$key}}", value)
     }
 
     private fun openAppScreenshot(action: RoutineAction): RoutineActionResult {
