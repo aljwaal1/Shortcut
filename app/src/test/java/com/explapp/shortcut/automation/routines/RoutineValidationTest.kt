@@ -61,6 +61,17 @@ class RoutineValidationTest {
     }
 
     @Test
+    fun validatesTimeRecurrenceValues() {
+        assertTrue(RoutineTrigger(RoutineTriggerType.TIME, "08:00", RoutineRepeat.DAILY).isValid())
+        assertTrue(RoutineTrigger(RoutineTriggerType.TIME, "08:00", RoutineRepeat.WEEKLY, "1").isValid())
+        assertFalse(RoutineTrigger(RoutineTriggerType.TIME, "08:00", RoutineRepeat.WEEKLY, "8").isValid())
+        assertTrue(RoutineTrigger(RoutineTriggerType.TIME, "08:00", RoutineRepeat.MONTHLY, "31").isValid())
+        assertFalse(RoutineTrigger(RoutineTriggerType.TIME, "08:00", RoutineRepeat.MONTHLY, "32").isValid())
+        assertTrue(RoutineTrigger(RoutineTriggerType.TIME, "08:00", RoutineRepeat.YEARLY, "12-25").isValid())
+        assertFalse(RoutineTrigger(RoutineTriggerType.TIME, "08:00", RoutineRepeat.YEARLY, "13-40").isValid())
+    }
+
+    @Test
     fun validatesTimeAndBatteryTriggerValues() {
         val action = RoutineAction(RoutineActionType.SHOW_NOTIFICATION, "Hello")
         assertTrue(AutomationRoutine(name = "Time", trigger = RoutineTrigger(RoutineTriggerType.TIME, "23:59"), actions = listOf(action)).isValid())
