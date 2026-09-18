@@ -26,6 +26,10 @@ object RoutineCatalog {
         RoutineActionMeta(RoutineActionType.READ_CLIPBOARD, "Text", "النصوص", "Read clipboard", "قراءة الحافظة", "Read the current clipboard text and store it in a variable.", "يقرأ النص الموجود حاليًا في الحافظة ويحفظه داخل متغير."),
         RoutineActionMeta(RoutineActionType.COPY_TO_CLIPBOARD, "Text", "النصوص", "Copy to clipboard", "نسخ إلى الحافظة", "Copy text, including a previous result, to the device clipboard.", "ينسخ نصًا إلى حافظة الهاتف، ويمكن أن يكون النص ناتجًا من خطوة سابقة."),
         RoutineActionMeta(RoutineActionType.STOP_SHORTCUT, "Flow", "التحكم", "Stop shortcut", "إيقاف الاختصار", "Stop here and do not run any steps below this block.", "يوقف التنفيذ عند هذه النقطة، ولن تُنفذ أي خطوة موجودة بعدها."),
+        RoutineActionMeta(RoutineActionType.SAVE_TEXT_FILE, "Files", "الملفات", "Save text as file", "حفظ النص كملف", "Save text or a previous result as a TXT file in the Shortcut downloads folder.", "يحفظ نصًا أو نتيجة سابقة كملف TXT داخل مجلد Shortcut في التنزيلات."),
+        RoutineActionMeta(RoutineActionType.SHARE_TEXT, "Sharing", "المشاركة", "Share text", "مشاركة نص", "Open Android's share sheet with text from this shortcut.", "يفتح قائمة المشاركة في أندرويد مع النص الناتج من الاختصار."),
+        RoutineActionMeta(RoutineActionType.SHARE_FILE, "Sharing", "المشاركة", "Share file", "مشاركة ملف", "Share a file created or selected by a previous step using Android's share sheet.", "يشارك ملفًا تم إنشاؤه أو تحديده في خطوة سابقة باستخدام قائمة المشاركة."),
+        RoutineActionMeta(RoutineActionType.WEB_SEARCH, "Web", "الويب", "Search the web", "البحث في الويب", "Search the web using text or a previous result.", "يبحث في الويب باستخدام نص تكتبه أو نتيجة من خطوة سابقة."),
         RoutineActionMeta(RoutineActionType.CUSTOM_SCRIPT, "Advanced", "متقدم", "Custom script", "سكربت مخصص", "Run restricted JavaScript for calculations, text processing, JSON, or custom logic, then store its result.", "يشغّل سكربتًا مخصصًا داخل بيئة محدودة لمعالجة النصوص أو الأرقام أو البيانات، ثم يحفظ النتيجة للخطوات التالية."),
         RoutineActionMeta(RoutineActionType.OPEN_TOOL, "Shortcut", "أدوات التطبيق", "Open built-in tool", "فتح أداة داخلية", "Open one of Shortcut's built-in tools.", "يفتح إحدى الأدوات الموجودة داخل التطبيق."),
     )
@@ -41,6 +45,10 @@ object RoutineCatalog {
         RoutineActionType.SET_VARIABLE,
         RoutineActionType.CUSTOM_SCRIPT,
         -> listOf(RoutineActionType.COPY_TO_CLIPBOARD, RoutineActionType.SEND_TELEGRAM_BOT, RoutineActionType.SHOW_NOTIFICATION)
+        RoutineActionType.SAVE_TEXT_FILE -> listOf(RoutineActionType.SHARE_FILE, RoutineActionType.SEND_TELEGRAM_BOT, RoutineActionType.SHOW_NOTIFICATION)
+        RoutineActionType.READ_CLIPBOARD,
+        RoutineActionType.COPY_TO_CLIPBOARD,
+        -> listOf(RoutineActionType.WEB_SEARCH, RoutineActionType.SHARE_TEXT, RoutineActionType.CUSTOM_SCRIPT)
         RoutineActionType.STOP_SHORTCUT -> emptyList()
         else -> listOf(RoutineActionType.SET_VARIABLE, RoutineActionType.WAIT, RoutineActionType.SHOW_NOTIFICATION)
     }
