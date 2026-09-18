@@ -69,6 +69,8 @@ import com.explapp.shortcut.automation.routines.RoutineTrigger
 import com.explapp.shortcut.automation.routines.RoutineTriggerType
 import com.explapp.shortcut.data.InstalledAppRepository
 import com.explapp.shortcut.tools.NfcSetupActivity
+import com.explapp.shortcut.tools.ToolCatalog
+import com.explapp.shortcut.tools.ToolId
 
 class MyAutomationsActivity : AppCompatActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -226,6 +228,8 @@ private fun RoutineBuilderScreen(
     var showAppPicker by remember { mutableStateOf(false) }
     var showActionPicker by remember { mutableStateOf(false) }
     var actionPickerSearch by remember { mutableStateOf("") }
+    var showToolPicker by remember { mutableStateOf(false) }
+    var toolPickerSearch by remember { mutableStateOf("") }
 
     fun resetActionEditor() {
         value = ""
@@ -720,11 +724,21 @@ private fun RoutineBuilderScreen(
                         }
 
                         RoutineActionType.OPEN_TOOL -> {
-                            LazyRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                                item {
-                                    FilterChip(selected = value == "app_usage", onClick = { value = "app_usage" }, label = { Text(if (ar) "وقت استخدام التطبيقات" else "App usage") })
-                                }
+                            val selectedTool = ToolCatalog.all().firstOrNull { it.id.name == value }
+                            Button(
+                                onClick = { showToolPicker = true },
+                                modifier = Modifier.fillMaxWidth(),
+                            ) {
+                                Text(
+                                    selectedTool?.let { if (ar) it.titleAr else it.titleEn }
+                                        ?: if (ar) "اختر أداة من التطبيق" else "Choose a built-in tool",
+                                )
                             }
+                            ClearHint(
+                                if (ar) "يمكنك تشغيل أدوات التطبيق نفسها داخل الاختصار، مثل QR وPDF وOCR وضغط الملفات والصور وأدوات الحافظة وغيرها."
+                                else "You can launch Shortcut's built-in tools inside an automation, including QR, PDF, OCR, ZIP, image, clipboard, and other tools.",
+                                ar,
+                            )
                         }
 
                         else -> OutlinedTextField(
@@ -867,6 +881,49 @@ private fun RoutineBuilderScreen(
             },
             confirmButton = {
                 TextButton(onClick = { showActionPicker = false }) {
+                    Text(if (ar) "إغلاق" else "Close")
+                }
+            },
+        )
+    }
+
+    if (showToolPicker) {
+        val tools = ToolCatalog.all().filter {
+            toolPickerSearch.isBlank() ||
+                (if (ar) it.titleAr else it.titleEn).contains(toolPickerSearch, ignoreCase = true) ||
+                it.id.name.contains(toolPickerSearch, ignoreCase = true)
+        }
+        AlertDialog(
+            onDismissRequest = { showToolPicker = false },
+            title = { Text(if (ar) "اختيار أداة" else "Choose a tool") },
+            text = {
+                Column {
+                    OutlinedTextField(
+                        value = toolPickerSearch,
+                        onValueChange = { toolPickerSearch = it },
+                        label = { Text(if (ar) "ابحث عن أداة" else "Search tools") },
+                        placeholder = { Text(if (ar) "مثال: PDF، QR، نص، صور، ضغط..." else "Example: PDF, QR, text, images, ZIP...") },
+                        modifier = Modifier.fillMaxWidth(),
+                    )
+                    Spacer(Modifier.height(8.dp))
+                    LazyColumn {
+                        items(tools) { tool ->
+                            TextButton(
+                                onClick = {
+                                    value = tool.id.name
+                                    showToolPicker = false
+                                    toolPickerSearch = ""
+                                },
+                                modifier = Modifier.fillMaxWidth(),
+                            ) {
+                                Text(if (ar) tool.titleAr else tool.titleEn)
+                            }
+                        }
+                    }
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = { showToolPicker = false }) {
                     Text(if (ar) "إغلاق" else "Close")
                 }
             },
