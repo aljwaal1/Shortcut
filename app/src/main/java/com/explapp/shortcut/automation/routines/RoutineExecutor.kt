@@ -29,7 +29,7 @@ class RoutineExecutor(
             var action = routine.actions[index]
 
             if (
-                action.type == RoutineActionType.OPEN_APP_SCREENSHOT &&
+                action.type in setOf(RoutineActionType.OPEN_APP_SCREENSHOT, RoutineActionType.TAKE_SCREENSHOT) &&
                 index + 1 < routine.actions.size &&
                 routine.actions[index + 1].type == RoutineActionType.SEND_TELEGRAM_BOT
             ) {
