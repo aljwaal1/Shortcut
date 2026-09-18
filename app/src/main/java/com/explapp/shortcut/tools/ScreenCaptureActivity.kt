@@ -40,6 +40,8 @@ import java.io.FileOutputStream
 
 class ScreenCaptureActivity : AppCompatActivity() {
     private var runOcr = false
+    private var launchPackage: String? = null
+    private var captureDelayMs: Long = DEFAULT_CAPTURE_DELAY_MS
 
     private val receiver = object : BroadcastReceiver() {
         override fun onReceive(context: Context, intent: Intent) {
@@ -63,13 +65,25 @@ class ScreenCaptureActivity : AppCompatActivity() {
         val service = Intent(this, ScreenCaptureService::class.java)
             .putExtra(ScreenCaptureService.EXTRA_RESULT_CODE, result.resultCode)
             .putExtra(ScreenCaptureService.EXTRA_DATA, data)
+            .putExtra(ScreenCaptureService.EXTRA_CAPTURE_DELAY_MS, captureDelayMs)
         ContextCompat.startForegroundService(this, service)
-        moveTaskToBack(true)
+
+        val packageNameToOpen = launchPackage
+        if (!packageNameToOpen.isNullOrBlank()) {
+            packageManager.getLaunchIntentForPackage(packageNameToOpen)?.let { target ->
+                startActivity(target.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+            }
+        } else {
+            moveTaskToBack(true)
+        }
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         runOcr = intent.getBooleanExtra(EXTRA_OCR, false)
+        launchPackage = intent.getStringExtra(EXTRA_LAUNCH_PACKAGE)?.takeIf { it.isNotBlank() }
+        captureDelayMs = intent.getLongExtra(EXTRA_CAPTURE_DELAY_MS, DEFAULT_CAPTURE_DELAY_MS)
+            .coerceIn(500L, 10_000L)
         ContextCompat.registerReceiver(
             this,
             receiver,
@@ -172,6 +186,9 @@ class ScreenCaptureActivity : AppCompatActivity() {
 
     companion object {
         const val EXTRA_OCR = "ocr"
+        const val EXTRA_LAUNCH_PACKAGE = "launch_package"
+        const val EXTRA_CAPTURE_DELAY_MS = "capture_delay_ms"
+        private const val DEFAULT_CAPTURE_DELAY_MS = 2_000L
         private const val OCR_CHANNEL = "screen_ocr"
     }
 }
@@ -214,7 +231,8 @@ class ScreenCaptureService : Service() {
             complete(null)
             return START_NOT_STICKY
         }
-        Handler(Looper.getMainLooper()).postDelayed({ capture(resultCode, data) }, 650)
+        val delayMs = intent.getLongExtra(EXTRA_CAPTURE_DELAY_MS, 650L).coerceIn(500L, 10_000L)
+        Handler(Looper.getMainLooper()).postDelayed({ capture(resultCode, data) }, delayMs)
         return START_NOT_STICKY
     }
 
@@ -312,6 +330,7 @@ class ScreenCaptureService : Service() {
         const val ACTION_COMPLETE = "com.explapp.shortcut.SCREEN_CAPTURE_COMPLETE"
         const val EXTRA_RESULT_CODE = "resultCode"
         const val EXTRA_DATA = "data"
+        const val EXTRA_CAPTURE_DELAY_MS = "captureDelayMs"
         const val EXTRA_PATH = "path"
         private const val CHANNEL = "screen_capture"
         private const val NOTIFICATION_ID = 8831
