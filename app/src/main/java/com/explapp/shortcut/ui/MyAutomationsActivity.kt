@@ -71,6 +71,8 @@ import com.explapp.shortcut.automation.routines.RoutineTrigger
 import com.explapp.shortcut.automation.routines.RoutineTriggerType
 import com.explapp.shortcut.data.InstalledAppRepository
 import com.explapp.shortcut.tools.NfcSetupActivity
+import com.explapp.shortcut.tools.ScreenCaptureActivity
+import com.explapp.shortcut.tools.PersistentScreenCaptureService
 import com.explapp.shortcut.tools.ToolCatalog
 import com.explapp.shortcut.tools.ToolId
 
