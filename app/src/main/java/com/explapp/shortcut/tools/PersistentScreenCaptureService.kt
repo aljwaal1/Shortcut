@@ -1,6 +1,7 @@
 package com.explapp.shortcut.tools
 
 import android.app.Activity
+import android.app.ActivityOptions
 import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.PendingIntent
@@ -179,11 +180,42 @@ class PersistentScreenCaptureService : Service() {
         val delayMs = intent.getLongExtra(EXTRA_CAPTURE_DELAY_MS, 3_000L).coerceIn(500L, 15_000L)
         val packageNameToOpen = intent.getStringExtra(EXTRA_LAUNCH_PACKAGE).orEmpty()
 
+        var launchSucceeded = true
         if (packageNameToOpen.isNotBlank()) {
-            packageManager.getLaunchIntentForPackage(packageNameToOpen)?.let { target ->
-                target.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-                runCatching { startActivity(target) }
+            val target = packageManager.getLaunchIntentForPackage(packageNameToOpen)
+            launchSucceeded = if (target == null) {
+                false
+            } else {
+                runCatching {
+                    target.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP)
+                    val pending = PendingIntent.getActivity(
+                        this,
+                        packageNameToOpen.hashCode(),
+                        target,
+                        PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
+                    )
+                    if (Build.VERSION.SDK_INT >= 34) {
+                        val options = ActivityOptions.makeBasic().apply {
+                            val mode = if (Build.VERSION.SDK_INT >= 36) {
+                                ActivityOptions.MODE_BACKGROUND_ACTIVITY_START_ALLOW_ALWAYS
+                            } else {
+                                @Suppress("DEPRECATION")
+                                ActivityOptions.MODE_BACKGROUND_ACTIVITY_START_ALLOWED
+                            }
+                            setPendingIntentBackgroundActivityStartMode(mode)
+                        }
+                        pending.send(this, 0, null, null, null, null, options.toBundle())
+                    } else {
+                        pending.send()
+                    }
+                    true
+                }.getOrDefault(false)
             }
+        }
+
+        if (!launchSucceeded) {
+            notifyResult(saved = false, sent = false)
+            return
         }
 
         handler.postDelayed({
