@@ -193,7 +193,7 @@ class ScreenCaptureActivity : AppCompatActivity() {
             ToolResultActions.show(this, listOf(uri), ToolOutputResultPolicy.forTool(ToolId.SCREENSHOT_CAPTURE).mime)
         }.onFailure {
             file.delete()
-            Toast.makeText(this, it.message ?: "Screenshot error", Toast.LENGTH_LONG).show()
+            Toast.makeText(this, it.message ?: local("Screenshot error", "حدث خطأ أثناء التقاط الشاشة"), Toast.LENGTH_LONG).show()
             finish()
         }
     }
@@ -215,7 +215,7 @@ class ScreenCaptureActivity : AppCompatActivity() {
             .addOnFailureListener {
                 bitmap.recycle()
                 file.delete()
-                Toast.makeText(this, it.message ?: "OCR error", Toast.LENGTH_LONG).show()
+                Toast.makeText(this, it.message ?: local("Text recognition error", "حدث خطأ أثناء التعرف على النص"), Toast.LENGTH_LONG).show()
                 finish()
             }
     }
@@ -284,13 +284,13 @@ class ScreenCaptureService : Service() {
         val manager = getSystemService(NotificationManager::class.java)
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             manager.createNotificationChannel(
-                NotificationChannel(CHANNEL, "Screen capture", NotificationManager.IMPORTANCE_LOW),
+                NotificationChannel(CHANNEL, local("Screen capture", "التقاط الشاشة"), NotificationManager.IMPORTANCE_LOW),
             )
         }
         val notification = NotificationCompat.Builder(this, CHANNEL)
             .setSmallIcon(android.R.drawable.ic_menu_camera)
-            .setContentTitle("Shortcut")
-            .setContentText("Capturing screenshot")
+            .setContentTitle(local("Shortcut", "الاختصارات"))
+            .setContentText(local("Capturing one screenshot…", "جارٍ التقاط صورة شاشة واحدة…"))
             .setOngoing(true)
             .build()
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
@@ -299,6 +299,9 @@ class ScreenCaptureService : Service() {
             startForeground(NOTIFICATION_ID, notification)
         }
     }
+
+    private fun local(en: String, ar: String): String =
+        if (resources.configuration.locales[0].language == "ar") ar else en
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         val resultCode = intent?.getIntExtra(EXTRA_RESULT_CODE, Activity.RESULT_CANCELED) ?: Activity.RESULT_CANCELED
