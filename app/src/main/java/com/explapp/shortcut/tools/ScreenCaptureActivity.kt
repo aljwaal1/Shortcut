@@ -48,6 +48,7 @@ class ScreenCaptureActivity : AppCompatActivity() {
     private var telegramBotToken: String = ""
     private var telegramChatId: String = ""
     private var telegramCaption: String = ""
+    private var normalTelegramShare: Boolean = false
     private var persistentStartOnly: Boolean = false
 
     private val receiver = object : BroadcastReceiver() {
@@ -108,6 +109,7 @@ class ScreenCaptureActivity : AppCompatActivity() {
         telegramBotToken = intent.getStringExtra(EXTRA_TELEGRAM_BOT_TOKEN).orEmpty()
         telegramChatId = intent.getStringExtra(EXTRA_TELEGRAM_CHAT_ID).orEmpty()
         telegramCaption = intent.getStringExtra(EXTRA_TELEGRAM_CAPTION).orEmpty()
+        normalTelegramShare = intent.getBooleanExtra(EXTRA_NORMAL_TELEGRAM_SHARE, false)
         persistentStartOnly = intent.getBooleanExtra(EXTRA_PERSISTENT_START_ONLY, false)
         ContextCompat.registerReceiver(
             this,
@@ -219,10 +221,29 @@ class ScreenCaptureActivity : AppCompatActivity() {
                     }
                     file.delete()
                 }.start()
+                ToolResultActions.show(this, listOf(uri), ToolOutputResultPolicy.forTool(ToolId.SCREENSHOT_CAPTURE).mime)
+            } else if (normalTelegramShare) {
+                file.delete()
+                val shareIntent = Intent(Intent.ACTION_SEND).apply {
+                    type = "image/png"
+                    putExtra(Intent.EXTRA_STREAM, uri)
+                    if (telegramCaption.isNotBlank()) putExtra(Intent.EXTRA_TEXT, telegramCaption)
+                    clipData = ClipData.newRawUri("Shortcut screenshot", uri)
+                    addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                    if (packageManager.getLaunchIntentForPackage("org.telegram.messenger") != null) {
+                        setPackage("org.telegram.messenger")
+                    }
+                }
+                runCatching {
+                    startActivity(Intent.createChooser(shareIntent, local("Choose Telegram chat", "اختر محادثة تيليجرام")))
+                }.onFailure {
+                    Toast.makeText(this, local("Could not open Telegram sharing", "تعذر فتح مشاركة تيليجرام"), Toast.LENGTH_LONG).show()
+                }
+                finish()
             } else {
                 file.delete()
+                ToolResultActions.show(this, listOf(uri), ToolOutputResultPolicy.forTool(ToolId.SCREENSHOT_CAPTURE).mime)
             }
-            ToolResultActions.show(this, listOf(uri), ToolOutputResultPolicy.forTool(ToolId.SCREENSHOT_CAPTURE).mime)
         }.onFailure {
             file.delete()
             Toast.makeText(this, it.message ?: local("Screenshot error", "حدث خطأ أثناء التقاط الشاشة"), Toast.LENGTH_LONG).show()
@@ -301,6 +322,7 @@ class ScreenCaptureActivity : AppCompatActivity() {
         const val EXTRA_TELEGRAM_BOT_TOKEN = "telegram_bot_token"
         const val EXTRA_TELEGRAM_CHAT_ID = "telegram_chat_id"
         const val EXTRA_TELEGRAM_CAPTION = "telegram_caption"
+        const val EXTRA_NORMAL_TELEGRAM_SHARE = "normal_telegram_share"
         const val EXTRA_PERSISTENT_START_ONLY = "persistent_start_only"
         private const val DEFAULT_CAPTURE_DELAY_MS = 3_000L
         private const val OCR_CHANNEL = "screen_ocr"
