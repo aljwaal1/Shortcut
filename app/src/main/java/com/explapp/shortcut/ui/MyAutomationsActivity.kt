@@ -333,6 +333,7 @@ private fun DailyScreenshotTelegramWizard(
 
     val selectedApp = installedApps.firstOrNull { it.packageName == appPackage }
     val repeatValid = when (repeat) {
+        RoutineRepeat.ONCE -> runCatching { java.time.LocalDate.parse(repeatValue) }.isSuccess
         RoutineRepeat.DAILY -> true
         RoutineRepeat.WEEKLY -> repeatValue.toIntOrNull() in 1..7
         RoutineRepeat.MONTHLY -> repeatValue.toIntOrNull() in 1..31
@@ -426,6 +427,13 @@ private fun DailyScreenshotTelegramWizard(
                             repeat = option
                             val now = Calendar.getInstance()
                             repeatValue = when (option) {
+                                RoutineRepeat.ONCE -> String.format(
+                                    Locale.US,
+                                    "%04d-%02d-%02d",
+                                    now.get(Calendar.YEAR),
+                                    now.get(Calendar.MONTH) + 1,
+                                    now.get(Calendar.DAY_OF_MONTH),
+                                )
                                 RoutineRepeat.DAILY -> ""
                                 RoutineRepeat.WEEKLY -> {
                                     val day = now.get(Calendar.DAY_OF_WEEK)
@@ -446,6 +454,40 @@ private fun DailyScreenshotTelegramWizard(
             }
 
             when (repeat) {
+                RoutineRepeat.ONCE -> {
+                    val now = Calendar.getInstance()
+                    val parts = repeatValue.split("-")
+                    val year = parts.getOrNull(0)?.toIntOrNull() ?: now.get(Calendar.YEAR)
+                    val month = parts.getOrNull(1)?.toIntOrNull() ?: (now.get(Calendar.MONTH) + 1)
+                    val day = parts.getOrNull(2)?.toIntOrNull() ?: now.get(Calendar.DAY_OF_MONTH)
+                    Button(
+                        onClick = {
+                            DatePickerDialog(
+                                context,
+                                { _, pickedYear, pickedMonth, pickedDay ->
+                                    repeatValue = String.format(Locale.US, "%04d-%02d-%02d", pickedYear, pickedMonth + 1, pickedDay)
+                                },
+                                year,
+                                month - 1,
+                                day,
+                            ).show()
+                        },
+                        modifier = Modifier.fillMaxWidth(),
+                    ) {
+                        Text(
+                            if (repeatValue.isBlank()) {
+                                if (ar) "اختر تاريخ التنفيذ" else "Choose run date"
+                            } else {
+                                (if (ar) "التاريخ: " else "Date: ") + repeatValue
+                            },
+                        )
+                    }
+                    ClearHint(
+                        if (ar) "سيعمل الاختصار مرة واحدة فقط في هذا التاريخ والوقت."
+                        else "The shortcut will run once on this date and time.",
+                        ar,
+                    )
+                }
                 RoutineRepeat.DAILY -> ClearHint(
                     if (ar) "سيعمل في الوقت المحدد كل يوم." else "Runs every day at the selected time.",
                     ar,
@@ -1776,6 +1818,7 @@ private fun SectionTitle(text: String) {
 }
 
 private fun repeatLabel(repeat: RoutineRepeat, ar: Boolean): String = when (repeat) {
+    RoutineRepeat.ONCE -> if (ar) "مرة واحدة" else "Once"
     RoutineRepeat.DAILY -> if (ar) "يومي" else "Daily"
     RoutineRepeat.WEEKLY -> if (ar) "أسبوعي" else "Weekly"
     RoutineRepeat.MONTHLY -> if (ar) "شهري" else "Monthly"
@@ -1783,6 +1826,7 @@ private fun repeatLabel(repeat: RoutineRepeat, ar: Boolean): String = when (repe
 }
 
 private fun repeatSummary(trigger: RoutineTrigger, ar: Boolean): String = when (trigger.repeat) {
+    RoutineRepeat.ONCE -> if (ar) "مرة واحدة • " + trigger.repeatValue else "Once • " + trigger.repeatValue
     RoutineRepeat.DAILY -> if (ar) "يومي" else "Daily"
     RoutineRepeat.WEEKLY -> {
         val day = trigger.repeatValue.toIntOrNull()
