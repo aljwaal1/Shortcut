@@ -19,6 +19,8 @@ import android.os.Handler
 import android.os.IBinder
 import android.os.Looper
 import androidx.core.app.NotificationCompat
+import android.content.ClipData
+import android.net.Uri
 import com.explapp.shortcut.automation.routines.TelegramBotSender
 import java.io.File
 import java.io.FileOutputStream
@@ -32,6 +34,7 @@ class PersistentScreenCaptureService : Service() {
     private var pendingToken = ""
     private var pendingChatId = ""
     private var pendingCaption = ""
+    private var pendingNormalTelegramShare = false
 
     override fun onBind(intent: Intent?): IBinder? = null
 
@@ -129,6 +132,7 @@ class PersistentScreenCaptureService : Service() {
                 val token = pendingToken
                 val chatId = pendingChatId
                 val caption = pendingCaption
+                val normalShare = pendingNormalTelegramShare
                 if (token.isNotBlank() && chatId.isNotBlank()) {
                     Thread {
                         val sent = TelegramBotSender().sendPhoto(token, chatId, caption, file)
@@ -138,6 +142,9 @@ class PersistentScreenCaptureService : Service() {
                             sent = sent.isSuccess,
                         )
                     }.start()
+                } else if (normalShare && saved.isSuccess) {
+                    file.delete()
+                    notifyNormalTelegramShare(saved.getOrThrow(), caption)
                 } else {
                     file.delete()
                     notifyResult(saved = saved.isSuccess, sent = false)
@@ -168,6 +175,7 @@ class PersistentScreenCaptureService : Service() {
         pendingToken = intent.getStringExtra(EXTRA_TELEGRAM_BOT_TOKEN).orEmpty()
         pendingChatId = intent.getStringExtra(EXTRA_TELEGRAM_CHAT_ID).orEmpty()
         pendingCaption = intent.getStringExtra(EXTRA_TELEGRAM_CAPTION).orEmpty()
+        pendingNormalTelegramShare = intent.getBooleanExtra(EXTRA_NORMAL_TELEGRAM_SHARE, false)
         val delayMs = intent.getLongExtra(EXTRA_CAPTURE_DELAY_MS, 3_000L).coerceIn(500L, 15_000L)
         val packageNameToOpen = intent.getStringExtra(EXTRA_LAUNCH_PACKAGE).orEmpty()
 
@@ -237,6 +245,37 @@ class PersistentScreenCaptureService : Service() {
             .build()
     }
 
+    private fun notifyNormalTelegramShare(uri: Uri, caption: String) {
+        val sendIntent = Intent(Intent.ACTION_SEND).apply {
+            type = "image/png"
+            putExtra(Intent.EXTRA_STREAM, uri)
+            if (caption.isNotBlank()) putExtra(Intent.EXTRA_TEXT, caption)
+            clipData = ClipData.newRawUri("Shortcut screenshot", uri)
+            addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_ACTIVITY_NEW_TASK)
+            if (packageManager.getLaunchIntentForPackage("org.telegram.messenger") != null) {
+                setPackage("org.telegram.messenger")
+            }
+        }
+        val pending = PendingIntent.getActivity(
+            this,
+            9203,
+            Intent.createChooser(sendIntent, local("Choose Telegram chat", "اختر محادثة تيليجرام"))
+                .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
+        )
+        getSystemService(NotificationManager::class.java).notify(
+            RESULT_NOTIFICATION_ID,
+            NotificationCompat.Builder(this, CHANNEL)
+                .setSmallIcon(android.R.drawable.ic_menu_send)
+                .setContentTitle(local("Screenshot ready for Telegram", "لقطة الشاشة جاهزة لتيليجرام"))
+                .setContentText(local("Tap to choose the normal Telegram conversation and send.", "اضغط لاختيار محادثة تيليجرام العادية ثم الإرسال."))
+                .setContentIntent(pending)
+                .setAutoCancel(true)
+                .addAction(0, local("Open Telegram", "فتح تيليجرام"), pending)
+                .build(),
+        )
+    }
+
     private fun notifyResult(saved: Boolean, sent: Boolean) {
         val title = when {
             saved && sent -> local("Screenshot sent to Telegram", "تم إرسال لقطة الشاشة إلى تيليجرام")
@@ -286,6 +325,7 @@ class PersistentScreenCaptureService : Service() {
         const val EXTRA_TELEGRAM_BOT_TOKEN = "telegramBotToken"
         const val EXTRA_TELEGRAM_CHAT_ID = "telegramChatId"
         const val EXTRA_TELEGRAM_CAPTION = "telegramCaption"
+        const val EXTRA_NORMAL_TELEGRAM_SHARE = "normalTelegramShare"
 
         private const val CHANNEL = "persistent_screen_capture"
         private const val NOTIFICATION_ID = 9200
