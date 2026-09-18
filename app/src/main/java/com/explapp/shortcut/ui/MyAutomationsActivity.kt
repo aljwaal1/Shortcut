@@ -515,7 +515,7 @@ private fun RoutineBuilderScreen(
                                 placeholder = { Text(if (ar) "مثال: تقرير اليوم" else "Example: Today's report") },
                                 modifier = Modifier.fillMaxWidth(),
                             )
-                            if (actions.lastOrNull()?.type == RoutineActionType.OPEN_APP_SCREENSHOT) {
+                            if (actions.lastOrNull()?.type in setOf(RoutineActionType.OPEN_APP_SCREENSHOT, RoutineActionType.TAKE_SCREENSHOT)) {
                                 ClearHint(
                                     if (ar) "تم اكتشاف لقطة شاشة قبل هذه الخطوة. سيستخدم التطبيق الصورة الناتجة تلقائيًا كمرفق، ولا تحتاج إلى اختيار ملف يدويًا."
                                     else "A screenshot was detected before this step. Shortcut will automatically use that image as the attachment.",
@@ -571,6 +571,11 @@ private fun RoutineBuilderScreen(
                                 label = { Text(if (ar) "القيمة التي تريد حفظها" else "Value to save") },
                                 modifier = Modifier.fillMaxWidth(),
                             )
+                            ClearHint(
+                                if (ar) "مثال: إذا سميت المتغير «النتيجة»، يمكنك استخدام {{النتيجة}} داخل أي حقل نصي في الخطوات التالية."
+                                else "Example: if you name the variable result, use {{result}} in text fields in later steps.",
+                                ar,
+                            )
                         }
 
                         RoutineActionType.READ_CLIPBOARD -> {
@@ -581,6 +586,11 @@ private fun RoutineBuilderScreen(
                                 placeholder = { Text(if (ar) "مثال: النص" else "Example: text") },
                                 modifier = Modifier.fillMaxWidth(),
                             )
+                            ClearHint(
+                                if (ar) "سيقرأ التطبيق الحافظة عند وصول التنفيذ إلى هذه الخطوة. إذا سميت المتغير «النص»، استخدم {{النص}} في الخطوات التالية."
+                                else "Shortcut reads the clipboard when this step runs. If you name the variable text, use {{text}} in later steps.",
+                                ar,
+                            )
                         }
 
                         RoutineActionType.COPY_TO_CLIPBOARD -> {
@@ -590,6 +600,11 @@ private fun RoutineBuilderScreen(
                                 label = { Text(if (ar) "النص المراد نسخه" else "Text to copy") },
                                 placeholder = { Text(if (ar) "اكتب النص أو استخدم قيمة من خطوة سابقة" else "Enter text or use a value from a previous step") },
                                 modifier = Modifier.fillMaxWidth(),
+                            )
+                            ClearHint(
+                                if (ar) "يمكنك كتابة نص ثابت، أو إدخال متغير سابق بين قوسين مزدوجين مثل {{النتيجة}}."
+                                else "You can enter fixed text or insert a previous variable using double braces, such as {{result}}.",
+                                ar,
                             )
                         }
 
