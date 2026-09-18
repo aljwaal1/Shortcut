@@ -282,7 +282,10 @@ private fun DailyScreenshotTelegramWizard(
     val ar = LocalConfiguration.current.locales[0].language == "ar"
     val installedApps = remember(context) { InstalledAppRepository(context).loadLaunchableApps() }
 
+    var shortcutName by remember { mutableStateOf("") }
     var time by remember { mutableStateOf("") }
+    var repeat by remember { mutableStateOf(RoutineRepeat.DAILY) }
+    var repeatValue by remember { mutableStateOf("") }
     var appPackage by remember { mutableStateOf("") }
     var delayMs by remember { mutableStateOf("3000") }
     var botToken by remember { mutableStateOf("") }
@@ -329,7 +332,13 @@ private fun DailyScreenshotTelegramWizard(
     }
 
     val selectedApp = installedApps.firstOrNull { it.packageName == appPackage }
-    val canSave = time.isNotBlank() && appPackage.isNotBlank() &&
+    val repeatValid = when (repeat) {
+        RoutineRepeat.DAILY -> true
+        RoutineRepeat.WEEKLY -> repeatValue.toIntOrNull() in 1..7
+        RoutineRepeat.MONTHLY -> repeatValue.toIntOrNull() in 1..31
+        RoutineRepeat.YEARLY -> runCatching { java.time.MonthDay.parse("--" + repeatValue) }.isSuccess
+    }
+    val canSave = time.isNotBlank() && appPackage.isNotBlank() && repeatValid &&
         (!useBot || (botToken.isNotBlank() && chatId.isNotBlank()))
 
     LazyColumn(
@@ -362,7 +371,25 @@ private fun DailyScreenshotTelegramWizard(
         }
 
         item {
-            Text(if (ar) "1. الوقت اليومي" else "1. Daily time", fontWeight = FontWeight.Bold)
+            OutlinedTextField(
+                value = shortcutName,
+                onValueChange = { shortcutName = it },
+                label = { Text(if (ar) "اسم الجدولة" else "Schedule name") },
+                placeholder = {
+                    Text(
+                        if (useBot) {
+                            if (ar) "مثال: تقرير الصباح إلى البوت" else "Example: Morning report to bot"
+                        } else {
+                            if (ar) "مثال: لقطة الصباح إلى تيليجرام" else "Example: Morning screenshot to Telegram"
+                        },
+                    )
+                },
+                modifier = Modifier.fillMaxWidth(),
+            )
+        }
+
+        item {
+            Text(if (ar) "1. الوقت" else "1. Time", fontWeight = FontWeight.Bold)
             val now = Calendar.getInstance()
             val parts = time.split(":")
             val hour = parts.getOrNull(0)?.toIntOrNull() ?: now.get(Calendar.HOUR_OF_DAY)
@@ -390,7 +417,101 @@ private fun DailyScreenshotTelegramWizard(
         }
 
         item {
-            Text(if (ar) "2. التطبيق" else "2. App", fontWeight = FontWeight.Bold)
+            Text(if (ar) "2. التكرار" else "2. Repeat", fontWeight = FontWeight.Bold)
+            LazyRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                items(RoutineRepeat.entries) { option ->
+                    FilterChip(
+                        selected = repeat == option,
+                        onClick = {
+                            repeat = option
+                            val now = Calendar.getInstance()
+                            repeatValue = when (option) {
+                                RoutineRepeat.DAILY -> ""
+                                RoutineRepeat.WEEKLY -> {
+                                    val day = now.get(Calendar.DAY_OF_WEEK)
+                                    if (day == Calendar.SUNDAY) "7" else (day - 1).toString()
+                                }
+                                RoutineRepeat.MONTHLY -> now.get(Calendar.DAY_OF_MONTH).toString()
+                                RoutineRepeat.YEARLY -> String.format(
+                                    Locale.US,
+                                    "%02d-%02d",
+                                    now.get(Calendar.MONTH) + 1,
+                                    now.get(Calendar.DAY_OF_MONTH),
+                                )
+                            }
+                        },
+                        label = { Text(repeatLabel(option, ar)) },
+                    )
+                }
+            }
+
+            when (repeat) {
+                RoutineRepeat.DAILY -> ClearHint(
+                    if (ar) "سيعمل في الوقت المحدد كل يوم." else "Runs every day at the selected time.",
+                    ar,
+                )
+                RoutineRepeat.WEEKLY -> {
+                    Text(if (ar) "يوم الأسبوع" else "Weekday", fontWeight = FontWeight.Bold)
+                    val days = if (ar) {
+                        listOf("1" to "الاثنين", "2" to "الثلاثاء", "3" to "الأربعاء", "4" to "الخميس", "5" to "الجمعة", "6" to "السبت", "7" to "الأحد")
+                    } else {
+                        listOf("1" to "Monday", "2" to "Tuesday", "3" to "Wednesday", "4" to "Thursday", "5" to "Friday", "6" to "Saturday", "7" to "Sunday")
+                    }
+                    LazyRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                        items(days) { (stored, label) ->
+                            FilterChip(
+                                selected = repeatValue == stored,
+                                onClick = { repeatValue = stored },
+                                label = { Text(label) },
+                            )
+                        }
+                    }
+                }
+                RoutineRepeat.MONTHLY -> {
+                    Text(if (ar) "يوم الشهر" else "Day of month", fontWeight = FontWeight.Bold)
+                    LazyRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                        items((1..31).toList()) { day ->
+                            FilterChip(
+                                selected = repeatValue == day.toString(),
+                                onClick = { repeatValue = day.toString() },
+                                label = { Text(day.toString()) },
+                            )
+                        }
+                    }
+                }
+                RoutineRepeat.YEARLY -> {
+                    val now = Calendar.getInstance()
+                    val parts = repeatValue.split("-")
+                    val month = parts.getOrNull(0)?.toIntOrNull() ?: (now.get(Calendar.MONTH) + 1)
+                    val day = parts.getOrNull(1)?.toIntOrNull() ?: now.get(Calendar.DAY_OF_MONTH)
+                    Button(
+                        onClick = {
+                            DatePickerDialog(
+                                context,
+                                { _, _, pickedMonth, pickedDay ->
+                                    repeatValue = String.format(Locale.US, "%02d-%02d", pickedMonth + 1, pickedDay)
+                                },
+                                now.get(Calendar.YEAR),
+                                month - 1,
+                                day,
+                            ).show()
+                        },
+                        modifier = Modifier.fillMaxWidth(),
+                    ) {
+                        Text(
+                            if (repeatValue.isBlank()) {
+                                if (ar) "اختر التاريخ السنوي" else "Choose yearly date"
+                            } else {
+                                (if (ar) "التاريخ: " else "Date: ") + repeatValue
+                            },
+                        )
+                    }
+                }
+            }
+        }
+
+        item {
+            Text(if (ar) "3. التطبيق" else "3. App", fontWeight = FontWeight.Bold)
             Button(
                 onClick = { showAppPicker = true },
                 modifier = Modifier.fillMaxWidth(),
@@ -407,6 +528,7 @@ private fun DailyScreenshotTelegramWizard(
         }
 
         item {
+            Text(if (ar) "4. لقطة الشاشة" else "4. Screenshot", fontWeight = FontWeight.Bold)
             Text(if (ar) "وضع تصوير الشاشة" else "Screen-capture mode", fontWeight = FontWeight.Bold)
             LazyRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                 item {
@@ -458,7 +580,7 @@ private fun DailyScreenshotTelegramWizard(
 
         if (useBot) {
             item {
-                Text(if (ar) "3. تيليجرام" else "3. Telegram", fontWeight = FontWeight.Bold)
+                Text(if (ar) "5. تيليجرام" else "5. Telegram", fontWeight = FontWeight.Bold)
                 OutlinedTextField(
                     value = botToken,
                     onValueChange = { botToken = it },
@@ -595,15 +717,18 @@ private fun DailyScreenshotTelegramWizard(
                 Button(
                     onClick = {
                         val routine = AutomationRoutine(
-                            name = if (useBot) {
-                                if (ar) "لقطة يومية إلى تيليجرام بواسطة البوت" else "Daily screenshot to Telegram bot"
-                            } else {
-                                if (ar) "لقطة يومية إلى محادثة تيليجرام عادية" else "Daily screenshot to normal Telegram chat"
+                            name = shortcutName.ifBlank {
+                                if (useBot) {
+                                    if (ar) "لقطة مجدولة إلى تيليجرام بواسطة البوت" else "Scheduled screenshot to Telegram bot"
+                                } else {
+                                    if (ar) "لقطة مجدولة إلى محادثة تيليجرام عادية" else "Scheduled screenshot to normal Telegram chat"
+                                }
                             },
                             trigger = RoutineTrigger(
                                 type = RoutineTriggerType.TIME,
                                 value = time,
-                                repeat = RoutineRepeat.DAILY,
+                                repeat = repeat,
+                                repeatValue = repeatValue,
                             ),
                             actions = if (useBot) {
                                 listOf(
