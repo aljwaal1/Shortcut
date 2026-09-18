@@ -48,6 +48,7 @@ class RoutineExecutor(
                 .getOrElse { RoutineActionResult.failure(action, it.message ?: it.javaClass.simpleName) }
             results += result
             if (result.status == RoutineActionStatus.FAILED && !action.continueOnError) break
+            if (action.type == RoutineActionType.STOP_SHORTCUT) break
             index += 1
         }
 
