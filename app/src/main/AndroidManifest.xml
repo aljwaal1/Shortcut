@@ -31,6 +31,7 @@
             <meta-data android:name="autoStoreLocales" android:value="true" />
         </service>
         <service android:name=".tools.ScreenCaptureService" android:exported="false" android:foregroundServiceType="mediaProjection" />
+        <service android:name=".tools.PersistentScreenCaptureService" android:exported="false" android:foregroundServiceType="mediaProjection" />
         <service
             android:name=".system.ShortcutTileService"
             android:exported="true"
