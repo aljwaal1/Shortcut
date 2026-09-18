@@ -593,6 +593,14 @@ private fun RoutineBuilderScreen(
                             )
                         }
 
+                        RoutineActionType.STOP_SHORTCUT -> {
+                            ClearHint(
+                                if (ar) "عندما يصل التنفيذ إلى هذه الخطوة، يتوقف الاختصار فورًا ولا ينفذ أي خطوة بعدها."
+                                else "When execution reaches this block, the shortcut stops immediately and no later steps run.",
+                                ar,
+                            )
+                        }
+
                         RoutineActionType.OPEN_TOOL -> {
                             LazyRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                                 item {
@@ -851,7 +859,7 @@ private fun conditionValueHint(type: RoutineConditionType, ar: Boolean): String 
     RoutineConditionType.BATTERY_BELOW,
     -> "30"
     RoutineConditionType.DAY_OF_WEEK -> if (ar) "1=الأحد ... 7=السبت" else "1=Sunday ... 7=Saturday"
-    else -> if (ar) "currentDate / currentTime / batteryPercent / dayOfWeek" else "currentDate / currentTime / batteryPercent / dayOfWeek"
+    else -> if (ar) "اختر قيمة من الخيارات" else "Choose a value from the options"
 }
 
 private fun actionValueHint(type: RoutineActionType, ar: Boolean): String = when (type) {
@@ -868,8 +876,12 @@ private fun actionSummary(action: RoutineAction, appLabel: String?, ar: Boolean)
     RoutineActionType.WAIT,
     RoutineActionType.TAKE_SCREENSHOT,
     -> "${(action.value.toLongOrNull() ?: action.secondaryValue.toLongOrNull() ?: 0L) / 1000.0} ${if (ar) "ث" else "s"}"
-    RoutineActionType.SEND_TELEGRAM_BOT -> "Chat ID: " + action.parameters["chatId"].orEmpty()
+    RoutineActionType.SEND_TELEGRAM_BOT -> (if (ar) "معرّف المحادثة: " else "Chat ID: ") + action.parameters["chatId"].orEmpty()
     RoutineActionType.CUSTOM_SCRIPT -> action.value.lineSequence().firstOrNull().orEmpty().take(80)
+    RoutineActionType.SET_VARIABLE -> (if (ar) "المتغير: " else "Variable: ") + action.value
+    RoutineActionType.READ_CLIPBOARD -> (if (ar) "يحفظ في: " else "Stores in: ") + action.value
+    RoutineActionType.COPY_TO_CLIPBOARD -> action.value.take(100)
+    RoutineActionType.STOP_SHORTCUT -> if (ar) "يتوقف التنفيذ هنا" else "Execution stops here"
     else -> action.value.take(100)
 }
 
