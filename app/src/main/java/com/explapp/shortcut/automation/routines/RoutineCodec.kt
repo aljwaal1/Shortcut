@@ -35,6 +35,15 @@ object RoutineCodec {
             put("type", trigger.type.name)
             put("value", trigger.value)
         })
+        put("conditions", buildJsonArray {
+            conditions.forEach { condition ->
+                add(buildJsonObject {
+                    put("type", condition.type.name)
+                    put("value", condition.value)
+                    put("secondaryValue", condition.secondaryValue)
+                })
+            }
+        })
         put("actions", buildJsonArray {
             actions.forEach { action ->
                 add(buildJsonObject {
@@ -42,6 +51,9 @@ object RoutineCodec {
                     put("value", action.value)
                     put("secondaryValue", action.secondaryValue)
                     put("continueOnError", action.continueOnError)
+                    put("parameters", buildJsonObject {
+                        action.parameters.forEach { (key, value) -> put(key, value) }
+                    })
                 })
             }
         })
@@ -58,14 +70,27 @@ object RoutineCodec {
                 type = RoutineTriggerType.valueOf(triggerJson.getValue("type").jsonPrimitive.content),
                 value = triggerJson["value"]?.jsonPrimitive?.content.orEmpty(),
             ),
-            actions = getValue("actions").jsonArray.map { item ->
-                val action = item.jsonObject
-                RoutineAction(
-                    type = RoutineActionType.valueOf(action.getValue("type").jsonPrimitive.content),
-                    value = action["value"]?.jsonPrimitive?.content.orEmpty(),
-                    secondaryValue = action["secondaryValue"]?.jsonPrimitive?.content.orEmpty(),
-                    continueOnError = action["continueOnError"]?.jsonPrimitive?.boolean ?: false,
-                )
+            conditions = this["conditions"]?.jsonArray?.mapNotNull { item ->
+                runCatching {
+                    val condition = item.jsonObject
+                    RoutineCondition(
+                        type = RoutineConditionType.valueOf(condition.getValue("type").jsonPrimitive.content),
+                        value = condition["value"]?.jsonPrimitive?.content.orEmpty(),
+                        secondaryValue = condition["secondaryValue"]?.jsonPrimitive?.content.orEmpty(),
+                    )
+                }.getOrNull()
+            }.orEmpty(),
+            actions = getValue("actions").jsonArray.mapNotNull { item ->
+                runCatching {
+                    val action = item.jsonObject
+                    RoutineAction(
+                        type = RoutineActionType.valueOf(action.getValue("type").jsonPrimitive.content),
+                        value = action["value"]?.jsonPrimitive?.content.orEmpty(),
+                        secondaryValue = action["secondaryValue"]?.jsonPrimitive?.content.orEmpty(),
+                        continueOnError = action["continueOnError"]?.jsonPrimitive?.boolean ?: false,
+                        parameters = action["parameters"]?.jsonObject?.mapValues { it.value.jsonPrimitive.content }.orEmpty(),
+                    )
+                }.getOrNull()
             },
         )
     }
