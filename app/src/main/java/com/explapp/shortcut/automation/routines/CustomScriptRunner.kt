@@ -9,7 +9,7 @@ class CustomScriptRunner {
         val cx = Context.enter()
         try {
             cx.optimizationLevel = -1
-            cx.classShutter = ClassShutter { false }
+            cx.setClassShutter(ClassShutter { false })
             val scope: Scriptable = cx.initSafeStandardObjects()
             variables.forEach { (key, value) ->
                 scope.put(key, scope, value)
