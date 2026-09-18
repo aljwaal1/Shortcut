@@ -91,6 +91,7 @@ private fun MyAutomationsScreen(onBack: () -> Unit) {
     var editing by remember { mutableStateOf<AutomationRoutine?>(null) }
     var creating by remember { mutableStateOf(false) }
     var showTemplates by remember { mutableStateOf(false) }
+    var showDailyScreenshotTelegram by remember { mutableStateOf(false) }
     var lastDeleted by remember { mutableStateOf<AutomationRoutine?>(null) }
 
     fun persist(items: List<AutomationRoutine>) {
@@ -113,6 +114,14 @@ private fun MyAutomationsScreen(onBack: () -> Unit) {
             initial = editing,
             onCancel = { creating = false; editing = null },
             onSave = { routine -> upsert(routine); creating = false; editing = null },
+        )
+
+        showDailyScreenshotTelegram -> DailyScreenshotTelegramWizard(
+            onCancel = { showDailyScreenshotTelegram = false },
+            onSave = { routine ->
+                upsert(routine)
+                showDailyScreenshotTelegram = false
+            },
         )
 
         showTemplates -> RoutineTemplatesScreen(
@@ -138,6 +147,30 @@ private fun MyAutomationsScreen(onBack: () -> Unit) {
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     Button(onClick = { creating = true }, modifier = Modifier.weight(1f)) { Text(if (ar) "اختصار جديد" else "New shortcut") }
                     TextButton(onClick = { showTemplates = true }, modifier = Modifier.weight(1f)) { Text(if (ar) "القوالب" else "Templates") }
+                }
+            }
+            item {
+                ElevatedCard(Modifier.fillMaxWidth()) {
+                    Column(Modifier.fillMaxWidth().padding(14.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Text(
+                            if (ar) "أتمتة جاهزة: تطبيق ← لقطة شاشة ← تيليجرام"
+                            else "Quick automation: App → Screenshot → Telegram",
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.Bold,
+                        )
+                        Text(
+                            if (ar) "حدد الوقت والتطبيق والمحادثة مرة واحدة، وسيجهز التطبيق التنفيذ يوميًا."
+                            else "Choose the time, app, and Telegram destination once, and Shortcut prepares it to run every day.",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                        Button(
+                            onClick = { showDailyScreenshotTelegram = true },
+                            modifier = Modifier.fillMaxWidth(),
+                        ) {
+                            Text(if (ar) "إعداد هذه الأتمتة" else "Set up this automation")
+                        }
+                    }
                 }
             }
             item {
@@ -197,6 +230,200 @@ private fun MyAutomationsScreen(onBack: () -> Unit) {
                 }
             }
         }
+    }
+}
+
+@Composable
+private fun DailyScreenshotTelegramWizard(
+    onCancel: () -> Unit,
+    onSave: (AutomationRoutine) -> Unit,
+) {
+    val context = LocalContext.current
+    val ar = LocalConfiguration.current.locales[0].language == "ar"
+    val installedApps = remember(context) { InstalledAppRepository(context).loadLaunchableApps() }
+
+    var time by remember { mutableStateOf("") }
+    var appPackage by remember { mutableStateOf("") }
+    var delayMs by remember { mutableStateOf("3000") }
+    var botToken by remember { mutableStateOf("") }
+    var chatId by remember { mutableStateOf("") }
+    var caption by remember { mutableStateOf("") }
+    var showAppPicker by remember { mutableStateOf(false) }
+
+    val selectedApp = installedApps.firstOrNull { it.packageName == appPackage }
+    val canSave = time.isNotBlank() && appPackage.isNotBlank() && botToken.isNotBlank() && chatId.isNotBlank()
+
+    LazyColumn(
+        Modifier.fillMaxSize(),
+        contentPadding = PaddingValues(18.dp),
+        verticalArrangement = Arrangement.spacedBy(12.dp),
+    ) {
+        item {
+            Text(
+                if (ar) "فتح تطبيق يوميًا وإرسال لقطة الشاشة إلى تيليجرام"
+                else "Open an app daily and send a screenshot to Telegram",
+                style = MaterialTheme.typography.headlineSmall,
+                fontWeight = FontWeight.ExtraBold,
+            )
+            ClearHint(
+                if (ar) "المسار: في الوقت المحدد ← تأكيد إذن تصوير الشاشة ← فتح التطبيق ← انتظار قصير ← التقاط صورة واحدة ← إرسالها إلى محادثة تيليجرام المحددة."
+                else "Flow: at the scheduled time → approve screen capture → open the app → wait briefly → take one screenshot → send it to the selected Telegram chat.",
+                ar,
+            )
+        }
+
+        item {
+            Text(if (ar) "1. الوقت اليومي" else "1. Daily time", fontWeight = FontWeight.Bold)
+            val now = Calendar.getInstance()
+            val parts = time.split(":")
+            val hour = parts.getOrNull(0)?.toIntOrNull() ?: now.get(Calendar.HOUR_OF_DAY)
+            val minute = parts.getOrNull(1)?.toIntOrNull() ?: now.get(Calendar.MINUTE)
+            Button(
+                onClick = {
+                    TimePickerDialog(
+                        context,
+                        { _, h, m -> time = String.format(Locale.US, "%02d:%02d", h, m) },
+                        hour,
+                        minute,
+                        true,
+                    ).show()
+                },
+                modifier = Modifier.fillMaxWidth(),
+            ) {
+                Text(
+                    if (time.isBlank()) {
+                        if (ar) "اختر الوقت" else "Choose time"
+                    } else {
+                        (if (ar) "كل يوم الساعة " else "Every day at ") + time
+                    },
+                )
+            }
+        }
+
+        item {
+            Text(if (ar) "2. التطبيق" else "2. App", fontWeight = FontWeight.Bold)
+            Button(
+                onClick = { showAppPicker = true },
+                modifier = Modifier.fillMaxWidth(),
+            ) {
+                Text(selectedApp?.label ?: if (ar) "اختر التطبيق المطلوب فتحه" else "Choose the app to open")
+            }
+            Text(if (ar) "مدة الانتظار قبل التقاط الصورة" else "Wait before taking the screenshot", fontWeight = FontWeight.Bold)
+            DelayChips(ar, delayMs) { delayMs = it }
+            ClearHint(
+                if (ar) "اختر 3 إلى 5 ثوانٍ عادةً حتى يكتمل تحميل شاشة التطبيق قبل التصوير."
+                else "Usually 3–5 seconds is enough for the app screen to load before capture.",
+                ar,
+            )
+        }
+
+        item {
+            Text(if (ar) "3. تيليجرام" else "3. Telegram", fontWeight = FontWeight.Bold)
+            OutlinedTextField(
+                value = botToken,
+                onValueChange = { botToken = it },
+                label = { Text(if (ar) "رمز البوت" else "Bot token") },
+                visualTransformation = PasswordVisualTransformation(),
+                modifier = Modifier.fillMaxWidth(),
+            )
+            OutlinedTextField(
+                value = chatId,
+                onValueChange = { chatId = it },
+                label = { Text(if (ar) "معرّف محادثة الشخص" else "Person's chat ID") },
+                supportingText = {
+                    Text(
+                        if (ar) "يجب أن تكون المحادثة متاحة للبوت. لا يمكن للبوت الإرسال إلى شخص لم يبدأ محادثة معه أو لا يسمح له تيليجرام بالوصول إليه."
+                        else "The chat must be accessible to your bot. A bot cannot send to a person who has not started a chat with it or is otherwise inaccessible to the bot.",
+                    )
+                },
+                modifier = Modifier.fillMaxWidth(),
+            )
+            OutlinedTextField(
+                value = caption,
+                onValueChange = { caption = it },
+                label = { Text(if (ar) "تعليق اختياري مع الصورة" else "Optional image caption") },
+                placeholder = { Text(if (ar) "مثال: لقطة الشاشة اليومية" else "Example: Daily screenshot") },
+                modifier = Modifier.fillMaxWidth(),
+            )
+        }
+
+        item {
+            ClearHint(
+                if (ar) "مهم: أندرويد لا يسمح للتطبيق بأخذ لقطة شاشة سرًا في الخلفية. عند حلول الوقت سيظهر إشعار؛ اضغط عليه ووافق على إذن تصوير الشاشة، ثم يكمل التطبيق الفتح والتصوير والإرسال مباشرة."
+                else "Important: Android does not allow silent background screen capture. At the scheduled time you will get a notification; tap it and approve screen capture, then Shortcut opens the app, captures, and sends immediately.",
+                ar,
+            )
+        }
+
+        item {
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                TextButton(onClick = onCancel, modifier = Modifier.weight(1f)) {
+                    Text(if (ar) "إلغاء" else "Cancel")
+                }
+                Button(
+                    onClick = {
+                        onSave(
+                            AutomationRoutine(
+                                name = if (ar) "لقطة يومية إلى تيليجرام" else "Daily screenshot to Telegram",
+                                trigger = RoutineTrigger(
+                                    type = RoutineTriggerType.TIME,
+                                    value = time,
+                                    repeat = RoutineRepeat.DAILY,
+                                ),
+                                actions = listOf(
+                                    RoutineAction(
+                                        type = RoutineActionType.OPEN_APP_SCREENSHOT,
+                                        value = appPackage,
+                                        secondaryValue = delayMs,
+                                    ),
+                                    RoutineAction(
+                                        type = RoutineActionType.SEND_TELEGRAM_BOT,
+                                        value = "telegram",
+                                        secondaryValue = caption,
+                                        parameters = mapOf(
+                                            "botToken" to botToken,
+                                            "chatId" to chatId,
+                                            "attachment" to "__screenshot_output__",
+                                        ),
+                                    ),
+                                ),
+                            ),
+                        )
+                    },
+                    enabled = canSave,
+                    modifier = Modifier.weight(1f),
+                ) {
+                    Text(if (ar) "حفظ الأتمتة" else "Save automation")
+                }
+            }
+        }
+    }
+
+    if (showAppPicker) {
+        AlertDialog(
+            onDismissRequest = { showAppPicker = false },
+            title = { Text(if (ar) "اختر التطبيق" else "Choose app") },
+            text = {
+                LazyColumn {
+                    items(installedApps, key = { it.packageName }) { app ->
+                        TextButton(
+                            onClick = {
+                                appPackage = app.packageName
+                                showAppPicker = false
+                            },
+                            modifier = Modifier.fillMaxWidth(),
+                        ) {
+                            Text(app.label)
+                        }
+                    }
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = { showAppPicker = false }) {
+                    Text(if (ar) "إلغاء" else "Cancel")
+                }
+            },
+        )
     }
 }
 
