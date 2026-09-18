@@ -81,6 +81,7 @@ class AndroidRoutineActionRunner(
             .putExtra(ScreenCaptureActivity.EXTRA_TELEGRAM_BOT_TOKEN, action.parameters["telegramBotToken"].orEmpty())
             .putExtra(ScreenCaptureActivity.EXTRA_TELEGRAM_CHAT_ID, action.parameters["telegramChatId"].orEmpty())
             .putExtra(ScreenCaptureActivity.EXTRA_TELEGRAM_CAPTION, resolve(action.parameters["telegramCaption"].orEmpty()))
+            .putExtra(ScreenCaptureActivity.EXTRA_NORMAL_TELEGRAM_SHARE, action.parameters["normalTelegramShare"].toBoolean())
             .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
         return runCatching {
             context.startActivity(workflowIntent)
@@ -245,6 +246,7 @@ class AndroidRoutineActionRunner(
                     .putExtra(PersistentScreenCaptureService.EXTRA_TELEGRAM_BOT_TOKEN, action.parameters["telegramBotToken"].orEmpty())
                     .putExtra(PersistentScreenCaptureService.EXTRA_TELEGRAM_CHAT_ID, action.parameters["telegramChatId"].orEmpty())
                     .putExtra(PersistentScreenCaptureService.EXTRA_TELEGRAM_CAPTION, resolve(action.parameters["telegramCaption"].orEmpty()))
+                    .putExtra(PersistentScreenCaptureService.EXTRA_NORMAL_TELEGRAM_SHARE, action.parameters["normalTelegramShare"].toBoolean())
                 return runCatching {
                     ContextCompat.startForegroundService(context, captureIntent)
                     RoutineActionResult.success(action)
