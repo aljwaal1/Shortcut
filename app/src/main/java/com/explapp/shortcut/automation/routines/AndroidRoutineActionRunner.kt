@@ -5,6 +5,8 @@ import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.PendingIntent
 import android.content.Context
+import android.content.ClipData
+import android.content.ClipboardManager
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.net.Uri
@@ -93,6 +95,32 @@ class AndroidRoutineActionRunner(
             ?: RoutineActionResult.success(action)
     }
 
+    private fun setVariable(action: RoutineAction): RoutineActionResult {
+        val name = action.value.trim()
+        if (name.isBlank()) return RoutineActionResult.failure(action, "Variable name is required")
+        variables[name] = resolve(action.secondaryValue)
+        variables["lastResult"] = variables[name].orEmpty()
+        return RoutineActionResult.success(action)
+    }
+
+    private fun readClipboard(action: RoutineAction): RoutineActionResult {
+        val name = action.value.trim()
+        if (name.isBlank()) return RoutineActionResult.failure(action, "Variable name is required")
+        val clipboard = context.getSystemService(ClipboardManager::class.java)
+        val text = clipboard.primaryClip?.getItemAt(0)?.coerceToText(context)?.toString().orEmpty()
+        variables[name] = text
+        variables["lastResult"] = text
+        return RoutineActionResult.success(action)
+    }
+
+    private fun copyToClipboard(action: RoutineAction): RoutineActionResult {
+        val text = resolve(action.value)
+        val clipboard = context.getSystemService(ClipboardManager::class.java)
+        clipboard.setPrimaryClip(ClipData.newPlainText("Shortcut", text))
+        variables["lastResult"] = text
+        return RoutineActionResult.success(action)
+    }
+
     private fun runCustomScript(action: RoutineAction): RoutineActionResult {
         val inputs = variables + mapOf(
             "input" to resolve(action.secondaryValue),
@@ -109,8 +137,14 @@ class AndroidRoutineActionRunner(
         )
     }
 
-    private fun resolve(raw: String): String = variables.entries.fold(raw) { acc, (key, value) ->
-        acc.replace("{{$key}}", value)
+    private fun resolve(raw: String): String {
+        val builtIns = mapOf(
+            "currentDate" to SimpleDateFormat("yyyy-MM-dd", Locale.US).format(Date()),
+            "currentTime" to SimpleDateFormat("HH:mm:ss", Locale.US).format(Date()),
+        )
+        return (builtIns + variables).entries.fold(raw) { acc, (key, value) ->
+            acc.replace("{{$key}}", value)
+        }
     }
 
     private fun openAppScreenshot(action: RoutineAction): RoutineActionResult {
