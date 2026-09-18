@@ -500,7 +500,8 @@ private fun DailyScreenshotTelegramWizard(
                                     if (result.isSuccess) {
                                         if (ar) "نجح الاتصال بتيليجرام ووصلت رسالة الاختبار." else "Telegram connection succeeded and the test message was sent."
                                     } else {
-                                        if (ar) "فشل اختبار تيليجرام. تحقق من رمز البوت ومعرّف المحادثة." else "Telegram test failed. Check the bot token and chat ID."
+                                        val reason = result.exceptionOrNull()?.message.orEmpty()
+                                        if (ar) "فشل اختبار تيليجرام: " + reason else "Telegram test failed: " + reason
                                     },
                                     Toast.LENGTH_LONG,
                                 ).show()
