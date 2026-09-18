@@ -35,6 +35,7 @@ import androidx.appcompat.app.AppCompatActivity
 import androidx.core.app.NotificationCompat
 import androidx.core.content.ContextCompat
 import com.google.mlkit.vision.common.InputImage
+import com.explapp.shortcut.automation.routines.TelegramBotSender
 import com.google.mlkit.vision.text.TextRecognition
 import com.google.mlkit.vision.text.latin.TextRecognizerOptions
 import java.io.File
@@ -44,6 +45,9 @@ class ScreenCaptureActivity : AppCompatActivity() {
     private var runOcr = false
     private var launchPackage: String? = null
     private var captureDelayMs: Long = DEFAULT_CAPTURE_DELAY_MS
+    private var telegramBotToken: String = ""
+    private var telegramChatId: String = ""
+    private var telegramCaption: String = ""
 
     private val receiver = object : BroadcastReceiver() {
         override fun onReceive(context: Context, intent: Intent) {
@@ -86,6 +90,9 @@ class ScreenCaptureActivity : AppCompatActivity() {
         launchPackage = intent.getStringExtra(EXTRA_LAUNCH_PACKAGE)?.takeIf { it.isNotBlank() }
         captureDelayMs = intent.getLongExtra(EXTRA_CAPTURE_DELAY_MS, DEFAULT_CAPTURE_DELAY_MS)
             .coerceIn(500L, 10_000L)
+        telegramBotToken = intent.getStringExtra(EXTRA_TELEGRAM_BOT_TOKEN).orEmpty()
+        telegramChatId = intent.getStringExtra(EXTRA_TELEGRAM_CHAT_ID).orEmpty()
+        telegramCaption = intent.getStringExtra(EXTRA_TELEGRAM_CAPTION).orEmpty()
         ContextCompat.registerReceiver(
             this,
             receiver,
@@ -167,7 +174,22 @@ class ScreenCaptureActivity : AppCompatActivity() {
             }
             uri
         }.onSuccess { uri ->
-            file.delete()
+            if (telegramBotToken.isNotBlank() && telegramChatId.isNotBlank()) {
+                Thread {
+                    val result = TelegramBotSender().sendPhoto(telegramBotToken, telegramChatId, telegramCaption, file)
+                    runOnUiThread {
+                        Toast.makeText(
+                            this,
+                            if (result.isSuccess) local("Screenshot sent to Telegram", "تم إرسال لقطة الشاشة إلى تيليجرام")
+                            else local("Screenshot saved, but Telegram send failed", "تم حفظ الصورة لكن فشل إرسالها إلى تيليجرام"),
+                            Toast.LENGTH_LONG,
+                        ).show()
+                    }
+                    file.delete()
+                }.start()
+            } else {
+                file.delete()
+            }
             ToolResultActions.show(this, listOf(uri), ToolOutputResultPolicy.forTool(ToolId.SCREENSHOT_CAPTURE).mime)
         }.onFailure {
             file.delete()
@@ -244,6 +266,9 @@ class ScreenCaptureActivity : AppCompatActivity() {
         const val EXTRA_OCR = "ocr"
         const val EXTRA_LAUNCH_PACKAGE = "launch_package"
         const val EXTRA_CAPTURE_DELAY_MS = "capture_delay_ms"
+        const val EXTRA_TELEGRAM_BOT_TOKEN = "telegram_bot_token"
+        const val EXTRA_TELEGRAM_CHAT_ID = "telegram_chat_id"
+        const val EXTRA_TELEGRAM_CAPTION = "telegram_caption"
         private const val DEFAULT_CAPTURE_DELAY_MS = 3_000L
         private const val OCR_CHANNEL = "screen_ocr"
     }
