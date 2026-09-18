@@ -12,6 +12,7 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
+import androidx.compose.foundation.gestures.detectDragGesturesAfterLongPress
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
@@ -41,10 +42,12 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
+import kotlin.math.abs
 import com.explapp.shortcut.automation.routines.AutomationRoutine
 import com.explapp.shortcut.automation.routines.RoutineAction
 import com.explapp.shortcut.automation.routines.RoutineActionType
@@ -311,7 +314,7 @@ private fun RoutineBuilderScreen(
                     )
                 }
             }
-            Text(RoutineCatalog.triggerHint(triggerType, ar), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            ClearHint(RoutineCatalog.triggerHint(triggerType, ar), ar)
         }
 
         if (triggerType == RoutineTriggerType.TIME || triggerType == RoutineTriggerType.BATTERY_BELOW || triggerType == RoutineTriggerType.NFC) {
@@ -328,11 +331,10 @@ private fun RoutineBuilderScreen(
 
         item {
             SectionTitle(if (ar) "2. شروط اختيارية" else "2. Optional conditions")
-            Text(
-                if (ar) "مثال: نفّذ فقط إذا كانت البطارية أعلى من 30% أو في يوم معين."
-                else "Example: only run above 30% battery or on a specific day.",
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            ClearHint(
+                if (ar) "الشروط اختيارية. إذا أضفت أكثر من شرط فيجب أن تتحقق جميعها قبل تنفيذ الخطوات. يمكنك سحب الشروط لاحقًا لتغيير ترتيب عرضها."
+                else "Conditions are optional. If you add more than one, all must match before the steps run. You can drag conditions later to reorder them.",
+                ar,
             )
             LazyRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                 items(RoutineConditionType.entries) { type ->
@@ -343,13 +345,34 @@ private fun RoutineBuilderScreen(
                     )
                 }
             }
-            OutlinedTextField(
-                value = conditionValue,
-                onValueChange = { conditionValue = it },
-                label = { Text(conditionValueLabel(conditionType, ar)) },
-                placeholder = { Text(conditionValueHint(conditionType, ar)) },
-                modifier = Modifier.fillMaxWidth(),
-            )
+            if (conditionType == RoutineConditionType.VARIABLE_EQUALS || conditionType == RoutineConditionType.VARIABLE_CONTAINS) {
+                Text(if (ar) "اختر القيمة التي تريد فحصها" else "Choose the value to check", fontWeight = FontWeight.Bold)
+                LazyRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    items(
+                        listOf(
+                            "currentDate" to if (ar) "التاريخ الحالي" else "Current date",
+                            "currentTime" to if (ar) "الوقت الحالي" else "Current time",
+                            "batteryPercent" to if (ar) "نسبة البطارية" else "Battery percentage",
+                            "dayOfWeek" to if (ar) "يوم الأسبوع" else "Day of week",
+                        ),
+                    ) { (storedValue, label) ->
+                        FilterChip(
+                            selected = conditionValue == storedValue,
+                            onClick = { conditionValue = storedValue },
+                            label = { Text(label) },
+                        )
+                    }
+                }
+            } else {
+                OutlinedTextField(
+                    value = conditionValue,
+                    onValueChange = { conditionValue = it },
+                    label = { Text(conditionValueLabel(conditionType, ar)) },
+                    placeholder = { Text(conditionValueHint(conditionType, ar)) },
+                    modifier = Modifier.fillMaxWidth(),
+                )
+            }
+            ClearHint(conditionHint(conditionType, ar), ar)
             if (conditionType == RoutineConditionType.VARIABLE_EQUALS || conditionType == RoutineConditionType.VARIABLE_CONTAINS) {
                 OutlinedTextField(
                     value = conditionSecondary,
@@ -368,19 +391,36 @@ private fun RoutineBuilderScreen(
             ) { Text(if (ar) "+ إضافة شرط" else "+ Add condition") }
         }
 
-        items(conditions) { condition ->
+        items(conditions, key = { it.hashCode() }) { condition ->
+            val index = conditions.indexOf(condition)
             ElevatedCard(Modifier.fillMaxWidth()) {
-                Row(Modifier.fillMaxWidth().padding(10.dp), verticalAlignment = Alignment.CenterVertically) {
-                    Text(conditionTitle(condition.type, ar) + ": " + condition.value, modifier = Modifier.weight(1f))
-                    TextButton(onClick = { conditions.remove(condition) }) { Text(if (ar) "حذف" else "Remove") }
+                Column(Modifier.fillMaxWidth().padding(10.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                        ReorderHandle(
+                            ar = ar,
+                            index = index,
+                            size = conditions.size,
+                            onMove = { from, to ->
+                                val moved = conditions.removeAt(from)
+                                conditions.add(to, moved)
+                            },
+                        )
+                        Text(conditionDisplay(condition, ar), modifier = Modifier.weight(1f))
+                        TextButton(onClick = { conditions.remove(condition) }) { Text(if (ar) "حذف" else "Remove") }
+                    }
                 }
             }
         }
 
         item {
             SectionTitle(if (ar) "3. نفّذ" else "3. Do")
+            ClearHint(
+                if (ar) "أضف ما تحتاجه من خطوات. ينفذ التطبيق الخطوات من الأعلى إلى الأسفل. اضغط مطولًا على مقبض السحب بجانب أي خطوة واسحبها لتغيير مكانها."
+                else "Add as many steps as you need. Steps run from top to bottom. Long-press the drag handle beside a step and drag it to reorder.",
+                ar,
+            )
             if (actions.isNotEmpty()) {
-                Text(if (ar) "اقتراحات للخطوة التالية" else "Suggested next actions", style = MaterialTheme.typography.labelLarge)
+                Text(if (ar) "اقتراحات مناسبة بعد الخطوة السابقة" else "Suggested after the previous step", style = MaterialTheme.typography.labelLarge)
                 LazyRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                     items(RoutineCatalog.suggestions(actions.lastOrNull()?.type)) { type ->
                         val meta = RoutineCatalog.meta(type)
@@ -424,7 +464,7 @@ private fun RoutineBuilderScreen(
             ElevatedCard(Modifier.fillMaxWidth()) {
                 Column(Modifier.fillMaxWidth().padding(14.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
                     Text(if (ar) meta.titleAr else meta.titleEn, fontWeight = FontWeight.Bold)
-                    Text(if (ar) meta.hintAr else meta.hintEn, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    ClearHint(if (ar) meta.hintAr else meta.hintEn, ar)
 
                     when (actionType) {
                         RoutineActionType.OPEN_APP,
@@ -457,37 +497,36 @@ private fun RoutineBuilderScreen(
                             OutlinedTextField(
                                 value = params["botToken"].orEmpty(),
                                 onValueChange = { params = params + ("botToken" to it) },
-                                label = { Text("Bot Token") },
+                                label = { Text(if (ar) "رمز البوت" else "Bot token") },
                                 visualTransformation = PasswordVisualTransformation(),
-                                supportingText = { Text(if (ar) "يحفظ محليًا ولا يدخل في النسخ الاحتياطي أو التصدير." else "Stored locally and excluded from backups/exports.") },
+                                supportingText = { Text(if (ar) "أدخل الرمز الذي حصلت عليه من بوت فاذر. يُحفظ محليًا ولا يدخل في النسخ الاحتياطي أو التصدير." else "Enter the token you received from BotFather. It stays local and is excluded from backups and exports.") },
                                 modifier = Modifier.fillMaxWidth(),
                             )
                             OutlinedTextField(
                                 value = params["chatId"].orEmpty(),
                                 onValueChange = { params = params + ("chatId" to it) },
-                                label = { Text("Chat ID") },
+                                label = { Text(if (ar) "معرّف المحادثة" else "Chat ID") },
                                 modifier = Modifier.fillMaxWidth(),
                             )
                             OutlinedTextField(
                                 value = secondary,
                                 onValueChange = { secondary = it },
-                                label = { Text(if (ar) "الرسالة / التعليق" else "Message / caption") },
-                                placeholder = { Text(if (ar) "يمكن استخدام {{lastResult}}" else "You can use {{lastResult}}") },
+                                label = { Text(if (ar) "نص الرسالة أو تعليق الصورة" else "Message or image caption") },
+                                placeholder = { Text(if (ar) "مثال: تقرير اليوم" else "Example: Today's report") },
                                 modifier = Modifier.fillMaxWidth(),
                             )
                             if (actions.lastOrNull()?.type == RoutineActionType.OPEN_APP_SCREENSHOT) {
-                                Text(
-                                    if (ar) "✓ سيتم إرسال لقطة الشاشة الناتجة من الخطوة السابقة تلقائيًا مع هذه الرسالة."
-                                    else "✓ The screenshot produced by the previous step will be sent automatically with this message.",
-                                    style = MaterialTheme.typography.bodySmall,
-                                    color = MaterialTheme.colorScheme.primary,
+                                ClearHint(
+                                    if (ar) "تم اكتشاف لقطة شاشة قبل هذه الخطوة. سيستخدم التطبيق الصورة الناتجة تلقائيًا كمرفق، ولا تحتاج إلى اختيار ملف يدويًا."
+                                    else "A screenshot was detected before this step. Shortcut will automatically use that image as the attachment.",
+                                    ar,
                                 )
                             } else {
                                 OutlinedTextField(
                                     value = params["attachment"].orEmpty(),
                                     onValueChange = { params = params + ("attachment" to it) },
-                                    label = { Text(if (ar) "ملف اختياري" else "Optional file path") },
-                                    placeholder = { Text("{{lastFile}}") },
+                                    label = { Text(if (ar) "ملف اختياري" else "Optional file") },
+                                    placeholder = { Text(if (ar) "اتركه فارغًا لإرسال النص فقط" else "Leave empty to send text only") },
                                     modifier = Modifier.fillMaxWidth(),
                                 )
                             }
@@ -497,12 +536,12 @@ private fun RoutineBuilderScreen(
                             OutlinedTextField(
                                 value = value,
                                 onValueChange = { value = it },
-                                label = { Text("JavaScript") },
+                                label = { Text(if (ar) "السكربت المخصص" else "Custom script") },
                                 placeholder = { Text("return input.toUpperCase();") },
                                 supportingText = {
                                     Text(
-                                        if (ar) "متاح: input, currentDate, currentTime, lastResult. بدون وصول مباشر للنظام أو Java."
-                                        else "Available: input, currentDate, currentTime, lastResult. No direct system or Java access.",
+                                        if (ar) "استخدمه للحسابات ومعالجة النصوص والبيانات والمنطق المخصص. يعمل داخل بيئة محدودة ولا يملك وصولًا مباشرًا إلى نظام الهاتف."
+                                        else "Use it for calculations, text/data processing, and custom logic. It runs in a restricted environment with no direct phone-system access.",
                                     )
                                 },
                                 minLines = 5,
@@ -511,8 +550,45 @@ private fun RoutineBuilderScreen(
                             OutlinedTextField(
                                 value = secondary,
                                 onValueChange = { secondary = it },
-                                label = { Text(if (ar) "Input اختياري" else "Optional input") },
-                                placeholder = { Text("{{lastResult}}") },
+                                label = { Text(if (ar) "القيمة الداخلة الاختيارية" else "Optional input") },
+                                placeholder = { Text(if (ar) "يمكن تركها فارغة" else "You can leave this empty") },
+                                modifier = Modifier.fillMaxWidth(),
+                            )
+                        }
+
+                        RoutineActionType.SET_VARIABLE -> {
+                            OutlinedTextField(
+                                value = value,
+                                onValueChange = { value = it },
+                                label = { Text(if (ar) "اسم المتغير" else "Variable name") },
+                                placeholder = { Text(if (ar) "مثال: النتيجة" else "Example: result") },
+                                supportingText = { Text(if (ar) "اختر اسمًا قصيرًا لتستخدم القيمة لاحقًا داخل نفس الاختصار." else "Choose a short name so later steps can reuse this value.") },
+                                modifier = Modifier.fillMaxWidth(),
+                            )
+                            OutlinedTextField(
+                                value = secondary,
+                                onValueChange = { secondary = it },
+                                label = { Text(if (ar) "القيمة التي تريد حفظها" else "Value to save") },
+                                modifier = Modifier.fillMaxWidth(),
+                            )
+                        }
+
+                        RoutineActionType.READ_CLIPBOARD -> {
+                            OutlinedTextField(
+                                value = value,
+                                onValueChange = { value = it },
+                                label = { Text(if (ar) "اسم المتغير الذي سيحفظ النص" else "Variable name for clipboard text") },
+                                placeholder = { Text(if (ar) "مثال: النص" else "Example: text") },
+                                modifier = Modifier.fillMaxWidth(),
+                            )
+                        }
+
+                        RoutineActionType.COPY_TO_CLIPBOARD -> {
+                            OutlinedTextField(
+                                value = value,
+                                onValueChange = { value = it },
+                                label = { Text(if (ar) "النص المراد نسخه" else "Text to copy") },
+                                placeholder = { Text(if (ar) "اكتب النص أو استخدم قيمة من خطوة سابقة" else "Enter text or use a value from a previous step") },
                                 modifier = Modifier.fillMaxWidth(),
                             )
                         }
@@ -535,9 +611,14 @@ private fun RoutineBuilderScreen(
                     }
 
                     Row(verticalAlignment = Alignment.CenterVertically) {
-                        Text(if (ar) "استمر إذا فشلت هذه الخطوة" else "Continue if this step fails", modifier = Modifier.weight(1f))
+                        Text(if (ar) "الاستمرار عند فشل الخطوة" else "Continue if this step fails", modifier = Modifier.weight(1f))
                         Switch(checked = continueOnError, onCheckedChange = { continueOnError = it })
                     }
+                    ClearHint(
+                        if (ar) "إذا كان هذا الخيار مفعّلًا وفشلت الخطوة، فلن يتوقف الاختصار بل سينتقل إلى الخطوة التالية."
+                        else "When enabled, a failure in this step will not stop the shortcut; the next step will still run.",
+                        ar,
+                    )
 
                     val draft = RoutineAction(actionType, value, secondary, continueOnError, params)
                     Button(
@@ -561,25 +642,16 @@ private fun RoutineBuilderScreen(
                     val appLabel = installedApps.firstOrNull { it.packageName == action.value }?.label
                     val summary = actionSummary(action, appLabel, ar)
                     if (summary.isNotBlank()) Text(summary, style = MaterialTheme.typography.bodySmall)
-                    Row(horizontalArrangement = Arrangement.spacedBy(2.dp)) {
-                        TextButton(
-                            onClick = {
-                                if (index > 0) {
-                                    actions.removeAt(index)
-                                    actions.add(index - 1, action)
-                                }
+                    Row(horizontalArrangement = Arrangement.spacedBy(2.dp), verticalAlignment = Alignment.CenterVertically) {
+                        ReorderHandle(
+                            ar = ar,
+                            index = index,
+                            size = actions.size,
+                            onMove = { from, to ->
+                                val moved = actions.removeAt(from)
+                                actions.add(to, moved)
                             },
-                            enabled = index > 0,
-                        ) { Text("↑") }
-                        TextButton(
-                            onClick = {
-                                if (index < actions.lastIndex) {
-                                    actions.removeAt(index)
-                                    actions.add(index + 1, action)
-                                }
-                            },
-                            enabled = index < actions.lastIndex,
-                        ) { Text("↓") }
+                        )
                         TextButton(onClick = {
                             actionType = action.type
                             value = action.value
@@ -659,6 +731,72 @@ private fun DelayChips(ar: Boolean, selected: String, onSelect: (String) -> Unit
             )
         }
     }
+}
+
+@Composable
+private fun ClearHint(text: String, ar: Boolean) {
+    ElevatedCard(Modifier.fillMaxWidth()) {
+        Text(
+            text = "💡 " + text,
+            modifier = Modifier.fillMaxWidth().padding(10.dp),
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+    }
+}
+
+@Composable
+private fun ReorderHandle(
+    ar: Boolean,
+    index: Int,
+    size: Int,
+    onMove: (Int, Int) -> Unit,
+) {
+    var dragged by remember(index, size) { mutableStateOf(0f) }
+    Text(
+        text = if (ar) "⋮⋮ سحب" else "⋮⋮ Drag",
+        modifier = Modifier
+            .padding(end = 8.dp)
+            .pointerInput(index, size) {
+                detectDragGesturesAfterLongPress(
+                    onDragEnd = { dragged = 0f },
+                    onDragCancel = { dragged = 0f },
+                    onDrag = { change, amount ->
+                        change.consume()
+                        dragged += amount.y
+                        val threshold = 48.dp.toPx()
+                        if (abs(dragged) >= threshold) {
+                            val target = if (dragged > 0) index + 1 else index - 1
+                            if (target in 0 until size) onMove(index, target)
+                            dragged = 0f
+                        }
+                    },
+                )
+            },
+        style = MaterialTheme.typography.labelMedium,
+        color = MaterialTheme.colorScheme.primary,
+        fontWeight = FontWeight.Bold,
+    )
+}
+
+private fun conditionHint(type: RoutineConditionType, ar: Boolean): String = when (type) {
+    RoutineConditionType.BATTERY_ABOVE -> if (ar) "اكتب النسبة فقط، مثل 30. لن تنفذ الخطوات إلا إذا كانت البطارية أعلى منها." else "Enter a percentage such as 30. Steps run only when battery is above it."
+    RoutineConditionType.BATTERY_BELOW -> if (ar) "اكتب النسبة فقط، مثل 20. لن تنفذ الخطوات إلا إذا كانت البطارية أقل منها." else "Enter a percentage such as 20. Steps run only when battery is below it."
+    RoutineConditionType.DAY_OF_WEEK -> if (ar) "استخدم رقم اليوم: 1 الأحد، 2 الاثنين، 3 الثلاثاء، 4 الأربعاء، 5 الخميس، 6 الجمعة، 7 السبت." else "Use the day number: 1 Sunday, 2 Monday, 3 Tuesday, 4 Wednesday, 5 Thursday, 6 Friday, 7 Saturday."
+    RoutineConditionType.VARIABLE_EQUALS -> if (ar) "اختر قيمة من الخيارات ثم اكتب القيمة التي يجب أن تساويها بالضبط." else "Choose a built-in value, then enter the exact value it must equal."
+    RoutineConditionType.VARIABLE_CONTAINS -> if (ar) "اختر قيمة من الخيارات ثم اكتب النص الذي يجب أن يكون موجودًا داخلها." else "Choose a built-in value, then enter text that must appear inside it."
+}
+
+private fun conditionDisplay(condition: RoutineCondition, ar: Boolean): String {
+    val valueLabel = when (condition.value) {
+        "currentDate" -> if (ar) "التاريخ الحالي" else "Current date"
+        "currentTime" -> if (ar) "الوقت الحالي" else "Current time"
+        "batteryPercent" -> if (ar) "نسبة البطارية" else "Battery percentage"
+        "dayOfWeek" -> if (ar) "يوم الأسبوع" else "Day of week"
+        else -> condition.value
+    }
+    return conditionTitle(condition.type, ar) + ": " + valueLabel +
+        if (condition.secondaryValue.isNotBlank()) " → " + condition.secondaryValue else ""
 }
 
 @Composable
