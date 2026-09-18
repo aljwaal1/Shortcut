@@ -52,7 +52,7 @@ class PersistentScreenCaptureService : Service() {
             ACTION_CAPTURE -> requestCapture(intent)
             ACTION_STOP_SESSION -> stopSession()
         }
-        return START_STICKY
+        return START_NOT_STICKY
     }
 
     private fun startSession(intent: Intent) {
