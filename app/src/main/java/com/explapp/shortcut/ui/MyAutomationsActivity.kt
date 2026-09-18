@@ -1028,6 +1028,13 @@ private fun RoutineBuilderScreen(
                             onClick = {
                                 triggerRepeat = repeat
                                 triggerRepeatValue = when (repeat) {
+                                    RoutineRepeat.ONCE -> String.format(
+                                        Locale.US,
+                                        "%04d-%02d-%02d",
+                                        now.get(Calendar.YEAR),
+                                        now.get(Calendar.MONTH) + 1,
+                                        now.get(Calendar.DAY_OF_MONTH),
+                                    )
                                     RoutineRepeat.DAILY -> ""
                                     RoutineRepeat.WEEKLY -> {
                                         val iso = now.get(Calendar.DAY_OF_WEEK)
@@ -1048,6 +1055,35 @@ private fun RoutineBuilderScreen(
                 }
 
                 when (triggerRepeat) {
+                    RoutineRepeat.ONCE -> {
+                        val partsDate = triggerRepeatValue.split("-")
+                        val year = partsDate.getOrNull(0)?.toIntOrNull() ?: now.get(Calendar.YEAR)
+                        val month = partsDate.getOrNull(1)?.toIntOrNull() ?: (now.get(Calendar.MONTH) + 1)
+                        val day = partsDate.getOrNull(2)?.toIntOrNull() ?: now.get(Calendar.DAY_OF_MONTH)
+                        Button(
+                            onClick = {
+                                DatePickerDialog(
+                                    context,
+                                    { _, pickedYear, pickedMonth, pickedDay ->
+                                        triggerRepeatValue = String.format(Locale.US, "%04d-%02d-%02d", pickedYear, pickedMonth + 1, pickedDay)
+                                    },
+                                    year,
+                                    month - 1,
+                                    day,
+                                ).show()
+                            },
+                            modifier = Modifier.fillMaxWidth(),
+                        ) {
+                            Text(
+                                if (triggerRepeatValue.isBlank()) {
+                                    if (ar) "اختر تاريخ التنفيذ" else "Choose run date"
+                                } else {
+                                    (if (ar) "التاريخ: " else "Date: ") + triggerRepeatValue
+                                },
+                            )
+                        }
+                    }
+
                     RoutineRepeat.DAILY -> ClearHint(
                         if (ar) "سيعمل الاختصار كل يوم في الوقت المحدد."
                         else "The shortcut will run every day at the selected time.",
