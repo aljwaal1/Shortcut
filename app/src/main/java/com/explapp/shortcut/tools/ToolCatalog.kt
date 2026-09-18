@@ -19,6 +19,7 @@ enum class ToolId {
     BATTERY_CHARGER,
     NFC_TRIGGER,
     APP_OPEN_ROUTINE,
+    MY_AUTOMATIONS,
     MORNING_SLEEP,
     CALENDAR_REMINDERS,
     WATER_EJECT,
@@ -69,6 +70,7 @@ object ToolCatalog {
         ShortcutTool(ToolId.BATTERY_CHARGER, ToolSection.AUTOMATION, "Battery / charger automation", "أتمتة البطارية / الشاحن"),
         ShortcutTool(ToolId.NFC_TRIGGER, ToolSection.AUTOMATION, "NFC trigger", "تشغيل عبر NFC"),
         ShortcutTool(ToolId.APP_OPEN_ROUTINE, ToolSection.AUTOMATION, "App usage time", "وقت استخدام التطبيقات"),
+        ShortcutTool(ToolId.MY_AUTOMATIONS, ToolSection.AUTOMATION, "My automations", "الأتمتة الخاصة بي"),
         ShortcutTool(ToolId.MORNING_SLEEP, ToolSection.AUTOMATION, "Morning / sleep alarm setup", "إعداد منبه الصباح / النوم"),
         ShortcutTool(ToolId.CALENDAR_REMINDERS, ToolSection.AUTOMATION, "Add calendar reminder", "إضافة تذكير للتقويم"),
     )
