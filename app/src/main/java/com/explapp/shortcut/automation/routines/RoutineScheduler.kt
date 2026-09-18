@@ -90,6 +90,12 @@ class RoutineScheduler(private val context: Context) {
             date.atTime(hour, minute).atZone(now.zone).withSecond(0).withNano(0)
 
         return when (trigger.repeat) {
+            RoutineRepeat.ONCE -> {
+                val date = runCatching { LocalDate.parse(trigger.repeatValue) }.getOrNull() ?: return null
+                val candidate = at(date)
+                if (candidate.isAfter(now)) candidate else null
+            }
+
             RoutineRepeat.DAILY -> {
                 var candidate = at(now.toLocalDate())
                 if (!candidate.isAfter(now)) candidate = candidate.plusDays(1)
