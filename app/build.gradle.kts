@@ -12,8 +12,8 @@ android {
         applicationId = "com.explapp.shortcut"
         minSdk = 26
         targetSdk = 36
-        versionCode = 14
-        versionName = "0.7.4"
+        versionCode = 15
+        versionName = "0.8.0"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables { useSupportLibrary = true }
@@ -56,6 +56,7 @@ dependencies {
     implementation("com.google.zxing:core:3.5.3")
     implementation("com.tom-roush:pdfbox-android:2.0.27.0")
     implementation("com.squareup:gifencoder:0.10.1")
+    implementation("org.mozilla:rhino:1.7.15")
 
     testImplementation("junit:junit:4.13.2")
     androidTestImplementation("androidx.test.ext:junit:1.2.1")
