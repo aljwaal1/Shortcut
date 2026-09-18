@@ -34,6 +34,8 @@ object RoutineCodec {
         put("trigger", buildJsonObject {
             put("type", trigger.type.name)
             put("value", trigger.value)
+            put("repeat", trigger.repeat.name)
+            put("repeatValue", trigger.repeatValue)
         })
         put("conditions", buildJsonArray {
             conditions.forEach { condition ->
@@ -69,6 +71,10 @@ object RoutineCodec {
             trigger = RoutineTrigger(
                 type = RoutineTriggerType.valueOf(triggerJson.getValue("type").jsonPrimitive.content),
                 value = triggerJson["value"]?.jsonPrimitive?.content.orEmpty(),
+                repeat = runCatching {
+                    RoutineRepeat.valueOf(triggerJson["repeat"]?.jsonPrimitive?.content ?: RoutineRepeat.DAILY.name)
+                }.getOrDefault(RoutineRepeat.DAILY),
+                repeatValue = triggerJson["repeatValue"]?.jsonPrimitive?.content.orEmpty(),
             ),
             conditions = this["conditions"]?.jsonArray?.mapNotNull { item ->
                 runCatching {
