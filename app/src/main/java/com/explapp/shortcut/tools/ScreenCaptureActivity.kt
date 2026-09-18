@@ -231,7 +231,7 @@ class ScreenCaptureService : Service() {
             complete(null)
             return START_NOT_STICKY
         }
-        val delayMs = intent.getLongExtra(EXTRA_CAPTURE_DELAY_MS, 650L).coerceIn(500L, 10_000L)
+        val delayMs = (intent?.getLongExtra(EXTRA_CAPTURE_DELAY_MS, 650L) ?: 650L).coerceIn(500L, 10_000L)
         Handler(Looper.getMainLooper()).postDelayed({ capture(resultCode, data) }, delayMs)
         return START_NOT_STICKY
     }
