@@ -3,6 +3,7 @@ package com.explapp.shortcut.automation.routines
 import java.util.UUID
 
 enum class RoutineRepeat {
+    ONCE,
     DAILY,
     WEEKLY,
     MONTHLY,
@@ -80,6 +81,7 @@ data class RoutineTrigger(
             val minute = parts.getOrNull(1)?.toIntOrNull()
             val timeValid = parts.size == 2 && hour in 0..23 && minute in 0..59
             val repeatValid = when (repeat) {
+                RoutineRepeat.ONCE -> runCatching { java.time.LocalDate.parse(repeatValue) }.isSuccess
                 RoutineRepeat.DAILY -> true
                 RoutineRepeat.WEEKLY -> repeatValue.toIntOrNull() in 1..7
                 RoutineRepeat.MONTHLY -> repeatValue.toIntOrNull() in 1..31
