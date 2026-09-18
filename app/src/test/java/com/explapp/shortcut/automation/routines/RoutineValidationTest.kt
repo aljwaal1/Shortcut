@@ -44,6 +44,10 @@ class RoutineValidationTest {
         assertTrue(RoutineAction(RoutineActionType.READ_CLIPBOARD, "clipboardText").isValid())
         assertTrue(RoutineAction(RoutineActionType.COPY_TO_CLIPBOARD, "hello").isValid())
         assertTrue(RoutineAction(RoutineActionType.STOP_SHORTCUT, "").isValid())
+        assertTrue(RoutineAction(RoutineActionType.SAVE_TEXT_FILE, "hello", "note.txt").isValid())
+        assertTrue(RoutineAction(RoutineActionType.SHARE_TEXT, "hello").isValid())
+        assertTrue(RoutineAction(RoutineActionType.SHARE_FILE, "{{lastFile}}").isValid())
+        assertTrue(RoutineAction(RoutineActionType.WEB_SEARCH, "android automation").isValid())
         assertTrue(
             RoutineAction(
                 RoutineActionType.SEND_TELEGRAM_BOT,
