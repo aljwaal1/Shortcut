@@ -20,7 +20,7 @@ class RoutineExecutor(
 
         if (routine.conditions.any { !conditionEvaluator.matches(it) }) {
             val end = finishedAtMs ?: System.currentTimeMillis()
-            return RoutineRunResult(routine.id, routine.name, RoutineRunStatus.SKIPPED, emptyList(), startedAtMs, end)
+            return RoutineRunResult(routine.id, routine.name, RoutineRunStatus.PREPARED, emptyList(), startedAtMs, end)
         }
 
         val results = mutableListOf<RoutineActionResult>()
