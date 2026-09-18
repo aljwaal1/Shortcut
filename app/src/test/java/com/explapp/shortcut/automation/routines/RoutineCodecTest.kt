@@ -35,6 +35,16 @@ class RoutineCodecTest {
         )
         assertEquals(recurring, RoutineCodec.decode(RoutineCodec.encode(recurring)))
 
+        val once = listOf(
+            AutomationRoutine(
+                id = "once",
+                name = "Once",
+                trigger = RoutineTrigger(RoutineTriggerType.TIME, "10:45", RoutineRepeat.ONCE, "2026-09-20"),
+                actions = listOf(RoutineAction(RoutineActionType.SHOW_NOTIFICATION, "Done")),
+            ),
+        )
+        assertEquals(once, RoutineCodec.decode(RoutineCodec.encode(once)))
+
         val legacy = """[{"id":"old","name":"Old","isEnabled":true,"updatedAtMs":0,"trigger":{"type":"TIME","value":"07:00"},"actions":[{"type":"SHOW_NOTIFICATION","value":"Hi","secondaryValue":""}]}]"""
         val decoded = RoutineCodec.decode(legacy).single()
         assertEquals(RoutineRepeat.DAILY, decoded.trigger.repeat)
