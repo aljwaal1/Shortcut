@@ -249,6 +249,43 @@ private fun DailyScreenshotTelegramWizard(
     var chatId by remember { mutableStateOf("") }
     var caption by remember { mutableStateOf("") }
     var showAppPicker by remember { mutableStateOf(false) }
+    var pendingRoutine by remember { mutableStateOf<AutomationRoutine?>(null) }
+    var permissionMessage by remember { mutableStateOf<String?>(null) }
+
+    val alarmManager = remember(context) { context.getSystemService(AlarmManager::class.java) }
+
+    fun finishSave() {
+        val routine = pendingRoutine ?: return
+        onSave(routine)
+        pendingRoutine = null
+    }
+
+    val exactAlarmLauncher = rememberLauncherForActivityResult(ActivityResultContracts.StartActivityForResult()) {
+        finishSave()
+    }
+
+    fun requestExactAlarmOrSave() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S && !alarmManager.canScheduleExactAlarms()) {
+            permissionMessage = if (ar) "فعّل السماح بالمنبهات الدقيقة حتى يبدأ الاختصار أقرب ما يمكن إلى الوقت الذي اخترته." else "Allow exact alarms so the shortcut can start as close as possible to the selected time."
+            exactAlarmLauncher.launch(
+                Intent(
+                    Settings.ACTION_REQUEST_SCHEDULE_EXACT_ALARM,
+                    Uri.parse("package:${context.packageName}"),
+                ),
+            )
+        } else {
+            finishSave()
+        }
+    }
+
+    val notificationLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
+        if (granted) {
+            requestExactAlarmOrSave()
+        } else {
+            permissionMessage = if (ar) "يلزم السماح بالإشعارات لأن أندرويد يحتاج أن يعرض لك إشعارًا لتأكيد تصوير الشاشة عند حلول الوقت." else "Notification permission is required because Android must show you a notification to approve screen capture at the scheduled time."
+            pendingRoutine = null
+        }
+    }
 
     val selectedApp = installedApps.firstOrNull { it.packageName == appPackage }
     val canSave = time.isNotBlank() && appPackage.isNotBlank() && botToken.isNotBlank() && chatId.isNotBlank()
@@ -355,6 +392,12 @@ private fun DailyScreenshotTelegramWizard(
             )
         }
 
+        permissionMessage?.let { message ->
+            item {
+                Text(message, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall)
+            }
+        }
+
         item {
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 TextButton(onClick = onCancel, modifier = Modifier.weight(1f)) {
@@ -362,33 +405,41 @@ private fun DailyScreenshotTelegramWizard(
                 }
                 Button(
                     onClick = {
-                        onSave(
-                            AutomationRoutine(
-                                name = if (ar) "لقطة يومية إلى تيليجرام" else "Daily screenshot to Telegram",
-                                trigger = RoutineTrigger(
-                                    type = RoutineTriggerType.TIME,
-                                    value = time,
-                                    repeat = RoutineRepeat.DAILY,
+                        val routine = AutomationRoutine(
+                            name = if (ar) "لقطة يومية إلى تيليجرام" else "Daily screenshot to Telegram",
+                            trigger = RoutineTrigger(
+                                type = RoutineTriggerType.TIME,
+                                value = time,
+                                repeat = RoutineRepeat.DAILY,
+                            ),
+                            actions = listOf(
+                                RoutineAction(
+                                    type = RoutineActionType.OPEN_APP_SCREENSHOT,
+                                    value = appPackage,
+                                    secondaryValue = delayMs,
                                 ),
-                                actions = listOf(
-                                    RoutineAction(
-                                        type = RoutineActionType.OPEN_APP_SCREENSHOT,
-                                        value = appPackage,
-                                        secondaryValue = delayMs,
-                                    ),
-                                    RoutineAction(
-                                        type = RoutineActionType.SEND_TELEGRAM_BOT,
-                                        value = "telegram",
-                                        secondaryValue = caption,
-                                        parameters = mapOf(
-                                            "botToken" to botToken,
-                                            "chatId" to chatId,
-                                            "attachment" to "__screenshot_output__",
-                                        ),
+                                RoutineAction(
+                                    type = RoutineActionType.SEND_TELEGRAM_BOT,
+                                    value = "telegram",
+                                    secondaryValue = caption,
+                                    parameters = mapOf(
+                                        "botToken" to botToken,
+                                        "chatId" to chatId,
+                                        "attachment" to "__screenshot_output__",
                                     ),
                                 ),
                             ),
                         )
+                        pendingRoutine = routine
+                        permissionMessage = null
+
+                        val notificationsGranted = Build.VERSION.SDK_INT < 33 ||
+                            ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) == PackageManager.PERMISSION_GRANTED
+                        if (!notificationsGranted && Build.VERSION.SDK_INT >= 33) {
+                            notificationLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
+                        } else {
+                            requestExactAlarmOrSave()
+                        }
                     },
                     enabled = canSave,
                     modifier = Modifier.weight(1f),
