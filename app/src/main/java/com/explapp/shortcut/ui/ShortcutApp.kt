@@ -71,6 +71,7 @@ import androidx.core.os.LocaleListCompat
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import com.explapp.shortcut.R
+import com.explapp.shortcut.backup.BackupTransferActivity
 import com.explapp.shortcut.data.MessageStore
 import com.explapp.shortcut.data.ShortcutStore
 import com.explapp.shortcut.domain.MessagePlatform
@@ -527,10 +528,10 @@ private fun TemplatesScreen(
 
 @Composable
 private fun SettingsScreen(padding: PaddingValues, onOpenPermissions: () -> Unit) {
+    val context = LocalContext.current
     val configuration = LocalConfiguration.current
     val ar = configuration.locales[0].language == "ar"
     val rows = listOf(
-        R.string.backup,
         R.string.contact_us,
         R.string.feedback,
         R.string.report_problem,
@@ -580,6 +581,30 @@ private fun SettingsScreen(padding: PaddingValues, onOpenPermissions: () -> Unit
                     AccentIcon(Icons.Default.Settings, MaterialTheme.colorScheme.secondary)
                     Text(stringResource(R.string.permissions), modifier = Modifier.weight(1f), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
                     Text("→", color = MaterialTheme.colorScheme.secondary)
+                }
+            }
+        }
+        item {
+            ElevatedCard(
+                onClick = { context.startActivity(Intent(context, BackupTransferActivity::class.java)) },
+                modifier = Modifier.fillMaxWidth(),
+                colors = CardDefaults.elevatedCardColors(containerColor = MaterialTheme.colorScheme.tertiaryContainer.copy(alpha = 0.45f)),
+            ) {
+                Row(
+                    modifier = Modifier.fillMaxWidth().padding(18.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(12.dp),
+                ) {
+                    AccentIcon(Icons.Default.AutoAwesome, MaterialTheme.colorScheme.tertiary)
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(stringResource(R.string.backup), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                        Text(
+                            if (ar) "تصدير أو استعادة المهام والأتمتة محليًا" else "Export or restore tasks and automations locally",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                    Text("→", color = MaterialTheme.colorScheme.tertiary)
                 }
             }
         }
