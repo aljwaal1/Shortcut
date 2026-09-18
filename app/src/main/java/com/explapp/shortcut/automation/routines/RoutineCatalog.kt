@@ -25,6 +25,7 @@ object RoutineCatalog {
         RoutineActionMeta(RoutineActionType.SET_VARIABLE, "Variables", "المتغيرات", "Set variable", "تعيين متغير", "Save a value under a name so later steps can reuse it.", "يحفظ قيمة باسم تختاره حتى تستطيع الخطوات التالية استخدامها."),
         RoutineActionMeta(RoutineActionType.READ_CLIPBOARD, "Text", "النصوص", "Read clipboard", "قراءة الحافظة", "Read the current clipboard text and store it in a variable.", "يقرأ النص الموجود حاليًا في الحافظة ويحفظه داخل متغير."),
         RoutineActionMeta(RoutineActionType.COPY_TO_CLIPBOARD, "Text", "النصوص", "Copy to clipboard", "نسخ إلى الحافظة", "Copy text, including a previous result, to the device clipboard.", "ينسخ نصًا إلى حافظة الهاتف، ويمكن أن يكون النص ناتجًا من خطوة سابقة."),
+        RoutineActionMeta(RoutineActionType.STOP_SHORTCUT, "Flow", "التحكم", "Stop shortcut", "إيقاف الاختصار", "Stop here and do not run any steps below this block.", "يوقف التنفيذ عند هذه النقطة، ولن تُنفذ أي خطوة موجودة بعدها."),
         RoutineActionMeta(RoutineActionType.CUSTOM_SCRIPT, "Advanced", "متقدم", "Custom script", "سكربت مخصص", "Run restricted JavaScript for calculations, text processing, JSON, or custom logic, then store its result.", "يشغّل سكربتًا مخصصًا داخل بيئة محدودة لمعالجة النصوص أو الأرقام أو البيانات، ثم يحفظ النتيجة للخطوات التالية."),
         RoutineActionMeta(RoutineActionType.OPEN_TOOL, "Shortcut", "أدوات التطبيق", "Open built-in tool", "فتح أداة داخلية", "Open one of Shortcut's built-in tools.", "يفتح إحدى الأدوات الموجودة داخل التطبيق."),
     )
@@ -40,6 +41,7 @@ object RoutineCatalog {
         RoutineActionType.SET_VARIABLE,
         RoutineActionType.CUSTOM_SCRIPT,
         -> listOf(RoutineActionType.COPY_TO_CLIPBOARD, RoutineActionType.SEND_TELEGRAM_BOT, RoutineActionType.SHOW_NOTIFICATION)
+        RoutineActionType.STOP_SHORTCUT -> emptyList()
         else -> listOf(RoutineActionType.SET_VARIABLE, RoutineActionType.WAIT, RoutineActionType.SHOW_NOTIFICATION)
     }
 
