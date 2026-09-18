@@ -83,16 +83,29 @@ class ScreenCaptureActivity : AppCompatActivity() {
             ).show()
             finish()
         } else {
+            val packageNameToOpen = launchPackage
+            val handleResultInService = !runOcr && !packageNameToOpen.isNullOrBlank()
             val service = Intent(this, ScreenCaptureService::class.java)
                 .putExtra(ScreenCaptureService.EXTRA_RESULT_CODE, result.resultCode)
                 .putExtra(ScreenCaptureService.EXTRA_DATA, data)
                 .putExtra(ScreenCaptureService.EXTRA_CAPTURE_DELAY_MS, captureDelayMs)
+                .putExtra(ScreenCaptureService.EXTRA_HANDLE_RESULT_IN_SERVICE, handleResultInService)
+                .putExtra(ScreenCaptureService.EXTRA_TELEGRAM_BOT_TOKEN, telegramBotToken)
+                .putExtra(ScreenCaptureService.EXTRA_TELEGRAM_CHAT_ID, telegramChatId)
+                .putExtra(ScreenCaptureService.EXTRA_TELEGRAM_CAPTION, telegramCaption)
+                .putExtra(ScreenCaptureService.EXTRA_NORMAL_TELEGRAM_SHARE, normalTelegramShare)
             ContextCompat.startForegroundService(this, service)
 
-            val packageNameToOpen = launchPackage
             if (!packageNameToOpen.isNullOrBlank()) {
-                packageManager.getLaunchIntentForPackage(packageNameToOpen)?.let { target ->
-                    startActivity(target.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+                val target = packageManager.getLaunchIntentForPackage(packageNameToOpen)
+                if (target != null) {
+                    // Launch from this visible activity so Android background-start restrictions do not block it.
+                    // Do not keep this transparent/blank consent activity on top of the target app.
+                    startActivity(target)
+                    if (handleResultInService) finish()
+                } else {
+                    Toast.makeText(this, local("Target app is unavailable", "التطبيق المطلوب غير متاح"), Toast.LENGTH_LONG).show()
+                    finish()
                 }
             } else {
                 moveTaskToBack(true)
@@ -331,6 +344,11 @@ class ScreenCaptureActivity : AppCompatActivity() {
 
 class ScreenCaptureService : Service() {
     private var projection: MediaProjection? = null
+    private var handleResultInService = false
+    private var telegramBotToken = ""
+    private var telegramChatId = ""
+    private var telegramCaption = ""
+    private var normalTelegramShare = false
 
     override fun onBind(intent: Intent?): IBinder? = null
 
@@ -371,6 +389,11 @@ class ScreenCaptureService : Service() {
             return START_NOT_STICKY
         }
         val delayMs = (intent?.getLongExtra(EXTRA_CAPTURE_DELAY_MS, 650L) ?: 650L).coerceIn(500L, 10_000L)
+        handleResultInService = intent?.getBooleanExtra(EXTRA_HANDLE_RESULT_IN_SERVICE, false) == true
+        telegramBotToken = intent?.getStringExtra(EXTRA_TELEGRAM_BOT_TOKEN).orEmpty()
+        telegramChatId = intent?.getStringExtra(EXTRA_TELEGRAM_CHAT_ID).orEmpty()
+        telegramCaption = intent?.getStringExtra(EXTRA_TELEGRAM_CAPTION).orEmpty()
+        normalTelegramShare = intent?.getBooleanExtra(EXTRA_NORMAL_TELEGRAM_SHARE, false) == true
         Handler(Looper.getMainLooper()).postDelayed({ capture(resultCode, data) }, delayMs)
         return START_NOT_STICKY
     }
@@ -457,13 +480,121 @@ class ScreenCaptureService : Service() {
     }
 
     private fun complete(path: String?) {
-        sendBroadcast(
-            Intent(ACTION_COMPLETE)
-                .setPackage(packageName)
-                .putExtra(EXTRA_PATH, path),
-        )
-        stopForeground(STOP_FOREGROUND_REMOVE)
-        stopSelf()
+        if (handleResultInService) {
+            handleAutomationResult(path)
+        } else {
+            sendBroadcast(
+                Intent(ACTION_COMPLETE)
+                    .setPackage(packageName)
+                    .putExtra(EXTRA_PATH, path),
+            )
+            stopForeground(STOP_FOREGROUND_REMOVE)
+            stopSelf()
+        }
+    }
+
+    private fun handleAutomationResult(path: String?) {
+        if (path.isNullOrBlank()) {
+            showResultNotification(
+                local("Screenshot failed", "فشل التقاط لقطة الشاشة"),
+                local("Shortcut could not capture the target app screen.", "تعذر على التطبيق التقاط شاشة التطبيق المطلوب."),
+            )
+            stopForeground(STOP_FOREGROUND_REMOVE)
+            stopSelf()
+            return
+        }
+
+        val file = File(path)
+        val savedUri = runCatching {
+            val uri = ToolOutputStore(this).create(
+                "Screenshot_" + System.currentTimeMillis() + ".png",
+                "image/png",
+                true,
+            )
+            contentResolver.openOutputStream(uri).use { out ->
+                requireNotNull(out)
+                file.inputStream().use { it.copyTo(out) }
+            }
+            uri
+        }.getOrNull()
+
+        when {
+            telegramBotToken.isNotBlank() && telegramChatId.isNotBlank() -> {
+                Thread {
+                    val sent = TelegramBotSender().sendPhoto(
+                        telegramBotToken,
+                        telegramChatId,
+                        telegramCaption,
+                        file,
+                    )
+                    file.delete()
+                    showResultNotification(
+                        if (sent.isSuccess) local("Screenshot sent to Telegram", "تم إرسال لقطة الشاشة إلى تيليجرام")
+                        else local("Telegram send failed", "فشل الإرسال إلى تيليجرام"),
+                        if (sent.isSuccess) local("The target app screenshot was captured and sent.", "تم التقاط شاشة التطبيق وإرسالها.")
+                        else sent.exceptionOrNull()?.message.orEmpty(),
+                    )
+                    stopForeground(STOP_FOREGROUND_REMOVE)
+                    stopSelf()
+                }.start()
+            }
+
+            normalTelegramShare && savedUri != null -> {
+                file.delete()
+                val shareIntent = Intent(Intent.ACTION_SEND).apply {
+                    type = "image/png"
+                    putExtra(Intent.EXTRA_STREAM, savedUri)
+                    if (telegramCaption.isNotBlank()) putExtra(Intent.EXTRA_TEXT, telegramCaption)
+                    clipData = ClipData.newRawUri("Shortcut screenshot", savedUri)
+                    addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_ACTIVITY_NEW_TASK)
+                    if (packageManager.getLaunchIntentForPackage("org.telegram.messenger") != null) {
+                        setPackage("org.telegram.messenger")
+                    }
+                }
+                val pending = PendingIntent.getActivity(
+                    this,
+                    8833,
+                    Intent.createChooser(shareIntent, local("Choose Telegram chat", "اختر محادثة تيليجرام"))
+                        .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
+                    PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
+                )
+                showResultNotification(
+                    local("Screenshot ready for Telegram", "لقطة الشاشة جاهزة لتيليجرام"),
+                    local("Tap to choose the Telegram conversation.", "اضغط لاختيار محادثة تيليجرام."),
+                    pending,
+                )
+                stopForeground(STOP_FOREGROUND_REMOVE)
+                stopSelf()
+            }
+
+            else -> {
+                file.delete()
+                showResultNotification(
+                    if (savedUri != null) local("Screenshot saved", "تم حفظ لقطة الشاشة")
+                    else local("Screenshot failed", "فشل حفظ لقطة الشاشة"),
+                    if (savedUri != null) local("The target app screenshot was saved.", "تم حفظ لقطة شاشة التطبيق.")
+                    else local("Could not save the screenshot.", "تعذر حفظ لقطة الشاشة."),
+                )
+                stopForeground(STOP_FOREGROUND_REMOVE)
+                stopSelf()
+            }
+        }
+    }
+
+    private fun showResultNotification(title: String, text: String, pending: PendingIntent? = null) {
+        val manager = getSystemService(NotificationManager::class.java)
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            manager.createNotificationChannel(
+                NotificationChannel(RESULT_CHANNEL, local("Screenshot results", "نتائج لقطة الشاشة"), NotificationManager.IMPORTANCE_DEFAULT),
+            )
+        }
+        val builder = NotificationCompat.Builder(this, RESULT_CHANNEL)
+            .setSmallIcon(android.R.drawable.ic_menu_camera)
+            .setContentTitle(title)
+            .setContentText(text.take(180))
+            .setAutoCancel(true)
+        if (pending != null) builder.setContentIntent(pending)
+        manager.notify(RESULT_NOTIFICATION_ID, builder.build())
     }
 
     override fun onDestroy() {
@@ -478,7 +609,14 @@ class ScreenCaptureService : Service() {
         const val EXTRA_DATA = "data"
         const val EXTRA_CAPTURE_DELAY_MS = "captureDelayMs"
         const val EXTRA_PATH = "path"
+        const val EXTRA_HANDLE_RESULT_IN_SERVICE = "handleResultInService"
+        const val EXTRA_TELEGRAM_BOT_TOKEN = "telegramBotToken"
+        const val EXTRA_TELEGRAM_CHAT_ID = "telegramChatId"
+        const val EXTRA_TELEGRAM_CAPTION = "telegramCaption"
+        const val EXTRA_NORMAL_TELEGRAM_SHARE = "normalTelegramShare"
         private const val CHANNEL = "screen_capture"
+        private const val RESULT_CHANNEL = "screen_capture_results"
         private const val NOTIFICATION_ID = 8831
+        private const val RESULT_NOTIFICATION_ID = 8834
     }
 }
