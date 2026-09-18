@@ -12,18 +12,21 @@ data class RoutineActionMeta(
 
 object RoutineCatalog {
     val actions: List<RoutineActionMeta> = listOf(
-        RoutineActionMeta(RoutineActionType.OPEN_APP, "Apps", "التطبيقات", "Open app", "فتح تطبيق", "Choose any installed app.", "اختر أي تطبيق مثبت على جهازك."),
-        RoutineActionMeta(RoutineActionType.OPEN_APP_SCREENSHOT, "Apps", "التطبيقات", "Open app + screenshot", "فتح تطبيق + لقطة شاشة", "Open an app, wait, then capture one screenshot.", "افتح تطبيقًا وانتظر ثم التقط صورة شاشة واحدة."),
-        RoutineActionMeta(RoutineActionType.TAKE_SCREENSHOT, "Media", "الوسائط", "Take screenshot", "التقاط لقطة شاشة", "Capture the visible screen after a delay.", "التقط الشاشة الظاهرة بعد مدة تحددها."),
-        RoutineActionMeta(RoutineActionType.WAIT, "Flow", "التحكم", "Wait", "انتظار", "Pause before the next action.", "انتظر قبل تنفيذ الخطوة التالية."),
-        RoutineActionMeta(RoutineActionType.SHOW_NOTIFICATION, "System", "النظام", "Show notification", "إظهار إشعار", "Display a local notification.", "اعرض إشعارًا محليًا."),
-        RoutineActionMeta(RoutineActionType.OPEN_URL, "Web", "الويب", "Open URL", "فتح رابط", "Open a website or deep link.", "افتح موقعًا أو رابطًا عميقًا."),
-        RoutineActionMeta(RoutineActionType.OPEN_MAPS, "Apps", "التطبيقات", "Open maps", "فتح الخرائط", "Open a place or search in Maps.", "افتح مكانًا أو بحثًا في الخرائط."),
-        RoutineActionMeta(RoutineActionType.PREPARE_WHATSAPP, "Communication", "التواصل", "Prepare WhatsApp", "تجهيز واتساب", "Prepare recipient and message for user confirmation.", "جهز المستلم والرسالة ليكمل المستخدم الإرسال."),
-        RoutineActionMeta(RoutineActionType.PREPARE_TELEGRAM, "Communication", "التواصل", "Prepare Telegram", "تجهيز تيليجرام", "Prepare a Telegram message for user confirmation.", "جهز رسالة تيليجرام ليكمل المستخدم الإرسال."),
-        RoutineActionMeta(RoutineActionType.SEND_TELEGRAM_BOT, "Communication", "التواصل", "Telegram Bot send", "إرسال عبر Telegram Bot", "Send text or an output file automatically using your bot.", "أرسل نصًا أو ملفًا ناتجًا تلقائيًا بواسطة البوت."),
-        RoutineActionMeta(RoutineActionType.CUSTOM_SCRIPT, "Advanced", "متقدم", "Custom JavaScript", "JavaScript مخصص", "Run sandboxed JavaScript and store its returned value.", "شغّل JavaScript محدود الصلاحيات واستخدم النتيجة في الخطوات التالية."),
-        RoutineActionMeta(RoutineActionType.OPEN_TOOL, "Shortcut", "Shortcut", "Open Shortcut tool", "فتح أداة Shortcut", "Open one of Shortcut's built-in tools.", "افتح إحدى أدوات Shortcut الداخلية."),
+        RoutineActionMeta(RoutineActionType.OPEN_APP, "Apps", "التطبيقات", "Open app", "فتح تطبيق", "Choose any installed app. Use this only when you actually need another app to open.", "اختر أي تطبيق مثبت على جهازك. استخدم هذه الخطوة فقط عندما تحتاج فعلًا إلى فتح تطبيق آخر."),
+        RoutineActionMeta(RoutineActionType.OPEN_APP_SCREENSHOT, "Apps", "التطبيقات", "Open app and take screenshot", "فتح تطبيق والتقاط الشاشة", "Open an app, wait for it to appear, take one screenshot, then stop capture automatically.", "يفتح تطبيقًا، ينتظر حتى تظهر الشاشة، يلتقط صورة واحدة، ثم يوقف التصوير تلقائيًا."),
+        RoutineActionMeta(RoutineActionType.TAKE_SCREENSHOT, "Media", "الوسائط", "Take screenshot", "التقاط الشاشة", "Take one screenshot of whatever is visible after the delay you choose.", "يلتقط صورة واحدة لما هو ظاهر على الشاشة بعد مدة تحددها."),
+        RoutineActionMeta(RoutineActionType.WAIT, "Flow", "التحكم", "Wait", "انتظار", "Pause the shortcut before the next step. Useful when another screen needs time to load.", "يوقف الاختصار مؤقتًا قبل الخطوة التالية. مفيد عندما تحتاج شاشة أو عملية إلى وقت حتى تجهز."),
+        RoutineActionMeta(RoutineActionType.SHOW_NOTIFICATION, "System", "النظام", "Show notification", "إظهار إشعار", "Show a local notification with your text.", "يعرض إشعارًا على الهاتف بالنص الذي تكتبه."),
+        RoutineActionMeta(RoutineActionType.OPEN_URL, "Web", "الويب", "Open link", "فتح رابط", "Open a website, deep link, or any supported address.", "يفتح موقعًا أو رابطًا عميقًا أو عنوانًا تدعمه التطبيقات المثبتة."),
+        RoutineActionMeta(RoutineActionType.OPEN_MAPS, "Apps", "التطبيقات", "Open maps", "فتح الخرائط", "Open a place, address, or search in the maps app.", "يفتح مكانًا أو عنوانًا أو عبارة بحث في تطبيق الخرائط."),
+        RoutineActionMeta(RoutineActionType.PREPARE_WHATSAPP, "Communication", "التواصل", "Prepare WhatsApp message", "تجهيز رسالة واتساب", "Prepare the recipient and message, then let you confirm sending in WhatsApp.", "يجهز المستلم والرسالة، ثم يفتح واتساب لتؤكد الإرسال بنفسك."),
+        RoutineActionMeta(RoutineActionType.PREPARE_TELEGRAM, "Communication", "التواصل", "Prepare Telegram message", "تجهيز رسالة تيليجرام", "Prepare the message and open Telegram for your confirmation.", "يجهز الرسالة ويفتح تيليجرام لتؤكد الإرسال بنفسك."),
+        RoutineActionMeta(RoutineActionType.SEND_TELEGRAM_BOT, "Communication", "التواصل", "Send with Telegram bot", "إرسال بواسطة بوت تيليجرام", "Automatically send text or the output file from a previous step using your Telegram bot.", "يرسل تلقائيًا نصًا أو ملفًا ناتجًا من خطوة سابقة بواسطة بوت تيليجرام."),
+        RoutineActionMeta(RoutineActionType.SET_VARIABLE, "Variables", "المتغيرات", "Set variable", "تعيين متغير", "Save a value under a name so later steps can reuse it.", "يحفظ قيمة باسم تختاره حتى تستطيع الخطوات التالية استخدامها."),
+        RoutineActionMeta(RoutineActionType.READ_CLIPBOARD, "Text", "النصوص", "Read clipboard", "قراءة الحافظة", "Read the current clipboard text and store it in a variable.", "يقرأ النص الموجود حاليًا في الحافظة ويحفظه داخل متغير."),
+        RoutineActionMeta(RoutineActionType.COPY_TO_CLIPBOARD, "Text", "النصوص", "Copy to clipboard", "نسخ إلى الحافظة", "Copy text, including a previous result, to the device clipboard.", "ينسخ نصًا إلى حافظة الهاتف، ويمكن أن يكون النص ناتجًا من خطوة سابقة."),
+        RoutineActionMeta(RoutineActionType.CUSTOM_SCRIPT, "Advanced", "متقدم", "Custom script", "سكربت مخصص", "Run restricted JavaScript for calculations, text processing, JSON, or custom logic, then store its result.", "يشغّل سكربتًا مخصصًا داخل بيئة محدودة لمعالجة النصوص أو الأرقام أو البيانات، ثم يحفظ النتيجة للخطوات التالية."),
+        RoutineActionMeta(RoutineActionType.OPEN_TOOL, "Shortcut", "أدوات التطبيق", "Open built-in tool", "فتح أداة داخلية", "Open one of Shortcut's built-in tools.", "يفتح إحدى الأدوات الموجودة داخل التطبيق."),
     )
 
     fun meta(type: RoutineActionType): RoutineActionMeta = actions.first { it.type == type }
@@ -32,18 +35,21 @@ object RoutineCatalog {
         RoutineActionType.OPEN_APP -> listOf(RoutineActionType.WAIT, RoutineActionType.TAKE_SCREENSHOT, RoutineActionType.SHOW_NOTIFICATION)
         RoutineActionType.OPEN_APP_SCREENSHOT,
         RoutineActionType.TAKE_SCREENSHOT,
-        -> listOf(RoutineActionType.SEND_TELEGRAM_BOT, RoutineActionType.CUSTOM_SCRIPT, RoutineActionType.SHOW_NOTIFICATION)
-        RoutineActionType.CUSTOM_SCRIPT -> listOf(RoutineActionType.SEND_TELEGRAM_BOT, RoutineActionType.SHOW_NOTIFICATION, RoutineActionType.OPEN_URL)
-        else -> listOf(RoutineActionType.OPEN_APP, RoutineActionType.WAIT, RoutineActionType.SHOW_NOTIFICATION)
+        -> listOf(RoutineActionType.SEND_TELEGRAM_BOT, RoutineActionType.COPY_TO_CLIPBOARD, RoutineActionType.CUSTOM_SCRIPT)
+        RoutineActionType.READ_CLIPBOARD,
+        RoutineActionType.SET_VARIABLE,
+        RoutineActionType.CUSTOM_SCRIPT,
+        -> listOf(RoutineActionType.COPY_TO_CLIPBOARD, RoutineActionType.SEND_TELEGRAM_BOT, RoutineActionType.SHOW_NOTIFICATION)
+        else -> listOf(RoutineActionType.SET_VARIABLE, RoutineActionType.WAIT, RoutineActionType.SHOW_NOTIFICATION)
     }
 
     fun triggerHint(type: RoutineTriggerType, ar: Boolean): String = when (type) {
-        RoutineTriggerType.MANUAL -> if (ar) "مثال: شغّل الاختصار يدويًا من داخل التطبيق." else "Example: run this shortcut manually."
-        RoutineTriggerType.TIME -> if (ar) "مثال: 08:00 للتشغيل يوميًا في هذا الوقت." else "Example: 08:00 to run daily at this time."
-        RoutineTriggerType.CHARGER_CONNECTED -> if (ar) "يعمل عند توصيل الشاحن." else "Runs when the charger is connected."
-        RoutineTriggerType.CHARGER_DISCONNECTED -> if (ar) "يعمل عند فصل الشاحن." else "Runs when the charger is disconnected."
-        RoutineTriggerType.BATTERY_BELOW -> if (ar) "مثال: 20 للتشغيل عند نزول البطارية تحت 20%." else "Example: 20 to run below 20% battery."
-        RoutineTriggerType.NFC -> if (ar) "اكتب وسم NFC لهذا الاختصار بعد الحفظ." else "Write an NFC tag for this shortcut after saving."
-        RoutineTriggerType.BOOT -> if (ar) "يعمل بعد تشغيل الجهاز." else "Runs after device startup."
+        RoutineTriggerType.MANUAL -> if (ar) "يعمل فقط عندما تضغط تشغيل. مناسب للاختصارات التي تريد تنفيذها عند الطلب." else "Runs only when you tap Run. Best for shortcuts you want to start on demand."
+        RoutineTriggerType.TIME -> if (ar) "اكتب الوقت بصيغة 24 ساعة، مثل 08:00. سيحاول الاختصار التشغيل يوميًا في هذا الوقت." else "Enter a 24-hour time such as 08:00. The shortcut will try to run every day at that time."
+        RoutineTriggerType.CHARGER_CONNECTED -> if (ar) "يبدأ الاختصار عندما يتصل الهاتف بالشاحن." else "Starts when the phone is connected to a charger."
+        RoutineTriggerType.CHARGER_DISCONNECTED -> if (ar) "يبدأ الاختصار عندما يُفصل الهاتف عن الشاحن." else "Starts when the phone is disconnected from the charger."
+        RoutineTriggerType.BATTERY_BELOW -> if (ar) "اكتب نسبة مثل 20. يبدأ الاختصار عندما تنخفض البطارية إلى أقل من هذه النسبة." else "Enter a percentage such as 20. The shortcut starts when battery drops below it."
+        RoutineTriggerType.NFC -> if (ar) "بعد الحفظ، اكتب هذا الاختصار على وسم NFC. عند لمس الوسم سيبدأ الاختصار." else "After saving, write this shortcut to an NFC tag. Tapping the tag will start it."
+        RoutineTriggerType.BOOT -> if (ar) "يبدأ بعد تشغيل الهاتف أو إعادة تشغيله، وفق قيود أندرويد على التشغيل في الخلفية." else "Starts after device boot or restart, subject to Android background limits."
     }
 }
