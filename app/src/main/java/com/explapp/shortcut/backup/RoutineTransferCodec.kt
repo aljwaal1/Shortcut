@@ -7,7 +7,13 @@ import java.util.UUID
 object RoutineTransferCodec {
     const val MAX_CHARS = 128_000
 
-    fun encode(routine: AutomationRoutine): String = RoutineCodec.encode(listOf(routine))
+    fun encode(routine: AutomationRoutine): String = RoutineCodec.encode(listOf(routine.withoutSecrets()))
+
+    private fun AutomationRoutine.withoutSecrets(): AutomationRoutine = copy(
+        actions = actions.map { action ->
+            action.copy(parameters = action.parameters - "botToken" - "telegramBotToken")
+        },
+    )
 
     fun decode(raw: String, newId: String = UUID.randomUUID().toString()): Result<AutomationRoutine> = runCatching {
         require(raw.length <= MAX_CHARS) { "Routine document is too large" }
