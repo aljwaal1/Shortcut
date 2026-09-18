@@ -53,7 +53,6 @@ import com.explapp.shortcut.automation.routines.RoutineStore
 import com.explapp.shortcut.automation.routines.RoutineTemplateCatalog
 import com.explapp.shortcut.automation.routines.RoutineTrigger
 import com.explapp.shortcut.automation.routines.RoutineTriggerType
-import com.explapp.shortcut.backup.BackupTransferActivity
 import com.explapp.shortcut.data.InstalledAppRepository
 import com.explapp.shortcut.tools.NfcSetupActivity
 
@@ -123,16 +122,10 @@ private fun MyAutomationsScreen(onBack: () -> Unit) {
                 }
             }
             item {
-                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    TextButton(
-                        onClick = { context.startActivity(Intent(context, ScheduledTasksManagerActivity::class.java)) },
-                        modifier = Modifier.weight(1f),
-                    ) { Text(if (ar) "المهام المجدولة" else "Scheduled tasks") }
-                    TextButton(
-                        onClick = { context.startActivity(Intent(context, BackupTransferActivity::class.java)) },
-                        modifier = Modifier.weight(1f),
-                    ) { Text(if (ar) "نسخ احتياطي" else "Backup") }
-                }
+                TextButton(
+                    onClick = { context.startActivity(Intent(context, ScheduledTasksManagerActivity::class.java)) },
+                    modifier = Modifier.fillMaxWidth(),
+                ) { Text(if (ar) "المهام المجدولة" else "Scheduled tasks") }
             }
             lastDeleted?.let { deleted ->
                 item {
