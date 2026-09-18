@@ -10,6 +10,7 @@ import android.net.Uri
 import android.os.Build
 import android.os.Bundle
 import android.provider.Settings
+import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
@@ -69,6 +70,7 @@ import com.explapp.shortcut.automation.routines.RoutineStore
 import com.explapp.shortcut.automation.routines.RoutineTemplateCatalog
 import com.explapp.shortcut.automation.routines.RoutineTrigger
 import com.explapp.shortcut.automation.routines.RoutineTriggerType
+import com.explapp.shortcut.automation.routines.TelegramBotSender
 import com.explapp.shortcut.data.InstalledAppRepository
 import com.explapp.shortcut.tools.NfcSetupActivity
 import com.explapp.shortcut.tools.ScreenCaptureActivity
@@ -422,8 +424,8 @@ private fun DailyScreenshotTelegramWizard(
                 label = { Text(if (ar) "معرّف محادثة الشخص" else "Person's chat ID") },
                 supportingText = {
                     Text(
-                        if (ar) "يجب أن تكون المحادثة متاحة للبوت. لا يمكن للبوت الإرسال إلى شخص لم يبدأ محادثة معه أو لا يسمح له تيليجرام بالوصول إليه."
-                        else "The chat must be accessible to your bot. A bot cannot send to a person who has not started a chat with it or is otherwise inaccessible to the bot.",
+                        if (ar) "يجب أن يكون الشخص قد بدأ محادثة مع البوت. الإرسال التلقائي هنا يتم بواسطة البوت، وليس من حساب تيليجرام الشخصي."
+                        else "The person must have started a chat with your bot. Automatic sending here is from the bot, not from your personal Telegram account.",
                     )
                 },
                 modifier = Modifier.fillMaxWidth(),
@@ -431,10 +433,71 @@ private fun DailyScreenshotTelegramWizard(
             OutlinedTextField(
                 value = caption,
                 onValueChange = { caption = it },
-                label = { Text(if (ar) "تعليق اختياري مع الصورة" else "Optional image caption") },
+                label = { Text(if (ar) "نص الرسالة مع الصورة" else "Message with the image") },
                 placeholder = { Text(if (ar) "مثال: لقطة الشاشة اليومية" else "Example: Daily screenshot") },
                 modifier = Modifier.fillMaxWidth(),
             )
+
+            Button(
+                onClick = {
+                    Thread {
+                        val result = TelegramBotSender().sendText(
+                            botToken.trim(),
+                            chatId.trim(),
+                            if (ar) "رسالة اختبار من تطبيق Shortcut" else "Test message from Shortcut",
+                        )
+                        (context as? android.app.Activity)?.runOnUiThread {
+                            Toast.makeText(
+                                context,
+                                if (result.isSuccess) {
+                                    if (ar) "نجح الاتصال بتيليجرام ووصلت رسالة الاختبار." else "Telegram connection succeeded and the test message was sent."
+                                } else {
+                                    if (ar) "فشل اختبار تيليجرام. تحقق من رمز البوت ومعرّف المحادثة." else "Telegram test failed. Check the bot token and chat ID."
+                                },
+                                Toast.LENGTH_LONG,
+                            ).show()
+                        }
+                    }.start()
+                },
+                enabled = botToken.isNotBlank() && chatId.isNotBlank(),
+                modifier = Modifier.fillMaxWidth(),
+            ) {
+                Text(if (ar) "اختبار الإرسال إلى هذا الشخص" else "Test sending to this person")
+            }
+
+            if (keepCaptureSession) {
+                Button(
+                    onClick = {
+                        val captureIntent = Intent(context, PersistentScreenCaptureService::class.java)
+                            .setAction(PersistentScreenCaptureService.ACTION_CAPTURE)
+                            .putExtra(PersistentScreenCaptureService.EXTRA_LAUNCH_PACKAGE, appPackage)
+                            .putExtra(PersistentScreenCaptureService.EXTRA_CAPTURE_DELAY_MS, delayMs.toLongOrNull() ?: 3_000L)
+                            .putExtra(PersistentScreenCaptureService.EXTRA_TELEGRAM_BOT_TOKEN, botToken)
+                            .putExtra(PersistentScreenCaptureService.EXTRA_TELEGRAM_CHAT_ID, chatId)
+                            .putExtra(PersistentScreenCaptureService.EXTRA_TELEGRAM_CAPTION, caption)
+                        ContextCompat.startForegroundService(context, captureIntent)
+                        Toast.makeText(
+                            context,
+                            if (ar) "بدأ اختبار: فتح التطبيق ثم التقاط الشاشة وإرسالها." else "Test started: opening the app, capturing, and sending.",
+                            Toast.LENGTH_LONG,
+                        ).show()
+                    },
+                    enabled = appPackage.isNotBlank() &&
+                        botToken.isNotBlank() &&
+                        chatId.isNotBlank() &&
+                        PersistentScreenCaptureService.isSessionActive(context),
+                    modifier = Modifier.fillMaxWidth(),
+                ) {
+                    Text(if (ar) "اختبار لقطة الشاشة والإرسال الآن" else "Test screenshot and send now")
+                }
+                if (!PersistentScreenCaptureService.isSessionActive(context)) {
+                    ClearHint(
+                        if (ar) "فعّل جلسة تصوير الشاشة أولًا، ثم سيعمل زر الاختبار الكامل."
+                        else "Activate the persistent capture session first, then the full test button becomes available.",
+                        ar,
+                    )
+                }
+            }
         }
 
         item {
