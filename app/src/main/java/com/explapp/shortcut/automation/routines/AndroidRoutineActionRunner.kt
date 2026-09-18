@@ -10,6 +10,9 @@ import android.content.ClipboardManager
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.net.Uri
+import androidx.core.content.FileProvider
+import com.explapp.shortcut.tools.ToolOutputStore
+import java.io.File
 import android.os.Build
 import java.text.SimpleDateFormat
 import java.util.Date
@@ -44,6 +47,10 @@ class AndroidRoutineActionRunner(
         RoutineActionType.READ_CLIPBOARD -> readClipboard(action)
         RoutineActionType.COPY_TO_CLIPBOARD -> copyToClipboard(action)
         RoutineActionType.STOP_SHORTCUT -> RoutineActionResult.success(action)
+        RoutineActionType.SAVE_TEXT_FILE -> saveTextFile(action)
+        RoutineActionType.SHARE_TEXT -> shareText(action)
+        RoutineActionType.SHARE_FILE -> shareFile(action)
+        RoutineActionType.WEB_SEARCH -> webSearch(action)
         RoutineActionType.OPEN_TOOL -> {
             if (action.value == "app_usage") openExternal(action, Intent(context, AppUsageActivity::class.java))
             else RoutineActionResult.failure(action, local("Unknown built-in tool", "أداة داخلية غير معروفة"))
@@ -123,6 +130,73 @@ class AndroidRoutineActionRunner(
         clipboard.setPrimaryClip(ClipData.newPlainText("Shortcut", text))
         variables["lastResult"] = text
         return RoutineActionResult.success(action)
+    }
+
+    private fun saveTextFile(action: RoutineAction): RoutineActionResult {
+        val text = resolve(action.value)
+        val rawName = resolve(action.secondaryValue).ifBlank { "Shortcut_" + System.currentTimeMillis() + ".txt" }
+        val fileName = if (rawName.endsWith(".txt", ignoreCase = true)) rawName else rawName + ".txt"
+        return runCatching {
+            val uri = ToolOutputStore(context).create(fileName, "text/plain", false)
+            context.contentResolver.openOutputStream(uri).use { out ->
+                requireNotNull(out).write(text.toByteArray(Charsets.UTF_8))
+            }
+            variables["lastFile"] = uri.toString()
+            variables["lastResult"] = uri.toString()
+            RoutineActionResult.success(action)
+        }.getOrElse { RoutineActionResult.failure(action, it.message ?: local("Could not save file", "تعذر حفظ الملف")) }
+    }
+
+    private fun shareText(action: RoutineAction): RoutineActionResult {
+        val text = resolve(action.value)
+        val intent = Intent(Intent.ACTION_SEND).apply {
+            type = "text/plain"
+            putExtra(Intent.EXTRA_TEXT, text)
+            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        }
+        return if (userInitiated) {
+            runCatching {
+                context.startActivity(Intent.createChooser(intent, local("Share text", "مشاركة النص")).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+                RoutineActionResult.success(action)
+            }.getOrElse { RoutineActionResult.failure(action, it.message ?: local("Could not open sharing", "تعذر فتح المشاركة")) }
+        } else {
+            if (showNotification(local("Text ready to share", "النص جاهز للمشاركة"), text, intent)) {
+                RoutineActionResult.prepared(action, local("User action required", "يلزم إجراء من المستخدم"))
+            } else RoutineActionResult.failure(action, local("Notification permission is required", "يلزم السماح بالإشعارات"))
+        }
+    }
+
+    private fun shareFile(action: RoutineAction): RoutineActionResult {
+        val raw = resolve(action.value).ifBlank { variables["lastFile"].orEmpty() }
+        if (raw.isBlank()) return RoutineActionResult.failure(action, local("No file is available to share", "لا يوجد ملف متاح للمشاركة"))
+        val uri = runCatching {
+            val parsed = Uri.parse(raw)
+            if (parsed.scheme == "content") parsed
+            else FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", File(raw))
+        }.getOrElse {
+            return RoutineActionResult.failure(action, local("Could not access the file", "تعذر الوصول إلى الملف"))
+        }
+        val intent = Intent(Intent.ACTION_SEND).apply {
+            type = action.parameters["mime"].orEmpty().ifBlank { "*/*" }
+            putExtra(Intent.EXTRA_STREAM, uri)
+            addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_ACTIVITY_NEW_TASK)
+        }
+        return if (userInitiated) {
+            runCatching {
+                context.startActivity(Intent.createChooser(intent, local("Share file", "مشاركة الملف")).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+                RoutineActionResult.success(action)
+            }.getOrElse { RoutineActionResult.failure(action, it.message ?: local("Could not open sharing", "تعذر فتح المشاركة")) }
+        } else {
+            if (showNotification(local("File ready to share", "الملف جاهز للمشاركة"), local("Tap to choose where to share it", "اضغط لاختيار جهة المشاركة"), intent)) {
+                RoutineActionResult.prepared(action, local("User action required", "يلزم إجراء من المستخدم"))
+            } else RoutineActionResult.failure(action, local("Notification permission is required", "يلزم السماح بالإشعارات"))
+        }
+    }
+
+    private fun webSearch(action: RoutineAction): RoutineActionResult {
+        val query = resolve(action.value)
+        val intent = Intent(Intent.ACTION_VIEW, Uri.parse("https://www.google.com/search?q=" + Uri.encode(query)))
+        return openExternal(action, intent)
     }
 
     private fun runCustomScript(action: RoutineAction): RoutineActionResult {
