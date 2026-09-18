@@ -42,6 +42,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
 import com.explapp.shortcut.automation.routines.AutomationRoutine
@@ -457,7 +458,8 @@ private fun RoutineBuilderScreen(
                                 value = params["botToken"].orEmpty(),
                                 onValueChange = { params = params + ("botToken" to it) },
                                 label = { Text("Bot Token") },
-                                supportingText = { Text(if (ar) "يحفظ محليًا داخل الاختصار." else "Stored locally inside this shortcut.") },
+                                visualTransformation = PasswordVisualTransformation(),
+                                supportingText = { Text(if (ar) "يحفظ محليًا ولا يدخل في النسخ الاحتياطي أو التصدير." else "Stored locally and excluded from backups/exports.") },
                                 modifier = Modifier.fillMaxWidth(),
                             )
                             OutlinedTextField(
@@ -711,7 +713,7 @@ private fun conditionValueHint(type: RoutineConditionType, ar: Boolean): String 
     RoutineConditionType.BATTERY_BELOW,
     -> "30"
     RoutineConditionType.DAY_OF_WEEK -> if (ar) "1=الأحد ... 7=السبت" else "1=Sunday ... 7=Saturday"
-    else -> "lastResult"
+    else -> if (ar) "currentDate / currentTime / batteryPercent / dayOfWeek" else "currentDate / currentTime / batteryPercent / dayOfWeek"
 }
 
 private fun actionValueHint(type: RoutineActionType, ar: Boolean): String = when (type) {
