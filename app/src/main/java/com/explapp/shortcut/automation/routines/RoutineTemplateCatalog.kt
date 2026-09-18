@@ -33,6 +33,11 @@ object RoutineTemplateCatalog {
             actions = listOf(RoutineAction(RoutineActionType.PREPARE_TELEGRAM, "", "")),
         ),
         AutomationRoutine(
+            name = "Open app + screenshot",
+            trigger = RoutineTrigger(RoutineTriggerType.MANUAL),
+            actions = listOf(RoutineAction(RoutineActionType.OPEN_APP_SCREENSHOT, "", "2000")),
+        ),
+        AutomationRoutine(
             name = "App usage",
             trigger = RoutineTrigger(RoutineTriggerType.MANUAL),
             actions = listOf(RoutineAction(RoutineActionType.OPEN_TOOL, "app_usage")),
