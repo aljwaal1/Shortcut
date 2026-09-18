@@ -37,6 +37,7 @@ class PersistentScreenCaptureService : Service() {
 
     override fun onCreate() {
         super.onCreate()
+        setActive(false)
         createChannel()
         startAsForeground()
     }
