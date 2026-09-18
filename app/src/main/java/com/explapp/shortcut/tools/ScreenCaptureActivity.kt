@@ -48,6 +48,7 @@ class ScreenCaptureActivity : AppCompatActivity() {
     private var telegramBotToken: String = ""
     private var telegramChatId: String = ""
     private var telegramCaption: String = ""
+    private var persistentStartOnly: Boolean = false
 
     private val receiver = object : BroadcastReceiver() {
         override fun onReceive(context: Context, intent: Intent) {
@@ -68,19 +69,33 @@ class ScreenCaptureActivity : AppCompatActivity() {
             finish()
             return@registerForActivityResult
         }
-        val service = Intent(this, ScreenCaptureService::class.java)
-            .putExtra(ScreenCaptureService.EXTRA_RESULT_CODE, result.resultCode)
-            .putExtra(ScreenCaptureService.EXTRA_DATA, data)
-            .putExtra(ScreenCaptureService.EXTRA_CAPTURE_DELAY_MS, captureDelayMs)
-        ContextCompat.startForegroundService(this, service)
-
-        val packageNameToOpen = launchPackage
-        if (!packageNameToOpen.isNullOrBlank()) {
-            packageManager.getLaunchIntentForPackage(packageNameToOpen)?.let { target ->
-                startActivity(target.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
-            }
+        if (persistentStartOnly) {
+            val service = Intent(this, PersistentScreenCaptureService::class.java)
+                .setAction(PersistentScreenCaptureService.ACTION_START_SESSION)
+                .putExtra(PersistentScreenCaptureService.EXTRA_RESULT_CODE, result.resultCode)
+                .putExtra(PersistentScreenCaptureService.EXTRA_DATA, data)
+            ContextCompat.startForegroundService(this, service)
+            Toast.makeText(
+                this,
+                local("Persistent screen-capture session started", "تم تشغيل جلسة تصوير الشاشة المستمرة"),
+                Toast.LENGTH_LONG,
+            ).show()
+            finish()
         } else {
-            moveTaskToBack(true)
+            val service = Intent(this, ScreenCaptureService::class.java)
+                .putExtra(ScreenCaptureService.EXTRA_RESULT_CODE, result.resultCode)
+                .putExtra(ScreenCaptureService.EXTRA_DATA, data)
+                .putExtra(ScreenCaptureService.EXTRA_CAPTURE_DELAY_MS, captureDelayMs)
+            ContextCompat.startForegroundService(this, service)
+
+            val packageNameToOpen = launchPackage
+            if (!packageNameToOpen.isNullOrBlank()) {
+                packageManager.getLaunchIntentForPackage(packageNameToOpen)?.let { target ->
+                    startActivity(target.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+                }
+            } else {
+                moveTaskToBack(true)
+            }
         }
     }
 
@@ -93,6 +108,7 @@ class ScreenCaptureActivity : AppCompatActivity() {
         telegramBotToken = intent.getStringExtra(EXTRA_TELEGRAM_BOT_TOKEN).orEmpty()
         telegramChatId = intent.getStringExtra(EXTRA_TELEGRAM_CHAT_ID).orEmpty()
         telegramCaption = intent.getStringExtra(EXTRA_TELEGRAM_CAPTION).orEmpty()
+        persistentStartOnly = intent.getBooleanExtra(EXTRA_PERSISTENT_START_ONLY, false)
         ContextCompat.registerReceiver(
             this,
             receiver,
@@ -103,6 +119,22 @@ class ScreenCaptureActivity : AppCompatActivity() {
     }
 
     private fun showCaptureInstructions() {
+        if (persistentStartOnly) {
+            AlertDialog.Builder(this)
+                .setTitle(local("Keep screen-capture session active", "إبقاء جلسة تصوير الشاشة نشطة"))
+                .setMessage(
+                    local(
+                        "Approve screen capture once. Shortcut will keep one foreground capture session active and can reuse it for scheduled screenshots until you stop the session, Android stops it, or the phone restarts.",
+                        "وافق على تصوير الشاشة مرة واحدة. سيبقي التطبيق جلسة تصوير أمامية واحدة نشطة ويمكنه استخدامها للصور المجدولة حتى توقف الجلسة، أو يوقفها أندرويد، أو تعيد تشغيل الهاتف.",
+                    ),
+                )
+                .setPositiveButton(local("Start session", "تشغيل الجلسة")) { _, _ -> launchConsent() }
+                .setNegativeButton(local("Cancel", "إلغاء")) { _, _ -> finish() }
+                .setOnCancelListener { finish() }
+                .show()
+            return
+        }
+
         val packageNameToOpen = launchPackage
         if (!packageNameToOpen.isNullOrBlank()) {
             val appLabel = runCatching {
@@ -269,6 +301,7 @@ class ScreenCaptureActivity : AppCompatActivity() {
         const val EXTRA_TELEGRAM_BOT_TOKEN = "telegram_bot_token"
         const val EXTRA_TELEGRAM_CHAT_ID = "telegram_chat_id"
         const val EXTRA_TELEGRAM_CAPTION = "telegram_caption"
+        const val EXTRA_PERSISTENT_START_ONLY = "persistent_start_only"
         private const val DEFAULT_CAPTURE_DELAY_MS = 3_000L
         private const val OCR_CHANNEL = "screen_ocr"
     }
