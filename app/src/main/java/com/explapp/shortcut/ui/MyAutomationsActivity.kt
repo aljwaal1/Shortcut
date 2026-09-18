@@ -23,6 +23,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ElevatedCard
@@ -391,8 +392,7 @@ private fun RoutineBuilderScreen(
             ) { Text(if (ar) "+ إضافة شرط" else "+ Add condition") }
         }
 
-        items(conditions, key = { it.hashCode() }) { condition ->
-            val index = conditions.indexOf(condition)
+        itemsIndexed(conditions) { index, condition ->
             ElevatedCard(Modifier.fillMaxWidth()) {
                 Column(Modifier.fillMaxWidth().padding(10.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
                     Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
@@ -641,8 +641,7 @@ private fun RoutineBuilderScreen(
             }
         }
 
-        items(actions, key = { action -> action.hashCode() }) { action ->
-            val index = actions.indexOf(action)
+        itemsIndexed(actions) { index, action ->
             val meta = RoutineCatalog.meta(action.type)
             ElevatedCard(Modifier.fillMaxWidth()) {
                 Column(Modifier.fillMaxWidth().padding(12.dp), verticalArrangement = Arrangement.spacedBy(5.dp)) {
