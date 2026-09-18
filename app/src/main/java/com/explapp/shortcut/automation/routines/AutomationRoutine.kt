@@ -14,6 +14,7 @@ enum class RoutineTriggerType {
 
 enum class RoutineActionType {
     OPEN_APP,
+    OPEN_APP_SCREENSHOT,
     OPEN_URL,
     OPEN_MAPS,
     PREPARE_WHATSAPP,
@@ -48,6 +49,12 @@ data class RoutineAction(
         RoutineActionType.PREPARE_WHATSAPP,
         RoutineActionType.PREPARE_TELEGRAM,
         -> value.isNotBlank() && secondaryValue.isNotBlank()
+
+        RoutineActionType.OPEN_APP_SCREENSHOT -> {
+            val delayMs = secondaryValue.takeIf { it.isNotBlank() }?.toLongOrNull() ?: 2_000L
+            value.isNotBlank() && delayMs in 500L..10_000L
+        }
+
         else -> value.isNotBlank()
     }
 }
