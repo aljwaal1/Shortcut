@@ -26,6 +26,15 @@ class RoutineValidationTest {
     }
 
     @Test
+    fun validatesOpenAppScreenshotPackageAndDelay() {
+        assertTrue(RoutineAction(RoutineActionType.OPEN_APP_SCREENSHOT, "com.example.app", "2000").isValid())
+        assertTrue(RoutineAction(RoutineActionType.OPEN_APP_SCREENSHOT, "com.example.app", "").isValid())
+        assertFalse(RoutineAction(RoutineActionType.OPEN_APP_SCREENSHOT, "", "2000").isValid())
+        assertFalse(RoutineAction(RoutineActionType.OPEN_APP_SCREENSHOT, "com.example.app", "50").isValid())
+        assertFalse(RoutineAction(RoutineActionType.OPEN_APP_SCREENSHOT, "com.example.app", "30000").isValid())
+    }
+
+    @Test
     fun validatesTimeAndBatteryTriggerValues() {
         val action = RoutineAction(RoutineActionType.SHOW_NOTIFICATION, "Hello")
         assertTrue(AutomationRoutine(name = "Time", trigger = RoutineTrigger(RoutineTriggerType.TIME, "23:59"), actions = listOf(action)).isValid())
