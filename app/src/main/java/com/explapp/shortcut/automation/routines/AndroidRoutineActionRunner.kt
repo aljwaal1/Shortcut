@@ -40,23 +40,27 @@ class AndroidRoutineActionRunner(
         RoutineActionType.PREPARE_TELEGRAM -> preparedMessage(action, MessagePlatform.TELEGRAM)
         RoutineActionType.SEND_TELEGRAM_BOT -> sendTelegramBot(action)
         RoutineActionType.CUSTOM_SCRIPT -> runCustomScript(action)
+        RoutineActionType.SET_VARIABLE -> setVariable(action)
+        RoutineActionType.READ_CLIPBOARD -> readClipboard(action)
+        RoutineActionType.COPY_TO_CLIPBOARD -> copyToClipboard(action)
+        RoutineActionType.STOP_SHORTCUT -> RoutineActionResult.success(action)
         RoutineActionType.OPEN_TOOL -> {
             if (action.value == "app_usage") openExternal(action, Intent(context, AppUsageActivity::class.java))
-            else RoutineActionResult.failure(action, "Unknown tool: ${action.value}")
+            else RoutineActionResult.failure(action, local("Unknown built-in tool", "أداة داخلية غير معروفة"))
         }
         RoutineActionType.SHOW_NOTIFICATION -> {
-            if (showNotification("Shortcut", action.value, null)) RoutineActionResult.success(action)
-            else RoutineActionResult.failure(action, "Notification permission is required")
+            if (showNotification(local("Shortcut", "الاختصارات"), action.value, null)) RoutineActionResult.success(action)
+            else RoutineActionResult.failure(action, local("Notification permission is required", "يلزم السماح بالإشعارات"))
         }
     }
 
     private fun waitAction(action: RoutineAction): RoutineActionResult {
         val delay = action.value.toLongOrNull()?.coerceIn(100L, 60_000L)
-            ?: return RoutineActionResult.failure(action, "Invalid wait time")
+            ?: return RoutineActionResult.failure(action, local("Invalid wait time", "مدة الانتظار غير صالحة"))
         return runCatching {
             Thread.sleep(delay)
             RoutineActionResult.success(action)
-        }.getOrElse { RoutineActionResult.failure(action, it.message ?: "Wait failed") }
+        }.getOrElse { RoutineActionResult.failure(action, it.message ?: local("Wait failed", "فشل الانتظار")) }
     }
 
     private fun takeScreenshot(action: RoutineAction): RoutineActionResult {
@@ -69,7 +73,7 @@ class AndroidRoutineActionRunner(
             .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
         return runCatching {
             context.startActivity(workflowIntent)
-            RoutineActionResult.prepared(action, "Screen-capture consent required")
+            RoutineActionResult.prepared(action, local("Screen-capture consent required", "يلزم تأكيد إذن تصوير الشاشة"))
         }.getOrElse { RoutineActionResult.failure(action, it.message ?: it.javaClass.simpleName) }
     }
 
@@ -78,7 +82,7 @@ class AndroidRoutineActionRunner(
         val chatId = resolve(action.parameters["chatId"].orEmpty())
         val text = resolve(action.secondaryValue)
         val attachment = resolve(action.parameters["attachment"].orEmpty())
-        if (token.isBlank() || chatId.isBlank()) return RoutineActionResult.failure(action, "Bot token and chat ID are required")
+        if (token.isBlank() || chatId.isBlank()) return RoutineActionResult.failure(action, local("Bot token and chat ID are required", "يلزم إدخال رمز البوت ومعرّف المحادثة"))
         var error: Throwable? = null
         val thread = Thread {
             val result = if (attachment.isNotBlank()) {
@@ -90,14 +94,14 @@ class AndroidRoutineActionRunner(
         }
         thread.start()
         thread.join(20_000L)
-        return if (thread.isAlive) RoutineActionResult.failure(action, "Telegram request timed out")
-        else error?.let { RoutineActionResult.failure(action, it.message ?: "Telegram send failed") }
+        return if (thread.isAlive) RoutineActionResult.failure(action, local("Telegram request timed out", "انتهت مهلة الاتصال بتيليجرام"))
+        else error?.let { RoutineActionResult.failure(action, it.message ?: local("Telegram send failed", "فشل الإرسال إلى تيليجرام")) }
             ?: RoutineActionResult.success(action)
     }
 
     private fun setVariable(action: RoutineAction): RoutineActionResult {
         val name = action.value.trim()
-        if (name.isBlank()) return RoutineActionResult.failure(action, "Variable name is required")
+        if (name.isBlank()) return RoutineActionResult.failure(action, local("Variable name is required", "يلزم إدخال اسم المتغير"))
         variables[name] = resolve(action.secondaryValue)
         variables["lastResult"] = variables[name].orEmpty()
         return RoutineActionResult.success(action)
@@ -133,7 +137,7 @@ class AndroidRoutineActionRunner(
                 variables["lastResult"] = output
                 RoutineActionResult.success(action)
             },
-            onFailure = { RoutineActionResult.failure(action, it.message ?: "Script failed") },
+            onFailure = { RoutineActionResult.failure(action, it.message ?: local("Script failed", "فشل تنفيذ السكربت")) },
         )
     }
 
@@ -149,7 +153,7 @@ class AndroidRoutineActionRunner(
 
     private fun openAppScreenshot(action: RoutineAction): RoutineActionResult {
         if (context.packageManager.getLaunchIntentForPackage(action.value) == null) {
-            return RoutineActionResult.failure(action, "Target app is unavailable")
+            return RoutineActionResult.failure(action, local("Target app is unavailable", "التطبيق المطلوب غير متاح"))
         }
         val delayMs = action.secondaryValue.toLongOrNull()?.coerceIn(500L, 10_000L) ?: 3_000L
         val workflowIntent = Intent(context, ScreenCaptureActivity::class.java)
@@ -169,8 +173,8 @@ class AndroidRoutineActionRunner(
 
         return if (
             showNotification(
-                title = "Open app + screenshot",
-                text = "Tap to approve screen capture and continue",
+                title = local("Open app and take screenshot", "فتح تطبيق والتقاط الشاشة"),
+                text = local("Tap to approve screen capture and continue", "اضغط لتأكيد إذن تصوير الشاشة والمتابعة"),
                 intent = workflowIntent,
             )
         ) {
@@ -181,25 +185,25 @@ class AndroidRoutineActionRunner(
     }
 
     private fun preparedMessage(action: RoutineAction, platform: MessagePlatform): RoutineActionResult {
-        if (action.value.isBlank() || action.secondaryValue.isBlank()) return RoutineActionResult.failure(action, "Recipient and message are required")
+        if (action.value.isBlank() || action.secondaryValue.isBlank()) return RoutineActionResult.failure(action, local("Recipient and message are required", "يلزم إدخال المستلم ونص الرسالة"))
         val uri = Uri.parse(MessageDeepLinkFactory.build(platform, action.value, action.secondaryValue))
         val intent = Intent(Intent.ACTION_VIEW, uri).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
         return if (userInitiated) openExternal(action, intent) else {
             if (showNotification(
-                    title = if (platform == MessagePlatform.WHATSAPP) "WhatsApp message ready" else "Telegram message ready",
+                    title = if (platform == MessagePlatform.WHATSAPP) local("WhatsApp message ready", "رسالة واتساب جاهزة") else local("Telegram message ready", "رسالة تيليجرام جاهزة"),
                     text = action.secondaryValue,
                     intent = intent,
                 )
-            ) RoutineActionResult.prepared(action, "User action required")
+            ) RoutineActionResult.prepared(action, local("User action required", "يلزم إجراء من المستخدم"))
             else RoutineActionResult.failure(action, "Notification permission is required")
         }
     }
 
     private fun openExternal(action: RoutineAction, rawIntent: Intent?): RoutineActionResult {
-        val intent = rawIntent ?: return RoutineActionResult.failure(action, "Target is unavailable")
+        val intent = rawIntent ?: return RoutineActionResult.failure(action, local("Target is unavailable", "الوجهة غير متاحة"))
         intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
         if (!userInitiated) {
-            return if (showNotification("Shortcut action ready", action.value.ifBlank { action.type.name }, intent)) {
+            return if (showNotification(local("Shortcut action ready", "إجراء الاختصار جاهز"), action.value.ifBlank { action.type.name }, intent)) {
                 RoutineActionResult.prepared(action, "User action required")
             } else {
                 RoutineActionResult.failure(action, "Notification permission is required")
@@ -211,6 +215,9 @@ class AndroidRoutineActionRunner(
         }.getOrElse { RoutineActionResult.failure(action, it.message ?: it.javaClass.simpleName) }
     }
 
+    private fun local(en: String, ar: String): String =
+        if (context.resources.configuration.locales[0].language == "ar") ar else en
+
     private fun showNotification(title: String, text: String, intent: Intent?): Boolean {
         if (Build.VERSION.SDK_INT >= 33 &&
             ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED
@@ -218,7 +225,7 @@ class AndroidRoutineActionRunner(
 
         val manager = context.getSystemService(NotificationManager::class.java)
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            manager.createNotificationChannel(NotificationChannel(CHANNEL, "Automation routines", NotificationManager.IMPORTANCE_DEFAULT))
+            manager.createNotificationChannel(NotificationChannel(CHANNEL, local("Automation routines", "اختصارات الأتمتة"), NotificationManager.IMPORTANCE_DEFAULT))
         }
         val builder = NotificationCompat.Builder(context, CHANNEL)
             .setSmallIcon(android.R.drawable.ic_menu_manage)
