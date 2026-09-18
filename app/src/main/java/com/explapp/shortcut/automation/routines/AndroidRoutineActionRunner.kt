@@ -22,6 +22,8 @@ import androidx.core.content.ContextCompat
 import com.explapp.shortcut.domain.MessagePlatform
 import com.explapp.shortcut.messages.MessageDeepLinkFactory
 import com.explapp.shortcut.tools.ScreenCaptureActivity
+import com.explapp.shortcut.tools.ToolId
+import com.explapp.shortcut.tools.ToolRouter
 import com.explapp.shortcut.usage.AppUsageActivity
 
 class AndroidRoutineActionRunner(
@@ -52,7 +54,8 @@ class AndroidRoutineActionRunner(
         RoutineActionType.SHARE_FILE -> shareFile(action)
         RoutineActionType.WEB_SEARCH -> webSearch(action)
         RoutineActionType.OPEN_TOOL -> {
-            if (action.value == "app_usage") openExternal(action, Intent(context, AppUsageActivity::class.java))
+            val tool = runCatching { ToolId.valueOf(action.value) }.getOrNull()
+            if (tool != null) openExternal(action, ToolRouter.intent(context, tool))
             else RoutineActionResult.failure(action, local("Unknown built-in tool", "أداة داخلية غير معروفة"))
         }
         RoutineActionType.SHOW_NOTIFICATION -> {
