@@ -17,29 +17,91 @@ class TelegramBotSender {
         connection.disconnect()
     }
 
-    fun validateDestination(token: String, chatId: String): Result<Unit> = runCatching {
+    fun validateDestination(token: String, destination: String): Result<Unit> = runCatching {
+        resolveDestination(token, destination).getOrThrow()
+    }
+
+    fun resolveDestination(token: String, destination: String): Result<String> = runCatching {
         val cleanToken = token.trim()
-        val cleanChat = chatId.trim()
+        val raw = destination.trim()
         require(cleanToken.isNotBlank()) { "Bot token is required" }
-        require(cleanChat.isNotBlank()) { "Chat ID is required" }
+        require(raw.isNotBlank()) { "Telegram username is required" }
 
         validateBot(cleanToken).getOrThrow()
 
-        val url = "https://api.telegram.org/bot$cleanToken/getChat?chat_id=" + enc(cleanChat)
-        val connection = open(url, "GET", 8_000, 10_000)
-        ensureSuccess(connection)
-        connection.disconnect()
+        if (raw.matches(Regex("-?\\d+"))) {
+            val connection = open(
+                "https://api.telegram.org/bot$cleanToken/getChat?chat_id=" + enc(raw),
+                "GET",
+                8_000,
+                10_000,
+            )
+            ensureSuccess(connection)
+            connection.disconnect()
+            return@runCatching raw
+        }
+
+        val username = raw.removePrefix("@")
+        require(username.isNotBlank()) { "Telegram username is required" }
+
+        val publicHandle = "@$username"
+        val direct = runCatching {
+            val connection = open(
+                "https://api.telegram.org/bot$cleanToken/getChat?chat_id=" + enc(publicHandle),
+                "GET",
+                8_000,
+                10_000,
+            )
+            ensureSuccess(connection)
+            connection.disconnect()
+            publicHandle
+        }
+        if (direct.isSuccess) return@runCatching direct.getOrThrow()
+
+        val updatesConnection = open(
+            "https://api.telegram.org/bot$cleanToken/getUpdates?limit=100&timeout=0",
+            "GET",
+            8_000,
+            12_000,
+        )
+        val body = readBodyAndEnsureSuccess(updatesConnection)
+        updatesConnection.disconnect()
+
+        val root = JSONObject(body)
+        val updates = root.optJSONArray("result")
+        if (updates != null) {
+            for (i in updates.length() - 1 downTo 0) {
+                val update = updates.optJSONObject(i) ?: continue
+                val message = update.optJSONObject("message")
+                    ?: update.optJSONObject("edited_message")
+                    ?: update.optJSONObject("channel_post")
+                    ?: continue
+                val from = message.optJSONObject("from")
+                val chat = message.optJSONObject("chat")
+                val foundUsername = from?.optString("username").orEmpty().ifBlank {
+                    chat?.optString("username").orEmpty()
+                }
+                if (foundUsername.equals(username, ignoreCase = true)) {
+                    val id = chat?.optLong("id", 0L) ?: 0L
+                    if (id != 0L) return@runCatching id.toString()
+                }
+            }
+        }
+
+        throw IllegalStateException(
+            "Telegram: username @$username was not found. Ask the person to open the bot, press Start, and send it one message, then try again."
+        )
     }
 
     fun sendText(token: String, chatId: String, text: String): Result<Unit> = runCatching {
         val cleanToken = token.trim()
-        val cleanChat = chatId.trim()
+        val cleanDestination = chatId.trim()
         require(cleanToken.isNotBlank()) { "Bot token is required" }
-        require(cleanChat.isNotBlank()) { "Chat ID is required" }
+        require(cleanDestination.isNotBlank()) { "Telegram username is required" }
 
-        validateDestination(cleanToken, cleanChat).getOrThrow()
+        val resolvedChat = resolveDestination(cleanToken, cleanDestination).getOrThrow()
 
-        val body = "chat_id=" + enc(cleanChat) + "&text=" + enc(text)
+        val body = "chat_id=" + enc(resolvedChat) + "&text=" + enc(text)
         val connection = open(
             "https://api.telegram.org/bot$cleanToken/sendMessage",
             "POST",
@@ -57,14 +119,14 @@ class TelegramBotSender {
 
     fun sendPhoto(token: String, chatId: String, caption: String, file: File): Result<Unit> = runCatching {
         val cleanToken = token.trim()
-        val cleanChat = chatId.trim()
+        val cleanDestination = chatId.trim()
         require(cleanToken.isNotBlank()) { "Bot token is required" }
-        require(cleanChat.isNotBlank()) { "Chat ID is required" }
+        require(cleanDestination.isNotBlank()) { "Telegram username is required" }
         require(file.exists()) { "Screenshot file does not exist" }
         require(file.length() > 0L) { "Screenshot file is empty" }
         require(caption.length <= 1024) { "Telegram photo caption is longer than 1024 characters" }
 
-        validateDestination(cleanToken, cleanChat).getOrThrow()
+        val resolvedChat = resolveDestination(cleanToken, cleanDestination).getOrThrow()
 
         val boundary = "ShortcutBoundary" + System.currentTimeMillis()
         val connection = open(
@@ -89,7 +151,7 @@ class TelegramBotSender {
                 out.writeBytes("\r\n")
             }
 
-            field("chat_id", cleanChat)
+            field("chat_id", resolvedChat)
             if (caption.isNotBlank()) field("caption", caption)
 
             out.writeBytes("--$boundary\r\n")
@@ -112,6 +174,32 @@ class TelegramBotSender {
             useCaches = false
             setRequestProperty("User-Agent", "Shortcut-Android")
         }
+
+    private fun readBodyAndEnsureSuccess(connection: HttpURLConnection): String {
+        val code = connection.responseCode
+        val stream = if (code in 200..299) connection.inputStream else connection.errorStream
+        val body = runCatching {
+            stream?.bufferedReader(StandardCharsets.UTF_8)?.use { it.readText() }.orEmpty()
+        }.getOrDefault("")
+
+        val json = runCatching { JSONObject(body) }.getOrNull()
+        val apiOk = json?.optBoolean("ok", code in 200..299) ?: (code in 200..299)
+        if (code !in 200..299 || !apiOk) {
+            val description = json?.optString("description")?.takeIf { it.isNotBlank() }
+            val retryAfter = json
+                ?.optJSONObject("parameters")
+                ?.optInt("retry_after", 0)
+                ?.takeIf { it > 0 }
+            val detail = when {
+                retryAfter != null && description != null -> description + " (retry after " + retryAfter + "s)"
+                description != null -> description
+                body.isNotBlank() -> body.take(300)
+                else -> "HTTP " + code
+            }
+            throw IllegalStateException("Telegram: " + detail)
+        }
+        return body
+    }
 
     private fun ensureSuccess(connection: HttpURLConnection) {
         val code = connection.responseCode
