@@ -653,19 +653,25 @@ private fun DailyScreenshotTelegramWizard(
                 Button(
                     onClick = {
                         Thread {
-                            val result = TelegramBotSender().sendText(
-                                botToken.trim(),
-                                chatId.trim(),
-                                if (ar) "رسالة اختبار من تطبيق Shortcut" else "Test message from Shortcut",
-                            )
+                            val sender = TelegramBotSender()
+                            val destination = sender.validateDestination(botToken.trim(), chatId.trim())
+                            val result = if (destination.isSuccess) {
+                                sender.sendText(
+                                    botToken.trim(),
+                                    chatId.trim(),
+                                    if (ar) "رسالة اختبار من تطبيق Shortcut" else "Test message from Shortcut",
+                                )
+                            } else {
+                                destination
+                            }
                             (context as? android.app.Activity)?.runOnUiThread {
                                 Toast.makeText(
                                     context,
                                     if (result.isSuccess) {
-                                        if (ar) "نجح الاتصال بتيليجرام ووصلت رسالة الاختبار." else "Telegram connection succeeded and the test message was sent."
+                                        if (ar) "تم التحقق من البوت والمحادثة ووصلت رسالة الاختبار." else "Bot and chat verified; the test message was sent."
                                     } else {
                                         val reason = result.exceptionOrNull()?.message.orEmpty()
-                                        if (ar) "فشل اختبار تيليجرام: " + reason else "Telegram test failed: " + reason
+                                        if (ar) "فشل التحقق أو الإرسال: " + reason else "Verification or sending failed: " + reason
                                     },
                                     Toast.LENGTH_LONG,
                                 ).show()
