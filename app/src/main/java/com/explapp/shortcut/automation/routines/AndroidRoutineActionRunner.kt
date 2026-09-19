@@ -239,9 +239,25 @@ class AndroidRoutineActionRunner(
 
         if (usePersistentSession) {
             if (PersistentScreenCaptureService.isSessionActive(context)) {
+                var targetAlreadyLaunched = false
+                if (userInitiated) {
+                    val target = context.packageManager.getLaunchIntentForPackage(action.value)
+                        ?: return RoutineActionResult.failure(action, local("Target app is unavailable", "التطبيق المطلوب غير متاح"))
+                    target.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP)
+                    val launched = runCatching {
+                        context.startActivity(target)
+                        true
+                    }.getOrDefault(false)
+                    if (!launched) {
+                        return RoutineActionResult.failure(action, local("Could not open target app", "تعذر فتح التطبيق المطلوب"))
+                    }
+                    targetAlreadyLaunched = true
+                }
+
                 val captureIntent = Intent(context, PersistentScreenCaptureService::class.java)
                     .setAction(PersistentScreenCaptureService.ACTION_CAPTURE)
                     .putExtra(PersistentScreenCaptureService.EXTRA_LAUNCH_PACKAGE, action.value)
+                    .putExtra(PersistentScreenCaptureService.EXTRA_SKIP_APP_LAUNCH, targetAlreadyLaunched)
                     .putExtra(PersistentScreenCaptureService.EXTRA_CAPTURE_DELAY_MS, delayMs)
                     .putExtra(PersistentScreenCaptureService.EXTRA_TELEGRAM_BOT_TOKEN, action.parameters["telegramBotToken"].orEmpty())
                     .putExtra(PersistentScreenCaptureService.EXTRA_TELEGRAM_CHAT_ID, action.parameters["telegramChatId"].orEmpty())
