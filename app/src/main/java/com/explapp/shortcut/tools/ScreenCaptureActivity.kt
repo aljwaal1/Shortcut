@@ -2,6 +2,7 @@ package com.explapp.shortcut.tools
 
 import android.Manifest
 import android.app.Activity
+import android.app.ActivityOptions
 import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.PendingIntent
@@ -546,23 +547,57 @@ class ScreenCaptureService : Service() {
                     putExtra(Intent.EXTRA_STREAM, savedUri)
                     if (telegramCaption.isNotBlank()) putExtra(Intent.EXTRA_TEXT, telegramCaption)
                     clipData = ClipData.newRawUri("Shortcut screenshot", savedUri)
-                    addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_ACTIVITY_NEW_TASK)
+                    addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
                     if (packageManager.getLaunchIntentForPackage("org.telegram.messenger") != null) {
                         setPackage("org.telegram.messenger")
                     }
                 }
-                val pending = PendingIntent.getActivity(
-                    this,
-                    8833,
-                    Intent.createChooser(shareIntent, local("Choose Telegram chat", "اختر محادثة تيليجرام"))
-                        .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
-                    PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
-                )
-                showResultNotification(
-                    local("Screenshot ready for Telegram", "لقطة الشاشة جاهزة لتيليجرام"),
-                    local("Tap to choose the Telegram conversation.", "اضغط لاختيار محادثة تيليجرام."),
-                    pending,
-                )
+                val chooser = Intent.createChooser(
+                    shareIntent,
+                    local("Choose Telegram chat", "اختر محادثة تيليجرام"),
+                ).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+
+                val opened = runCatching {
+                    if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q) {
+                        startActivity(chooser)
+                    } else {
+                        val pending = PendingIntent.getActivity(
+                            this,
+                            8833,
+                            chooser,
+                            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
+                        )
+                        if (Build.VERSION.SDK_INT >= 34) {
+                            val options = ActivityOptions.makeBasic().apply {
+                                val mode = if (Build.VERSION.SDK_INT >= 36) {
+                                    ActivityOptions.MODE_BACKGROUND_ACTIVITY_START_ALLOW_ALWAYS
+                                } else {
+                                    @Suppress("DEPRECATION")
+                                    ActivityOptions.MODE_BACKGROUND_ACTIVITY_START_ALLOWED
+                                }
+                                setPendingIntentBackgroundActivityStartMode(mode)
+                            }
+                            pending.send(this, 0, null, null, null, null, options.toBundle())
+                        } else {
+                            pending.send()
+                        }
+                    }
+                    true
+                }.getOrDefault(false)
+
+                if (!opened) {
+                    val fallbackPending = PendingIntent.getActivity(
+                        this,
+                        8833,
+                        chooser,
+                        PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
+                    )
+                    showResultNotification(
+                        local("Screenshot ready for Telegram", "لقطة الشاشة جاهزة لتيليجرام"),
+                        local("Tap to choose the Telegram conversation.", "اضغط لاختيار محادثة تيليجرام."),
+                        fallbackPending,
+                    )
+                }
                 stopForeground(STOP_FOREGROUND_REMOVE)
                 stopSelf()
             }
