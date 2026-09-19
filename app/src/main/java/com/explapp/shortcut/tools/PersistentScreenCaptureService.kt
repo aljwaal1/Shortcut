@@ -179,34 +179,39 @@ class PersistentScreenCaptureService : Service() {
         pendingNormalTelegramShare = intent.getBooleanExtra(EXTRA_NORMAL_TELEGRAM_SHARE, false)
         val delayMs = intent.getLongExtra(EXTRA_CAPTURE_DELAY_MS, 3_000L).coerceIn(500L, 15_000L)
         val packageNameToOpen = intent.getStringExtra(EXTRA_LAUNCH_PACKAGE).orEmpty()
+        val skipAppLaunch = intent.getBooleanExtra(EXTRA_SKIP_APP_LAUNCH, false)
 
         var launchSucceeded = true
-        if (packageNameToOpen.isNotBlank()) {
+        if (!skipAppLaunch && packageNameToOpen.isNotBlank()) {
             val target = packageManager.getLaunchIntentForPackage(packageNameToOpen)
             launchSucceeded = if (target == null) {
                 false
             } else {
                 runCatching {
-                    target.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP)
-                    val pending = PendingIntent.getActivity(
-                        this,
-                        packageNameToOpen.hashCode(),
-                        target,
-                        PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
-                    )
-                    if (Build.VERSION.SDK_INT >= 34) {
-                        val options = ActivityOptions.makeBasic().apply {
-                            val mode = if (Build.VERSION.SDK_INT >= 36) {
-                                ActivityOptions.MODE_BACKGROUND_ACTIVITY_START_ALLOW_ALWAYS
-                            } else {
-                                @Suppress("DEPRECATION")
-                                ActivityOptions.MODE_BACKGROUND_ACTIVITY_START_ALLOWED
-                            }
-                            setPendingIntentBackgroundActivityStartMode(mode)
-                        }
-                        pending.send(this, 0, null, null, null, null, options.toBundle())
+                    target.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_RESET_TASK_IF_NEEDED)
+                    if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q) {
+                        startActivity(target)
                     } else {
-                        pending.send()
+                        val pending = PendingIntent.getActivity(
+                            this,
+                            packageNameToOpen.hashCode(),
+                            target,
+                            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
+                        )
+                        if (Build.VERSION.SDK_INT >= 34) {
+                            val options = ActivityOptions.makeBasic().apply {
+                                val mode = if (Build.VERSION.SDK_INT >= 36) {
+                                    ActivityOptions.MODE_BACKGROUND_ACTIVITY_START_ALLOW_ALWAYS
+                                } else {
+                                    @Suppress("DEPRECATION")
+                                    ActivityOptions.MODE_BACKGROUND_ACTIVITY_START_ALLOWED
+                                }
+                                setPendingIntentBackgroundActivityStartMode(mode)
+                            }
+                            pending.send(this, 0, null, null, null, null, options.toBundle())
+                        } else {
+                            pending.send()
+                        }
                     }
                     true
                 }.getOrDefault(false)
@@ -354,6 +359,7 @@ class PersistentScreenCaptureService : Service() {
         const val EXTRA_DATA = "data"
         const val EXTRA_LAUNCH_PACKAGE = "launchPackage"
         const val EXTRA_CAPTURE_DELAY_MS = "captureDelayMs"
+        const val EXTRA_SKIP_APP_LAUNCH = "skipAppLaunch"
         const val EXTRA_TELEGRAM_BOT_TOKEN = "telegramBotToken"
         const val EXTRA_TELEGRAM_CHAT_ID = "telegramChatId"
         const val EXTRA_TELEGRAM_CAPTION = "telegramCaption"
