@@ -141,6 +141,7 @@ class PersistentScreenCaptureService : Service() {
                         notifyResult(
                             saved = saved.isSuccess,
                             sent = sent.isSuccess,
+                            reason = sent.exceptionOrNull()?.message,
                         )
                     }.start()
                 } else if (normalShare && saved.isSuccess) {
@@ -148,11 +149,15 @@ class PersistentScreenCaptureService : Service() {
                     notifyNormalTelegramShare(saved.getOrThrow(), caption)
                 } else {
                     file.delete()
-                    notifyResult(saved = saved.isSuccess, sent = false)
+                    notifyResult(
+                        saved = saved.isSuccess,
+                        sent = false,
+                        reason = if (saved.isFailure) saved.exceptionOrNull()?.message else local("Telegram bot data is missing", "بيانات بوت تيليجرام غير مكتملة"),
+                    )
                 }
             }.onFailure {
                 runCatching { image.close() }
-                notifyResult(saved = false, sent = false)
+                notifyResult(saved = false, sent = false, reason = it.message)
             }
         }, handler)
 
@@ -219,7 +224,11 @@ class PersistentScreenCaptureService : Service() {
         }
 
         if (!launchSucceeded) {
-            notifyResult(saved = false, sent = false)
+            notifyResult(
+                saved = false,
+                sent = false,
+                reason = local("Android blocked opening the target app from background.", "منع أندرويد فتح التطبيق المطلوب من الخلفية."),
+            )
             return
         }
 
@@ -347,23 +356,36 @@ class PersistentScreenCaptureService : Service() {
         }
     }
 
-    private fun notifyResult(saved: Boolean, sent: Boolean) {
+    private fun notifyResult(saved: Boolean, sent: Boolean, reason: String? = null) {
+        val cleanReason = reason?.trim().orEmpty()
         val title = when {
             saved && sent -> local("Screenshot sent to Telegram", "تم إرسال لقطة الشاشة إلى تيليجرام")
+            saved && cleanReason.isNotBlank() -> local("Telegram send failed", "فشل الإرسال إلى تيليجرام")
             saved -> local("Screenshot saved", "تم حفظ لقطة الشاشة")
             else -> local("Screenshot failed", "فشل التقاط لقطة الشاشة")
         }
         val text = when {
-            saved && sent -> local("The screenshot was saved and sent to the selected Telegram chat.", "تم حفظ لقطة الشاشة وإرسالها إلى محادثة تيليجرام المحددة.")
-            saved -> local("The screenshot was saved, but Telegram sending did not complete.", "تم حفظ لقطة الشاشة، لكن لم يكتمل الإرسال إلى تيليجرام.")
-            else -> local("Shortcut could not create the scheduled screenshot.", "تعذر على التطبيق إنشاء لقطة الشاشة المجدولة.")
+            saved && sent -> local(
+                "The screenshot was saved and sent to the selected Telegram chat.",
+                "تم حفظ لقطة الشاشة وإرسالها إلى محادثة تيليجرام المحددة.",
+            )
+            cleanReason.isNotBlank() -> cleanReason
+            saved -> local(
+                "The screenshot was saved, but Telegram sending did not complete.",
+                "تم حفظ لقطة الشاشة، لكن لم يكتمل الإرسال إلى تيليجرام.",
+            )
+            else -> local(
+                "Shortcut could not create the scheduled screenshot.",
+                "تعذر على التطبيق إنشاء لقطة الشاشة المجدولة.",
+            )
         }
         getSystemService(NotificationManager::class.java).notify(
             RESULT_NOTIFICATION_ID,
-            NotificationCompat.Builder(this, CHANNEL)
+            NotificationCompat.Builder(this, RESULT_CHANNEL)
                 .setSmallIcon(android.R.drawable.ic_menu_camera)
                 .setContentTitle(title)
-                .setContentText(text)
+                .setContentText(text.take(220))
+                .setStyle(NotificationCompat.BigTextStyle().bigText(text))
                 .setAutoCancel(true)
                 .build(),
         )
@@ -371,8 +393,12 @@ class PersistentScreenCaptureService : Service() {
 
     private fun createChannel() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            getSystemService(NotificationManager::class.java).createNotificationChannel(
+            val manager = getSystemService(NotificationManager::class.java)
+            manager.createNotificationChannel(
                 NotificationChannel(CHANNEL, local("Persistent screen capture", "جلسة تصوير الشاشة المستمرة"), NotificationManager.IMPORTANCE_LOW),
+            )
+            manager.createNotificationChannel(
+                NotificationChannel(RESULT_CHANNEL, local("Automation results", "نتائج الأتمتة"), NotificationManager.IMPORTANCE_DEFAULT),
             )
         }
     }
@@ -402,6 +428,7 @@ class PersistentScreenCaptureService : Service() {
         private const val CHANNEL = "persistent_screen_capture"
         private const val NOTIFICATION_ID = 9200
         private const val RESULT_NOTIFICATION_ID = 9202
+        private const val RESULT_CHANNEL = "persistent_screen_capture_results"
         private const val PREFS = "persistent_screen_capture_state"
         private const val KEY_ACTIVE = "active"
 
