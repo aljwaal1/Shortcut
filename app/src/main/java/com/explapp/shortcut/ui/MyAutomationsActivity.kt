@@ -174,8 +174,8 @@ private fun MyAutomationsScreen(onBack: () -> Unit) {
                             fontWeight = FontWeight.Bold,
                         )
                         Text(
-                            if (ar) "إرسال تلقائي بواسطة البوت إلى Chat ID، أو إلى اسم مستخدم صالح لقناة/مجموعة عامة."
-                            else "Automatic bot delivery to a Chat ID, or a valid public channel/group username.",
+                            if (ar) "أدخل اسم مستخدم تيليجرام فقط، وسيحاول التطبيق العثور على المحادثة المناسبة تلقائيًا."
+                            else "Enter only the Telegram username; Shortcut will try to resolve the correct chat automatically.",
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
@@ -310,14 +310,14 @@ private fun DailyScreenshotTelegramWizard(
     fun telegramDestinationHint(raw: String): String {
         val value = raw.trim()
         if (value.isBlank()) {
-            return if (ar) "أدخل Chat ID رقميًا، أو اسم مستخدم لقناة/مجموعة عامة." else "Enter a numeric Chat ID, or a public channel/group username."
+            return if (ar) "أدخل اسم المستخدم فقط. يمكنك كتابته مع @ أو بدونها." else "Enter the username only. You can type it with or without @."
         }
         return when {
             value.matches(Regex("-?\\d+")) ->
-                if (ar) "تم التعرف عليه كـ Chat ID رقمي." else "Detected as a numeric Chat ID."
+                if (ar) "هذه قيمة رقمية. الأفضل إدخال اسم المستخدم بدلًا منها." else "This is a numeric value. Prefer entering the username instead."
             else ->
-                if (ar) "سيتم التعامل معه كاسم مستخدم: " + normalizedTelegramDestination(value) + ". أسماء مستخدمي الأشخاص العاديين لا تكفي غالبًا؛ استخدم Chat ID للمحادثة الخاصة."
-                else "Will be used as username: " + normalizedTelegramDestination(value) + ". A normal person's username usually is not enough; use the private chat ID."
+                if (ar) "سيبحث التطبيق عن " + normalizedTelegramDestination(value) + " تلقائيًا."
+                else "Shortcut will resolve " + normalizedTelegramDestination(value) + " automatically."
         }
     }
 
@@ -384,8 +384,8 @@ private fun DailyScreenshotTelegramWizard(
             )
             ClearHint(
                 if (useBot) {
-                    if (ar) "المسار: الوقت المحدد ← فتح التطبيق ← التقاط الصورة ← إرسالها تلقائيًا إلى الوجهة التي تم التحقق منها بواسطة البوت."
-                    else "Flow: scheduled time → open app → capture screenshot → automatically send it to the verified Telegram destination using the bot."
+                    if (ar) "المسار: الوقت المحدد ← فتح التطبيق ← التقاط الصورة ← العثور على المستخدم من اسمه ← الإرسال بواسطة البوت."
+                    else "Flow: scheduled time → open app → capture screenshot → resolve the username → send with the bot."
                 } else {
                     if (ar) "المسار: الوقت المحدد ← فتح التطبيق ← التقاط الصورة ← فتح تيليجرام بالصورة مباشرة إن سمح النظام، وإلا يظهر إشعار «فتح تيليجرام» ← اختيار المحادثة وتأكيد الإرسال."
                     else "Flow: scheduled time → open app → capture screenshot → open Telegram with the image when Android allows it; otherwise show an Open Telegram notification → choose the chat and confirm sending."
@@ -659,8 +659,8 @@ private fun DailyScreenshotTelegramWizard(
                         chatId = it
                         destinationStatus = null
                     },
-                    label = { Text(if (ar) "Chat ID أو اسم المستخدم" else "Chat ID or username") },
-                    placeholder = { Text(if (ar) "مثال: 123456789 أو @mychannel" else "Example: 123456789 or @mychannel") },
+                    label = { Text(if (ar) "اسم مستخدم تيليجرام" else "Telegram username") },
+                    placeholder = { Text(if (ar) "مثال: @username" else "Example: @username") },
                     supportingText = {
                         Column {
                             Text(telegramDestinationHint(chatId))
@@ -709,7 +709,7 @@ private fun DailyScreenshotTelegramWizard(
                     enabled = botToken.isNotBlank() && chatId.isNotBlank(),
                     modifier = Modifier.fillMaxWidth(),
                 ) {
-                    Text(if (ar) "اختبار الإرسال إلى هذا الشخص" else "Test sending to this person")
+                    Text(if (ar) "تحقق من اسم المستخدم وأرسل اختبارًا" else "Verify username and send test")
                 }
     
                 if (keepCaptureSession) {
