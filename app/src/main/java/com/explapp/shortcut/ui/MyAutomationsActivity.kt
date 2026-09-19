@@ -174,8 +174,8 @@ private fun MyAutomationsScreen(onBack: () -> Unit) {
                             fontWeight = FontWeight.Bold,
                         )
                         Text(
-                            if (ar) "إرسال تلقائي بالكامل إلى Chat ID محدد بواسطة البوت."
-                            else "Fully automatic delivery to a specific Chat ID using your bot.",
+                            if (ar) "إرسال تلقائي بواسطة البوت إلى Chat ID، أو إلى اسم مستخدم صالح لقناة/مجموعة عامة."
+                            else "Automatic bot delivery to a Chat ID, or a valid public channel/group username.",
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
@@ -290,6 +290,7 @@ private fun DailyScreenshotTelegramWizard(
     var delayMs by remember { mutableStateOf("3000") }
     var botToken by remember { mutableStateOf("") }
     var chatId by remember { mutableStateOf("") }
+    var destinationStatus by remember { mutableStateOf<String?>(null) }
     var caption by remember { mutableStateOf("") }
     var keepCaptureSession by remember { mutableStateOf(true) }
     var showAppPicker by remember { mutableStateOf(false) }
@@ -297,6 +298,28 @@ private fun DailyScreenshotTelegramWizard(
     var permissionMessage by remember { mutableStateOf<String?>(null) }
 
     val alarmManager = remember(context) { context.getSystemService(AlarmManager::class.java) }
+
+    fun normalizedTelegramDestination(raw: String): String {
+        val value = raw.trim()
+        if (value.isBlank()) return ""
+        if (value.startsWith("@")) return value
+        if (value.matches(Regex("-?\\d+"))) return value
+        return "@" + value
+    }
+
+    fun telegramDestinationHint(raw: String): String {
+        val value = raw.trim()
+        if (value.isBlank()) {
+            return if (ar) "أدخل Chat ID رقميًا، أو اسم مستخدم لقناة/مجموعة عامة." else "Enter a numeric Chat ID, or a public channel/group username."
+        }
+        return when {
+            value.matches(Regex("-?\\d+")) ->
+                if (ar) "تم التعرف عليه كـ Chat ID رقمي." else "Detected as a numeric Chat ID."
+            else ->
+                if (ar) "سيتم التعامل معه كاسم مستخدم: " + normalizedTelegramDestination(value) + ". أسماء مستخدمي الأشخاص العاديين لا تكفي غالبًا؛ استخدم Chat ID للمحادثة الخاصة."
+                else "Will be used as username: " + normalizedTelegramDestination(value) + ". A normal person's username usually is not enough; use the private chat ID."
+        }
+    }
 
     fun finishSave() {
         val routine = pendingRoutine ?: return
@@ -361,8 +384,8 @@ private fun DailyScreenshotTelegramWizard(
             )
             ClearHint(
                 if (useBot) {
-                    if (ar) "المسار: الوقت المحدد ← فتح التطبيق ← التقاط الصورة ← إرسالها تلقائيًا إلى Chat ID المحدد بواسطة البوت."
-                    else "Flow: scheduled time → open app → capture screenshot → automatically send it to the selected Chat ID using the bot."
+                    if (ar) "المسار: الوقت المحدد ← فتح التطبيق ← التقاط الصورة ← إرسالها تلقائيًا إلى الوجهة التي تم التحقق منها بواسطة البوت."
+                    else "Flow: scheduled time → open app → capture screenshot → automatically send it to the verified Telegram destination using the bot."
                 } else {
                     if (ar) "المسار: الوقت المحدد ← فتح التطبيق ← التقاط الصورة ← فتح تيليجرام بالصورة مباشرة إن سمح النظام، وإلا يظهر إشعار «فتح تيليجرام» ← اختيار المحادثة وتأكيد الإرسال."
                     else "Flow: scheduled time → open app → capture screenshot → open Telegram with the image when Android allows it; otherwise show an Open Telegram notification → choose the chat and confirm sending."
@@ -632,13 +655,19 @@ private fun DailyScreenshotTelegramWizard(
                 )
                 OutlinedTextField(
                     value = chatId,
-                    onValueChange = { chatId = it },
-                    label = { Text(if (ar) "معرّف محادثة الشخص" else "Person's chat ID") },
+                    onValueChange = {
+                        chatId = it
+                        destinationStatus = null
+                    },
+                    label = { Text(if (ar) "Chat ID أو اسم المستخدم" else "Chat ID or username") },
+                    placeholder = { Text(if (ar) "مثال: 123456789 أو @mychannel" else "Example: 123456789 or @mychannel") },
                     supportingText = {
-                        Text(
-                            if (ar) "يجب أن يكون الشخص قد بدأ محادثة مع البوت. الإرسال التلقائي هنا يتم بواسطة البوت، وليس من حساب تيليجرام الشخصي."
-                            else "The person must have started a chat with your bot. Automatic sending here is from the bot, not from your personal Telegram account.",
-                        )
+                        Column {
+                            Text(telegramDestinationHint(chatId))
+                            destinationStatus?.let { status ->
+                                Text(status, fontWeight = FontWeight.Bold)
+                            }
+                        }
                     },
                     modifier = Modifier.fillMaxWidth(),
                 )
@@ -654,27 +683,26 @@ private fun DailyScreenshotTelegramWizard(
                     onClick = {
                         Thread {
                             val sender = TelegramBotSender()
-                            val destination = sender.validateDestination(botToken.trim(), chatId.trim())
+                            val normalized = normalizedTelegramDestination(chatId)
+                            val destination = sender.validateDestination(botToken.trim(), normalized)
                             val result = if (destination.isSuccess) {
                                 sender.sendText(
                                     botToken.trim(),
-                                    chatId.trim(),
+                                    normalized,
                                     if (ar) "رسالة اختبار من تطبيق Shortcut" else "Test message from Shortcut",
                                 )
                             } else {
                                 destination
                             }
                             (context as? android.app.Activity)?.runOnUiThread {
-                                Toast.makeText(
-                                    context,
-                                    if (result.isSuccess) {
-                                        if (ar) "تم التحقق من البوت والمحادثة ووصلت رسالة الاختبار." else "Bot and chat verified; the test message was sent."
-                                    } else {
-                                        val reason = result.exceptionOrNull()?.message.orEmpty()
-                                        if (ar) "فشل التحقق أو الإرسال: " + reason else "Verification or sending failed: " + reason
-                                    },
-                                    Toast.LENGTH_LONG,
-                                ).show()
+                                val message = if (result.isSuccess) {
+                                    if (ar) "صالح ✓ تم التحقق ووصلت رسالة الاختبار." else "Valid ✓ Verified and test message sent."
+                                } else {
+                                    val reason = result.exceptionOrNull()?.message.orEmpty()
+                                    if (ar) "غير صالح ✗ " + reason else "Invalid ✗ " + reason
+                                }
+                                destinationStatus = message
+                                Toast.makeText(context, message, Toast.LENGTH_LONG).show()
                             }
                         }.start()
                     },
@@ -692,7 +720,7 @@ private fun DailyScreenshotTelegramWizard(
                                 .putExtra(PersistentScreenCaptureService.EXTRA_LAUNCH_PACKAGE, appPackage)
                                 .putExtra(PersistentScreenCaptureService.EXTRA_CAPTURE_DELAY_MS, delayMs.toLongOrNull() ?: 3_000L)
                                 .putExtra(PersistentScreenCaptureService.EXTRA_TELEGRAM_BOT_TOKEN, botToken)
-                                .putExtra(PersistentScreenCaptureService.EXTRA_TELEGRAM_CHAT_ID, chatId)
+                                .putExtra(PersistentScreenCaptureService.EXTRA_TELEGRAM_CHAT_ID, normalizedTelegramDestination(chatId))
                                 .putExtra(PersistentScreenCaptureService.EXTRA_TELEGRAM_CAPTION, caption)
                             ContextCompat.startForegroundService(context, captureIntent)
                             Toast.makeText(
