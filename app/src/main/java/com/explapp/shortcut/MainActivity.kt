@@ -20,7 +20,7 @@ import com.explapp.shortcut.ui.ShortcutTheme
 class MainActivity : AppCompatActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        DynamicShortcutPublisher.publish(this)
+        runCatching { DynamicShortcutPublisher.publish(this) }
         setContent {
             ShortcutTheme {
                 var showTools by remember { mutableStateOf(false) }
