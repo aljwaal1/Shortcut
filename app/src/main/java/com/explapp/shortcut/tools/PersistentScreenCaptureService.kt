@@ -47,10 +47,22 @@ class PersistentScreenCaptureService : Service() {
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
-        when (intent?.action) {
-            ACTION_START_SESSION -> startSession(intent)
-            ACTION_CAPTURE -> requestCapture(intent)
-            ACTION_STOP_SESSION -> stopSession()
+        runCatching {
+            when (intent?.action) {
+                ACTION_START_SESSION -> startSession(intent)
+                ACTION_CAPTURE -> requestCapture(intent)
+                ACTION_STOP_SESSION -> stopSession()
+            }
+        }.onFailure { error ->
+            setActive(false)
+            notifyResult(
+                saved = false,
+                sent = false,
+                reason = error.message ?: error.javaClass.simpleName,
+            )
+            cleanupProjection()
+            stopForeground(STOP_FOREGROUND_REMOVE)
+            stopSelf(startId)
         }
         return START_NOT_STICKY
     }
