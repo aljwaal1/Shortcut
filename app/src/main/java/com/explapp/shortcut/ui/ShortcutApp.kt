@@ -111,8 +111,12 @@ fun ShortcutApp(onOpenTools: () -> Unit = {}) {
     var showPermissions by remember { mutableStateOf(false) }
 
     LaunchedEffect(Unit) {
-        shortcuts.filter { it.isEnabled }.forEach(scheduler::schedule)
-        messages.filter { it.isEnabled }.forEach(messageScheduler::schedule)
+        shortcuts.filter { it.isEnabled }.forEach { shortcut ->
+            runCatching { scheduler.schedule(shortcut) }
+        }
+        messages.filter { it.isEnabled }.forEach { message ->
+            runCatching { messageScheduler.schedule(message) }
+        }
     }
 
     when {
