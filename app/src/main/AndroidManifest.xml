@@ -1,0 +1,108 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    <uses-permission android:name="android.permission.INTERNET" />
+    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
+    <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM" />
+    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
+    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
+    <uses-permission android:name="android.permission.NFC" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PROJECTION" />
+    <uses-permission android:name="android.permission.PACKAGE_USAGE_STATS" tools:ignore="ProtectedPermissions" />
+    <uses-feature android:name="android.hardware.nfc" android:required="false" />
+
+    <queries>
+        <intent><action android:name="android.intent.action.MAIN" /><category android:name="android.intent.category.LAUNCHER" /></intent>
+        <intent><action android:name="android.intent.action.VIEW" /><data android:scheme="geo" /></intent>
+    </queries>
+
+    <application android:allowBackup="false" android:label="@string/app_name" android:supportsRtl="true" android:theme="@style/Theme.Shortcut">
+        <provider
+            android:name="androidx.core.content.FileProvider"
+            android:authorities="${applicationId}.fileprovider"
+            android:exported="false"
+            android:grantUriPermissions="true">
+            <meta-data android:name="android.support.FILE_PROVIDER_PATHS" android:resource="@xml/file_paths" />
+        </provider>
+
+        <service android:name="androidx.appcompat.app.AppLocalesMetadataHolderService" android:enabled="false" android:exported="false">
+            <meta-data android:name="autoStoreLocales" android:value="true" />
+        </service>
+        <service android:name=".tools.ScreenCaptureService" android:exported="false" android:foregroundServiceType="mediaProjection" />
+        <service android:name=".tools.PersistentScreenCaptureService" android:exported="false" android:foregroundServiceType="mediaProjection" />
+        <service
+            android:name=".system.ShortcutTileService"
+            android:exported="true"
+            android:label="Shortcut"
+            android:icon="@android:drawable/ic_menu_manage"
+            android:permission="android.permission.BIND_QUICK_SETTINGS_TILE">
+            <intent-filter><action android:name="android.service.quicksettings.action.QS_TILE" /></intent-filter>
+        </service>
+        <!-- Standard build intentionally does NOT register or include an AccessibilityService. -->
+
+        <receiver android:name=".scheduler.ScheduledAppLaunchReceiver" android:exported="false" />
+        <receiver android:name=".scheduler.ScheduledMessageReceiver" android:exported="false" />
+        <receiver android:name=".scheduler.RestoreSchedulesReceiver" android:enabled="true" android:exported="false">
+            <intent-filter>
+                <action android:name="android.intent.action.BOOT_COMPLETED" />
+                <action android:name="android.intent.action.MY_PACKAGE_REPLACED" />
+                <action android:name="android.app.action.SCHEDULE_EXACT_ALARM_PERMISSION_STATE_CHANGED" />
+            </intent-filter>
+        </receiver>
+        <receiver android:name=".automation.BatteryCheckReceiver" android:exported="false" />
+        <receiver android:name=".automation.ChargerEventReceiver" android:enabled="true" android:exported="false">
+            <intent-filter>
+                <action android:name="android.intent.action.BOOT_COMPLETED" />
+                <action android:name="android.intent.action.MY_PACKAGE_REPLACED" />
+            </intent-filter>
+        </receiver>
+        <receiver android:name=".automation.routines.RoutineAlarmReceiver" android:exported="false" />
+        <receiver android:name=".automation.routines.RoutineStateReceiver" android:exported="false" />
+        <receiver android:name=".automation.routines.RoutineSystemEventReceiver" android:enabled="true" android:exported="false">
+            <intent-filter>
+                <action android:name="android.intent.action.BOOT_COMPLETED" />
+                <action android:name="android.intent.action.MY_PACKAGE_REPLACED" />
+            </intent-filter>
+        </receiver>
+        <receiver android:name=".system.ShortcutWidgetProvider" android:exported="true">
+            <intent-filter><action android:name="android.appwidget.action.APPWIDGET_UPDATE" /></intent-filter>
+            <meta-data android:name="android.appwidget.provider" android:resource="@xml/shortcut_widget_info" />
+        </receiver>
+
+        <activity android:name=".automation.BatterySetupActivity" android:exported="false" />
+        <activity android:name=".automation.CarModeActivity" android:exported="false" />
+        <activity android:name=".automation.ParkedCarActivity" android:exported="false" />
+        <activity android:name=".usage.AppUsageActivity" android:exported="false" />
+        <activity android:name=".tools.NfcSetupActivity" android:exported="false" />
+        <activity android:name=".tools.ScreenCaptureActivity" android:exported="false" />
+        <activity android:name=".tools.ImageBatchActivity" android:exported="false" />
+        <activity android:name=".tools.QuickFileActivity" android:exported="false" />
+        <activity android:name=".tools.ImageCropActivity" android:exported="false" />
+        <activity android:name=".tools.JpegConvertActivity" android:exported="false" />
+        <activity android:name=".tools.MultiUrlPdfActivity" android:exported="false" />
+        <activity android:name=".tools.ToolActivity" android:exported="false" />
+        <activity android:name=".ui.MyAutomationsActivity" android:exported="false" />
+        <activity android:name=".ui.ScheduledTasksManagerActivity" android:exported="false" />
+        <activity android:name=".search.CommandPaletteActivity" android:exported="false" />
+        <activity android:name=".backup.BackupTransferActivity" android:exported="false" />
+
+        <activity android:name=".tools.NfcDispatchActivity" android:exported="true">
+            <intent-filter>
+                <action android:name="android.nfc.action.NDEF_DISCOVERED" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <data android:scheme="shortcut" android:host="tool" />
+            </intent-filter>
+            <intent-filter>
+                <action android:name="android.nfc.action.NDEF_DISCOVERED" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <data android:scheme="shortcut" android:host="routine" />
+            </intent-filter>
+        </activity>
+
+        <activity android:name=".MainActivity" android:exported="true">
+            <intent-filter><action android:name="android.intent.action.MAIN" /><category android:name="android.intent.category.LAUNCHER" /></intent-filter>
+        </activity>
+    </application>
+</manifest>
