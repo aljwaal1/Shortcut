@@ -288,29 +288,63 @@ class PersistentScreenCaptureService : Service() {
             putExtra(Intent.EXTRA_STREAM, uri)
             if (caption.isNotBlank()) putExtra(Intent.EXTRA_TEXT, caption)
             clipData = ClipData.newRawUri("Shortcut screenshot", uri)
-            addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_ACTIVITY_NEW_TASK)
+            addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
             if (packageManager.getLaunchIntentForPackage("org.telegram.messenger") != null) {
                 setPackage("org.telegram.messenger")
             }
         }
-        val pending = PendingIntent.getActivity(
-            this,
-            9203,
-            Intent.createChooser(sendIntent, local("Choose Telegram chat", "اختر محادثة تيليجرام"))
-                .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
-            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
-        )
-        getSystemService(NotificationManager::class.java).notify(
-            RESULT_NOTIFICATION_ID,
-            NotificationCompat.Builder(this, CHANNEL)
-                .setSmallIcon(android.R.drawable.ic_menu_send)
-                .setContentTitle(local("Screenshot ready for Telegram", "لقطة الشاشة جاهزة لتيليجرام"))
-                .setContentText(local("Tap to choose the normal Telegram conversation and send.", "اضغط لاختيار محادثة تيليجرام العادية ثم الإرسال."))
-                .setContentIntent(pending)
-                .setAutoCancel(true)
-                .addAction(0, local("Open Telegram", "فتح تيليجرام"), pending)
-                .build(),
-        )
+        val chooser = Intent.createChooser(
+            sendIntent,
+            local("Choose Telegram chat", "اختر محادثة تيليجرام"),
+        ).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+
+        val opened = runCatching {
+            if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q) {
+                startActivity(chooser)
+            } else {
+                val pending = PendingIntent.getActivity(
+                    this,
+                    9203,
+                    chooser,
+                    PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
+                )
+                if (Build.VERSION.SDK_INT >= 34) {
+                    val options = ActivityOptions.makeBasic().apply {
+                        val mode = if (Build.VERSION.SDK_INT >= 36) {
+                            ActivityOptions.MODE_BACKGROUND_ACTIVITY_START_ALLOW_ALWAYS
+                        } else {
+                            @Suppress("DEPRECATION")
+                            ActivityOptions.MODE_BACKGROUND_ACTIVITY_START_ALLOWED
+                        }
+                        setPendingIntentBackgroundActivityStartMode(mode)
+                    }
+                    pending.send(this, 0, null, null, null, null, options.toBundle())
+                } else {
+                    pending.send()
+                }
+            }
+            true
+        }.getOrDefault(false)
+
+        if (!opened) {
+            val pending = PendingIntent.getActivity(
+                this,
+                9203,
+                chooser,
+                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
+            )
+            getSystemService(NotificationManager::class.java).notify(
+                RESULT_NOTIFICATION_ID,
+                NotificationCompat.Builder(this, CHANNEL)
+                    .setSmallIcon(android.R.drawable.ic_menu_send)
+                    .setContentTitle(local("Screenshot ready for Telegram", "لقطة الشاشة جاهزة لتيليجرام"))
+                    .setContentText(local("Tap to choose the normal Telegram conversation and send.", "اضغط لاختيار محادثة تيليجرام العادية ثم الإرسال."))
+                    .setContentIntent(pending)
+                    .setAutoCancel(true)
+                    .addAction(0, local("Open Telegram", "فتح تيليجرام"), pending)
+                    .build(),
+            )
+        }
     }
 
     private fun notifyResult(saved: Boolean, sent: Boolean) {
