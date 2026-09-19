@@ -198,8 +198,8 @@ private fun MyAutomationsScreen(onBack: () -> Unit) {
                             fontWeight = FontWeight.Bold,
                         )
                         Text(
-                            if (ar) "بدون بوت. بعد التقاط الصورة يفتح تيليجرام بالصورة، وتختار المحادثة العادية وتؤكد الإرسال."
-                            else "No bot. After capture, Telegram opens with the image so you choose a normal chat and confirm sending.",
+                            if (ar) "بدون بوت. بعد التقاط الصورة يحاول التطبيق فتح تيليجرام بالصورة مباشرة. إذا منع أندرويد الفتح من الخلفية، يظهر إشعار «فتح تيليجرام» كبديل."
+                            else "No bot. After capture, Shortcut tries to open Telegram with the image immediately. If Android blocks background opening, an Open Telegram notification appears as a fallback.",
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
@@ -364,8 +364,8 @@ private fun DailyScreenshotTelegramWizard(
                     if (ar) "المسار: الوقت المحدد ← فتح التطبيق ← التقاط الصورة ← إرسالها تلقائيًا إلى Chat ID المحدد بواسطة البوت."
                     else "Flow: scheduled time → open app → capture screenshot → automatically send it to the selected Chat ID using the bot."
                 } else {
-                    if (ar) "المسار: الوقت المحدد ← فتح التطبيق ← التقاط الصورة ← ظهور إشعار «فتح تيليجرام» ← اختيار المحادثة العادية وتأكيد الإرسال."
-                    else "Flow: scheduled time → open app → capture screenshot → a Telegram notification appears → choose the normal chat and confirm sending."
+                    if (ar) "المسار: الوقت المحدد ← فتح التطبيق ← التقاط الصورة ← فتح تيليجرام بالصورة مباشرة إن سمح النظام، وإلا يظهر إشعار «فتح تيليجرام» ← اختيار المحادثة وتأكيد الإرسال."
+                    else "Flow: scheduled time → open app → capture screenshot → open Telegram with the image when Android allows it; otherwise show an Open Telegram notification → choose the chat and confirm sending."
                 },
                 ar,
             )
