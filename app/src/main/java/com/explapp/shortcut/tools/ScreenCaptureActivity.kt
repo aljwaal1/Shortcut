@@ -226,12 +226,13 @@ class ScreenCaptureActivity : AppCompatActivity() {
                 Thread {
                     val result = TelegramBotSender().sendPhoto(telegramBotToken, telegramChatId, telegramCaption, file)
                     runOnUiThread {
-                        Toast.makeText(
-                            this,
-                            if (result.isSuccess) local("Screenshot sent to Telegram", "تم إرسال لقطة الشاشة إلى تيليجرام")
-                            else local("Screenshot saved, but Telegram send failed", "تم حفظ الصورة لكن فشل إرسالها إلى تيليجرام"),
-                            Toast.LENGTH_LONG,
-                        ).show()
+                        val message = if (result.isSuccess) {
+                            local("Screenshot sent to Telegram", "تم إرسال لقطة الشاشة إلى تيليجرام")
+                        } else {
+                            val reason = result.exceptionOrNull()?.message.orEmpty()
+                            local("Telegram send failed: ", "فشل الإرسال إلى تيليجرام: ") + reason
+                        }
+                        Toast.makeText(this, message, Toast.LENGTH_LONG).show()
                     }
                     file.delete()
                 }.start()
