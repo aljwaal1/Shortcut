@@ -33,6 +33,7 @@ class PersistentScreenCaptureService : Service() {
     private var display: android.hardware.display.VirtualDisplay? = null
     private var captureRequested = false
     private var captureInFlight = false
+    private var captureGeneration = 0L
     private var pendingToken = ""
     private var pendingChatId = ""
     private var pendingCaption = ""
@@ -208,6 +209,7 @@ class PersistentScreenCaptureService : Service() {
             return
         }
         captureInFlight = true
+        val generation = ++captureGeneration
 
         pendingToken = intent.getStringExtra(EXTRA_TELEGRAM_BOT_TOKEN).orEmpty()
         pendingChatId = intent.getStringExtra(EXTRA_TELEGRAM_CHAT_ID).orEmpty()
@@ -270,6 +272,20 @@ class PersistentScreenCaptureService : Service() {
                 // the screen after the requested delay, not an old frame.
                 runCatching { reader?.acquireLatestImage()?.close() }
                 captureRequested = true
+                handler.postDelayed({
+                    if (generation == captureGeneration && captureInFlight && captureRequested) {
+                        captureRequested = false
+                        captureInFlight = false
+                        notifyResult(
+                            saved = false,
+                            sent = false,
+                            reason = local(
+                                "Timed out waiting for a fresh screen frame. Try reactivating the capture session.",
+                                "انتهت مهلة انتظار لقطة شاشة جديدة. حاول إعادة تفعيل جلسة التصوير.",
+                            ),
+                        )
+                    }
+                }, CAPTURE_FRAME_TIMEOUT_MS)
             } else {
                 captureInFlight = false
             }
@@ -469,6 +485,7 @@ class PersistentScreenCaptureService : Service() {
         private const val NOTIFICATION_ID = 9200
         private const val RESULT_NOTIFICATION_ID = 9202
         private const val RESULT_CHANNEL = "persistent_screen_capture_results"
+        private const val CAPTURE_FRAME_TIMEOUT_MS = 6_000L
         private const val PREFS = "persistent_screen_capture_state"
         private const val KEY_ACTIVE = "active"
 
