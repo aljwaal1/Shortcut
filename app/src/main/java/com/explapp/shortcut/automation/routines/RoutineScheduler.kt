@@ -187,19 +187,31 @@ class RoutineScheduler(private val context: Context) {
 class RoutineAlarmReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent) {
         val id = intent.getStringExtra(RoutineScheduler.EXTRA_ID) ?: return
-        val routine = RoutineStore(context).load().firstOrNull { it.id == id && it.isEnabled && it.isValid() } ?: return
-        RoutineDispatcher(context).execute(routine, userInitiated = false)
-        RoutineScheduler(context).schedule(routine)
+        val pendingResult = goAsync()
+        Thread {
+            try {
+                val routine = RoutineStore(context).load()
+                    .firstOrNull { it.id == id && it.isEnabled && it.isValid() } ?: return@Thread
+                RoutineDispatcher(context).execute(routine, userInitiated = false)
+                runCatching { RoutineScheduler(context).schedule(routine) }
+            } finally {
+                pendingResult.finish()
+            }
+        }.start()
     }
 }
 
 class RoutineStateReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent) {
         val id = intent.getStringExtra(RoutineScheduler.EXTRA_ID) ?: return
-        val routine = RoutineStore(context).load().firstOrNull { it.id == id && it.isEnabled && it.isValid() } ?: return
-        val state = RoutineEdgeState(context)
+        val pendingResult = goAsync()
+        Thread {
+            try {
+                val routine = RoutineStore(context).load()
+                    .firstOrNull { it.id == id && it.isEnabled && it.isValid() } ?: return@Thread
+                val state = RoutineEdgeState(context)
 
-        when (routine.trigger.type) {
+                when (routine.trigger.type) {
             RoutineTriggerType.BATTERY_BELOW -> {
                 val threshold = routine.trigger.value.toIntOrNull() ?: return
                 val level = currentBatteryLevel(context)
@@ -222,10 +234,14 @@ class RoutineStateReceiver : BroadcastReceiver() {
                 state.setChargerState(id, connected)
             }
 
-            else -> return
-        }
+                    else -> return@Thread
+                }
 
-        RoutineScheduler(context).schedule(routine)
+                runCatching { RoutineScheduler(context).schedule(routine) }
+            } finally {
+                pendingResult.finish()
+            }
+        }.start()
     }
 }
 
