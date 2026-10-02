@@ -54,7 +54,13 @@ fun ToolHubScreen(
     onBack: () -> Unit,
     onTool: (ToolId) -> Unit,
 ) {
-    val isArabic = LocalConfiguration.current.locales[0].language == "ar"
+    val configuration = LocalConfiguration.current
+    val isArabic = configuration.locales[0].language == "ar"
+    val columns = when {
+        configuration.screenWidthDp >= 900 -> 4
+        configuration.screenWidthDp >= 600 -> 3
+        else -> 2
+    }
     val context = LocalContext.current
     val store = remember(context) { ToolPreferencesStore(context.applicationContext) }
     val all = remember { ToolCatalog.all() }
@@ -102,12 +108,13 @@ fun ToolHubScreen(
                     icon = Icons.Default.Star,
                 )
             }
-            favoriteTools.chunked(2).forEach { pair ->
+            favoriteTools.chunked(columns).forEach { pair ->
                 item {
                     ToolPair(
                         pair = pair,
                         isArabic = isArabic,
                         favorites = favorites,
+                        columns = columns,
                         onOpen = ::openTool,
                         onFavorite = { id -> favorites = store.toggleFavorite(id) },
                     )
@@ -124,12 +131,13 @@ fun ToolHubScreen(
                     icon = Icons.Default.AutoAwesome,
                 )
             }
-            recentTools.take(4).chunked(2).forEach { pair ->
+            recentTools.take(columns * 2).chunked(columns).forEach { pair ->
                 item {
                     ToolPair(
                         pair = pair,
                         isArabic = isArabic,
                         favorites = favorites,
+                        columns = columns,
                         onOpen = ::openTool,
                         onFavorite = { id -> favorites = store.toggleFavorite(id) },
                     )
@@ -164,12 +172,13 @@ fun ToolHubScreen(
             val sectionTools = filtered.filter { it.section == section }
             if (sectionTools.isEmpty()) return@forEach
             item { SectionHeader(section = section, isArabic = isArabic, count = sectionTools.size) }
-            sectionTools.chunked(2).forEach { pair ->
+            sectionTools.chunked(columns).forEach { pair ->
                 item {
                     ToolPair(
                         pair = pair,
                         isArabic = isArabic,
                         favorites = favorites,
+                        columns = columns,
                         onOpen = ::openTool,
                         onFavorite = { id -> favorites = store.toggleFavorite(id) },
                     )
@@ -185,6 +194,7 @@ private fun ToolPair(
     pair: List<ShortcutTool>,
     isArabic: Boolean,
     favorites: Set<ToolId>,
+    columns: Int,
     onOpen: (ShortcutTool) -> Unit,
     onFavorite: (ToolId) -> Unit,
 ) {
@@ -202,7 +212,9 @@ private fun ToolPair(
                 onFavorite = { onFavorite(tool.id) },
             )
         }
-        if (pair.size == 1) Box(Modifier.weight(1f))
+        repeat((columns - pair.size).coerceAtLeast(0)) {
+            Box(Modifier.weight(1f))
+        }
     }
 }
 
