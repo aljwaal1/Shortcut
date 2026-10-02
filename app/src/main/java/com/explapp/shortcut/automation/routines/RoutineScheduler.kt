@@ -213,7 +213,7 @@ class RoutineStateReceiver : BroadcastReceiver() {
 
                 when (routine.trigger.type) {
             RoutineTriggerType.BATTERY_BELOW -> {
-                val threshold = routine.trigger.value.toIntOrNull() ?: return
+                val threshold = routine.trigger.value.toIntOrNull() ?: return@Thread
                 val level = currentBatteryLevel(context)
                 val wasBelow = state.wasBelow(id)
                 val isBelow = BatteryThresholdEdge.isBelow(level, threshold)
@@ -247,14 +247,21 @@ class RoutineStateReceiver : BroadcastReceiver() {
 
 class RoutineSystemEventReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent) {
-        val dispatcher = RoutineDispatcher(context)
-        when (intent.action) {
-            Intent.ACTION_BOOT_COMPLETED -> {
-                dispatcher.dispatch(RoutineEvent(RoutineTriggerType.BOOT))
-                reschedule(context)
+        val pendingResult = goAsync()
+        Thread {
+            try {
+                val dispatcher = RoutineDispatcher(context)
+                when (intent.action) {
+                    Intent.ACTION_BOOT_COMPLETED -> {
+                        dispatcher.dispatch(RoutineEvent(RoutineTriggerType.BOOT))
+                        reschedule(context)
+                    }
+                    Intent.ACTION_MY_PACKAGE_REPLACED -> reschedule(context)
+                }
+            } finally {
+                pendingResult.finish()
             }
-            Intent.ACTION_MY_PACKAGE_REPLACED -> reschedule(context)
-        }
+        }.start()
     }
 
     private fun reschedule(context: Context) {
