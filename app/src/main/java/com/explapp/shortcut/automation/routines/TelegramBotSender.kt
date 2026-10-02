@@ -13,8 +13,11 @@ class TelegramBotSender {
         val cleanToken = token.trim()
         require(cleanToken.isNotBlank()) { "Bot token is required" }
         val connection = open("https://api.telegram.org/bot$cleanToken/getMe", "GET", 8_000, 10_000)
-        ensureSuccess(connection)
-        connection.disconnect()
+        try {
+            ensureSuccess(connection)
+        } finally {
+            connection.disconnect()
+        }
     }
 
     fun validateDestination(token: String, destination: String): Result<Unit> = runCatching {
@@ -27,8 +30,6 @@ class TelegramBotSender {
         require(cleanToken.isNotBlank()) { "Bot token is required" }
         require(raw.isNotBlank()) { "Telegram username is required" }
 
-        validateBot(cleanToken).getOrThrow()
-
         if (raw.matches(Regex("-?\\d+"))) {
             val connection = open(
                 "https://api.telegram.org/bot$cleanToken/getChat?chat_id=" + enc(raw),
@@ -36,9 +37,12 @@ class TelegramBotSender {
                 8_000,
                 10_000,
             )
-            ensureSuccess(connection)
-            connection.disconnect()
-            return@runCatching raw
+            try {
+                ensureSuccess(connection)
+                return@runCatching raw
+            } finally {
+                connection.disconnect()
+            }
         }
 
         val username = raw.removePrefix("@")
@@ -52,9 +56,12 @@ class TelegramBotSender {
                 8_000,
                 10_000,
             )
-            ensureSuccess(connection)
-            connection.disconnect()
-            publicHandle
+            try {
+                ensureSuccess(connection)
+                publicHandle
+            } finally {
+                connection.disconnect()
+            }
         }
         if (direct.isSuccess) return@runCatching direct.getOrThrow()
 
@@ -64,8 +71,11 @@ class TelegramBotSender {
             8_000,
             12_000,
         )
-        val body = readBodyAndEnsureSuccess(updatesConnection)
-        updatesConnection.disconnect()
+        val body = try {
+            readBodyAndEnsureSuccess(updatesConnection)
+        } finally {
+            updatesConnection.disconnect()
+        }
 
         val root = JSONObject(body)
         val updates = root.optJSONArray("result")
@@ -112,9 +122,12 @@ class TelegramBotSender {
             setRequestProperty("Content-Type", "application/x-www-form-urlencoded; charset=UTF-8")
             setRequestProperty("Accept", "application/json")
         }
-        connection.outputStream.use { it.write(body.toByteArray(StandardCharsets.UTF_8)) }
-        ensureSuccess(connection)
-        connection.disconnect()
+        try {
+            connection.outputStream.use { it.write(body.toByteArray(StandardCharsets.UTF_8)) }
+            ensureSuccess(connection)
+        } finally {
+            connection.disconnect()
+        }
     }
 
     fun sendPhoto(token: String, chatId: String, caption: String, file: File): Result<Unit> = runCatching {
@@ -142,28 +155,30 @@ class TelegramBotSender {
             setChunkedStreamingMode(64 * 1024)
         }
 
-        DataOutputStream(connection.outputStream).use { out ->
-            fun field(name: String, value: String) {
+        try {
+            DataOutputStream(connection.outputStream).use { out ->
+                fun field(name: String, value: String) {
+                    out.writeBytes("--$boundary\r\n")
+                    out.writeBytes("Content-Disposition: form-data; name=\"$name\"\r\n")
+                    out.writeBytes("Content-Type: text/plain; charset=UTF-8\r\n\r\n")
+                    out.write(value.toByteArray(StandardCharsets.UTF_8))
+                    out.writeBytes("\r\n")
+                }
+
+                field("chat_id", resolvedChat)
+                if (caption.isNotBlank()) field("caption", caption)
+
                 out.writeBytes("--$boundary\r\n")
-                out.writeBytes("Content-Disposition: form-data; name=\"$name\"\r\n")
-                out.writeBytes("Content-Type: text/plain; charset=UTF-8\r\n\r\n")
-                out.write(value.toByteArray(StandardCharsets.UTF_8))
-                out.writeBytes("\r\n")
+                out.writeBytes("Content-Disposition: form-data; name=\"photo\"; filename=\"screenshot.png\"\r\n")
+                out.writeBytes("Content-Type: image/png\r\n\r\n")
+                file.inputStream().use { input -> input.copyTo(out, 64 * 1024) }
+                out.writeBytes("\r\n--$boundary--\r\n")
+                out.flush()
             }
-
-            field("chat_id", resolvedChat)
-            if (caption.isNotBlank()) field("caption", caption)
-
-            out.writeBytes("--$boundary\r\n")
-            out.writeBytes("Content-Disposition: form-data; name=\"photo\"; filename=\"screenshot.png\"\r\n")
-            out.writeBytes("Content-Type: image/png\r\n\r\n")
-            file.inputStream().use { input -> input.copyTo(out, 64 * 1024) }
-            out.writeBytes("\r\n--$boundary--\r\n")
-            out.flush()
+            ensureSuccess(connection)
+        } finally {
+            connection.disconnect()
         }
-
-        ensureSuccess(connection)
-        connection.disconnect()
     }
 
     private fun open(url: String, method: String, connectMs: Int, readMs: Int): HttpURLConnection =
