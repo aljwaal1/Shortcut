@@ -415,6 +415,8 @@ private fun HomeScreen(
     val configuration = LocalConfiguration.current
     val ar = configuration.locales[0].language == "ar"
     var dashboardRefresh by remember { mutableIntStateOf(0) }
+    var pendingDeleteShortcut by remember { mutableStateOf<ScheduledAppShortcut?>(null) }
+    var pendingDeleteMessage by remember { mutableStateOf<ScheduledMessage?>(null) }
     DisposableEffect(lifecycleOwner) {
         val observer = LifecycleEventObserver { _, event ->
             if (event == Lifecycle.Event.ON_RESUME) dashboardRefresh++
@@ -549,7 +551,7 @@ private fun HomeScreen(
                         IconButton(onClick = { onEditShortcut(shortcut) }) {
                             Icon(Icons.Default.Edit, contentDescription = if (ar) "تعديل المهمة" else "Edit task", tint = MaterialTheme.colorScheme.primary)
                         }
-                        IconButton(onClick = { onDeleteShortcut(shortcut) }) {
+                        IconButton(onClick = { pendingDeleteShortcut = shortcut }) {
                             Icon(Icons.Default.Delete, contentDescription = stringResource(R.string.delete_shortcut), tint = MaterialTheme.colorScheme.error)
                         }
                     }
@@ -588,7 +590,7 @@ private fun HomeScreen(
                         IconButton(onClick = { onEditMessage(message) }) {
                             Icon(Icons.Default.Edit, contentDescription = if (ar) "تعديل الرسالة" else "Edit message", tint = MaterialTheme.colorScheme.secondary)
                         }
-                        IconButton(onClick = { onDeleteMessage(message) }) {
+                        IconButton(onClick = { pendingDeleteMessage = message }) {
                             Icon(Icons.Default.Delete, contentDescription = stringResource(R.string.delete_message), tint = MaterialTheme.colorScheme.error)
                         }
                     }
@@ -596,6 +598,36 @@ private fun HomeScreen(
             }
         }
         item { Spacer(Modifier.height(8.dp)) }
+    }
+
+    pendingDeleteShortcut?.let { item ->
+        AlertDialog(
+            onDismissRequest = { pendingDeleteShortcut = null },
+            title = { Text(if (ar) "حذف الاختصار؟" else "Delete shortcut?", fontWeight = FontWeight.Bold) },
+            text = { Text(if (ar) "سيتم حذف «${item.name}» وإلغاء جدولته." else "“${item.name}” will be deleted and unscheduled.") },
+            confirmButton = {
+                TextButton(onClick = {
+                    onDeleteShortcut(item)
+                    pendingDeleteShortcut = null
+                }) { Text(if (ar) "حذف" else "Delete", color = MaterialTheme.colorScheme.error) }
+            },
+            dismissButton = { TextButton(onClick = { pendingDeleteShortcut = null }) { Text(if (ar) "إلغاء" else "Cancel") } },
+        )
+    }
+
+    pendingDeleteMessage?.let { item ->
+        AlertDialog(
+            onDismissRequest = { pendingDeleteMessage = null },
+            title = { Text(if (ar) "حذف الرسالة المجدولة؟" else "Delete scheduled message?", fontWeight = FontWeight.Bold) },
+            text = { Text(if (ar) "سيتم حذف «${item.name}» وإلغاء جدولتها." else "“${item.name}” will be deleted and unscheduled.") },
+            confirmButton = {
+                TextButton(onClick = {
+                    onDeleteMessage(item)
+                    pendingDeleteMessage = null
+                }) { Text(if (ar) "حذف" else "Delete", color = MaterialTheme.colorScheme.error) }
+            },
+            dismissButton = { TextButton(onClick = { pendingDeleteMessage = null }) { Text(if (ar) "إلغاء" else "Cancel") } },
+        )
     }
 }
 
