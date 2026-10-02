@@ -75,7 +75,6 @@ import androidx.core.os.LocaleListCompat
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import com.explapp.shortcut.R
-import com.explapp.shortcut.MainActivity
 import com.explapp.shortcut.backup.BackupTransferActivity
 import com.explapp.shortcut.data.MessageStore
 import com.explapp.shortcut.data.ShortcutStore
@@ -548,11 +547,7 @@ private fun HomeScreen(
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                             )
                         }
-                        TextButton(onClick = {
-                            context.startActivity(Intent(context, MainActivity::class.java).apply {
-                                addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP)
-                            })
-                        }) {
+                        TextButton(onClick = { dashboardRefresh++ }) {
                             Text(if (ar) "تحديث" else "Refresh")
                         }
                     }
