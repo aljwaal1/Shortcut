@@ -30,6 +30,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -47,6 +48,9 @@ import com.explapp.shortcut.scheduler.AndroidMessageScheduler
 import com.explapp.shortcut.tools.ToolId
 import com.explapp.shortcut.tools.ToolPreferencesStore
 import com.explapp.shortcut.ui.ShortcutTheme
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 class BackupTransferActivity : AppCompatActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -61,8 +65,10 @@ private fun BackupTransferScreen(onBack: () -> Unit) {
     val ar = LocalConfiguration.current.locales[0].language == "ar"
     var status by remember { mutableStateOf("") }
     var pendingImport by remember { mutableStateOf<BackupPayload?>(null) }
+    val scope = rememberCoroutineScope()
 
     fun write(uri: Uri) {
+        scope.launch {
         val toolPrefs = ToolPreferencesStore(context)
         val payload = BackupPayload(
             shortcuts = ShortcutStore(context).load(),
@@ -71,28 +77,39 @@ private fun BackupTransferScreen(onBack: () -> Unit) {
             favoriteToolIds = toolPrefs.favorites().map { it.name },
             recentToolIds = toolPrefs.recents().map { it.name },
         )
-        runCatching {
-            context.contentResolver.openOutputStream(uri)?.bufferedWriter()?.use { it.write(BackupCodec.encode(payload)) }
-                ?: error("Cannot open destination")
-        }.onSuccess { status = if (ar) "تم تصدير النسخة الاحتياطية" else "Backup exported" }
+        val result = withContext(Dispatchers.IO) {
+            runCatching {
+                context.contentResolver.openOutputStream(uri)?.bufferedWriter()?.use { it.write(BackupCodec.encode(payload)) }
+                    ?: error("Cannot open destination")
+            }
+        }
+        result.onSuccess { status = if (ar) "تم تصدير النسخة الاحتياطية" else "Backup exported" }
             .onFailure { status = it.message.orEmpty() }
+        }
     }
 
     fun read(uri: Uri) {
-        runCatching {
-            val raw = context.contentResolver.openInputStream(uri)?.bufferedReader()?.use { it.readText() }
-                ?: error("Cannot open backup")
-            BackupCodec.decode(raw).getOrThrow()
-        }.onSuccess { payload ->
-            pendingImport = payload
-            status = if (ar) "تم فحص النسخة. راجع التفاصيل ثم أكد الاستعادة." else "Backup validated. Review the details and confirm restore."
-        }.onFailure {
-            status = if (ar) "فشل فحص النسخة: " + (it.message ?: "خطأ غير معروف") else "Backup validation failed: " + (it.message ?: "Unknown error")
+        scope.launch {
+            val result = withContext(Dispatchers.IO) {
+                runCatching {
+                    val raw = context.contentResolver.openInputStream(uri)?.bufferedReader()?.use { it.readText() }
+                        ?: error("Cannot open backup")
+                    BackupCodec.decode(raw).getOrThrow()
+                }
+            }
+            result.onSuccess { payload ->
+                pendingImport = payload
+                status = if (ar) "تم فحص النسخة. راجع التفاصيل ثم أكد الاستعادة." else "Backup validated. Review the details and confirm restore."
+            }.onFailure {
+                status = if (ar) "فشل فحص النسخة: " + (it.message ?: "خطأ غير معروف") else "Backup validation failed: " + (it.message ?: "Unknown error")
+            }
         }
     }
 
     fun restore(payload: BackupPayload) {
-        runCatching {
+        scope.launch {
+            val result = withContext(Dispatchers.IO) {
+                runCatching {
             val shortcutStore = ShortcutStore(context)
             val messageStore = MessageStore(context)
             val routineStore = RoutineStore(context)
@@ -119,11 +136,14 @@ private fun BackupTransferScreen(onBack: () -> Unit) {
             payload.shortcuts.filter { it.isEnabled }.forEach { item -> runCatching { appScheduler.schedule(item) } }
             payload.messages.filter { it.isEnabled }.forEach { item -> runCatching { messageScheduler.schedule(item) } }
             payload.routines.filter { it.isEnabled && it.isValid() }.forEach { item -> runCatching { routineScheduler.schedule(item) } }
-        }.onSuccess {
-            pendingImport = null
-            status = if (ar) "تمت الاستعادة بنجاح" else "Backup restored"
-        }.onFailure {
-            status = if (ar) "فشلت الاستعادة: " + (it.message ?: "خطأ غير معروف") else "Restore failed: " + (it.message ?: "Unknown error")
+                }
+            }
+            result.onSuccess {
+                pendingImport = null
+                status = if (ar) "تمت الاستعادة بنجاح" else "Backup restored"
+            }.onFailure {
+                status = if (ar) "فشلت الاستعادة: " + (it.message ?: "خطأ غير معروف") else "Restore failed: " + (it.message ?: "Unknown error")
+            }
         }
     }
 
