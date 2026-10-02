@@ -145,7 +145,7 @@ fun ShortcutApp(onOpenTools: () -> Unit = {}) {
                 val index = shortcuts.indexOfFirst { it.id == saved.id }
                 if (index >= 0) shortcuts[index] = saved else shortcuts.add(saved)
                 store.save(shortcuts)
-                if (saved.isEnabled) scheduler.schedule(saved)
+                if (saved.isEnabled) runCatching { scheduler.schedule(saved) }
                 editingShortcut = null
             },
         )
@@ -159,7 +159,7 @@ fun ShortcutApp(onOpenTools: () -> Unit = {}) {
                 val index = messages.indexOfFirst { it.id == saved.id }
                 if (index >= 0) messages[index] = saved else messages.add(saved)
                 messageStore.save(messages)
-                if (saved.isEnabled) messageScheduler.schedule(saved)
+                if (saved.isEnabled) runCatching { messageScheduler.schedule(saved) }
                 editingMessage = null
             },
         )
@@ -168,7 +168,7 @@ fun ShortcutApp(onOpenTools: () -> Unit = {}) {
             onSave = { shortcut ->
                 shortcuts.add(shortcut)
                 store.save(shortcuts)
-                scheduler.schedule(shortcut)
+                runCatching { scheduler.schedule(shortcut) }
                 showBuilder = false
             },
         )
@@ -178,7 +178,7 @@ fun ShortcutApp(onOpenTools: () -> Unit = {}) {
             onSave = { message ->
                 messages.add(message)
                 messageStore.save(messages)
-                messageScheduler.schedule(message)
+                runCatching { messageScheduler.schedule(message) }
                 showMessageBuilder = null
             },
         )
@@ -270,7 +270,11 @@ private fun MainShell(
     onDeleteMessage: (ScheduledMessage) -> Unit,
     onOpenPermissions: () -> Unit,
 ) {
-    var selected by remember { mutableStateOf(MainTab.HOME) }
+    val context = LocalContext.current
+    val ar = LocalConfiguration.current.locales[0].language == "ar"
+    var selected by rememberSaveable { mutableStateOf(MainTab.HOME) }
+    var showCreateMenu by rememberSaveable { mutableStateOf(false) }
+
     Scaffold(
         containerColor = MaterialTheme.colorScheme.background,
         bottomBar = {
@@ -291,7 +295,7 @@ private fun MainShell(
         floatingActionButton = {
             if (selected == MainTab.HOME) {
                 FloatingActionButton(
-                    onClick = onCreateShortcut,
+                    onClick = { showCreateMenu = true },
                     containerColor = MaterialTheme.colorScheme.primary,
                     contentColor = MaterialTheme.colorScheme.onPrimary,
                 ) {
@@ -315,6 +319,81 @@ private fun MainShell(
             MainTab.TEMPLATES -> TemplatesScreen(padding, onCreateShortcut, onCreateMessage)
             MainTab.HISTORY -> ExecutionHistoryScreen(padding)
             MainTab.SETTINGS -> SettingsScreen(padding, onOpenPermissions)
+        }
+    }
+
+    if (showCreateMenu) {
+        AlertDialog(
+            onDismissRequest = { showCreateMenu = false },
+            title = { Text(if (ar) "ماذا تريد أن تنشئ؟" else "What do you want to create?", fontWeight = FontWeight.ExtraBold) },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    CreateChoice(
+                        title = if (ar) "فتح تطبيق بموعد" else "Scheduled app",
+                        subtitle = if (ar) "افتح تطبيقًا تلقائيًا في الوقت الذي تختاره" else "Open an app automatically at a chosen time",
+                        accent = MaterialTheme.colorScheme.primary,
+                    ) {
+                        showCreateMenu = false
+                        onCreateShortcut()
+                    }
+                    CreateChoice(
+                        title = if (ar) "رسالة واتساب" else "WhatsApp message",
+                        subtitle = if (ar) "جهّز رسالة في موعد محدد" else "Prepare a message on schedule",
+                        accent = MaterialTheme.colorScheme.secondary,
+                    ) {
+                        showCreateMenu = false
+                        onCreateMessage(MessagePlatform.WHATSAPP)
+                    }
+                    CreateChoice(
+                        title = if (ar) "رسالة تيليجرام" else "Telegram message",
+                        subtitle = if (ar) "جهّز رسالة في موعد محدد" else "Prepare a message on schedule",
+                        accent = MaterialTheme.colorScheme.tertiary,
+                    ) {
+                        showCreateMenu = false
+                        onCreateMessage(MessagePlatform.TELEGRAM)
+                    }
+                    CreateChoice(
+                        title = if (ar) "أتمتة متقدمة" else "Advanced automation",
+                        subtitle = if (ar) "مشغلات وشروط وإجراءات متعددة" else "Triggers, conditions and multi-step actions",
+                        accent = MaterialTheme.colorScheme.primary,
+                    ) {
+                        showCreateMenu = false
+                        context.startActivity(Intent(context, MyAutomationsActivity::class.java))
+                    }
+                }
+            },
+            confirmButton = {},
+            dismissButton = {
+                TextButton(onClick = { showCreateMenu = false }) {
+                    Text(if (ar) "إغلاق" else "Close")
+                }
+            },
+        )
+    }
+}
+
+@Composable
+private fun CreateChoice(
+    title: String,
+    subtitle: String,
+    accent: Color,
+    onClick: () -> Unit,
+) {
+    ElevatedCard(
+        onClick = onClick,
+        modifier = Modifier.fillMaxWidth(),
+        colors = CardDefaults.elevatedCardColors(containerColor = accent.copy(alpha = 0.08f)),
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth().padding(14.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            AccentIcon(Icons.Default.Add, accent)
+            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                Text(title, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                Text(subtitle, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
         }
     }
 }
