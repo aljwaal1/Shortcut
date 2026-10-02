@@ -23,8 +23,12 @@ class RoutineStore(context: Context) {
                             }
                             value.isNotBlank() -> {
                                 if (secrets.put(secretKey, value)) {
-                                    migrated = true
+                                    updated[key] = value
+                                } else {
+                                    // Never keep a credential in plaintext when secure storage is unavailable.
+                                    updated.remove(key)
                                 }
+                                migrated = true
                             }
                         }
                     }
