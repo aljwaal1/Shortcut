@@ -73,10 +73,12 @@ class RoutineScheduler(private val context: Context) {
         val pending = statePending(routine.id, PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE, time = true) ?: return
         val alarm = context.getSystemService(AlarmManager::class.java)
         val millis = at.toInstant().toEpochMilli()
-        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.S || alarm.canScheduleExactAlarms()) {
-            alarm.setExactAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, millis, pending)
-        } else {
-            alarm.setAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, millis, pending)
+        runCatching {
+            if (Build.VERSION.SDK_INT < Build.VERSION_CODES.S || alarm.canScheduleExactAlarms()) {
+                alarm.setExactAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, millis, pending)
+            } else {
+                alarm.setAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, millis, pending)
+            }
         }
     }
 
@@ -144,11 +146,13 @@ class RoutineScheduler(private val context: Context) {
 
     private fun scheduleStatePoll(routine: AutomationRoutine) {
         val pending = statePending(routine.id, PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE, time = false) ?: return
-        context.getSystemService(AlarmManager::class.java).setAndAllowWhileIdle(
-            AlarmManager.ELAPSED_REALTIME_WAKEUP,
-            SystemClock.elapsedRealtime() + STATE_POLL_INTERVAL_MS,
-            pending,
-        )
+        runCatching {
+            context.getSystemService(AlarmManager::class.java).setAndAllowWhileIdle(
+                AlarmManager.ELAPSED_REALTIME_WAKEUP,
+                SystemClock.elapsedRealtime() + STATE_POLL_INTERVAL_MS,
+                pending,
+            )
+        }
     }
 
     fun cancel(id: String) {
@@ -239,6 +243,8 @@ class RoutineSystemEventReceiver : BroadcastReceiver() {
 
     private fun reschedule(context: Context) {
         val scheduler = RoutineScheduler(context)
-        RoutineStore(context).load().filter { it.isEnabled && it.isValid() }.forEach(scheduler::schedule)
+        RoutineStore(context).load().filter { it.isEnabled && it.isValid() }.forEach { routine ->
+            runCatching { scheduler.schedule(routine) }
+        }
     }
 }
