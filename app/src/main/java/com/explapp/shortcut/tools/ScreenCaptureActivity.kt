@@ -353,6 +353,7 @@ class ScreenCaptureService : Service() {
     private var telegramChatId = ""
     private var telegramCaption = ""
     private var normalTelegramShare = false
+    @Volatile private var captureBusy = false
 
     override fun onBind(intent: Intent?): IBinder? = null
 
@@ -383,6 +384,18 @@ class ScreenCaptureService : Service() {
         if (resources.configuration.locales[0].language == "ar") ar else en
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
+        if (captureBusy) {
+            showResultNotification(
+                local("Screenshot request ignored", "تم تجاهل طلب لقطة الشاشة"),
+                local(
+                    "Another screenshot is already being processed. Try again after it finishes.",
+                    "توجد لقطة شاشة أخرى قيد المعالجة. حاول مرة أخرى بعد انتهائها.",
+                ),
+            )
+            return START_NOT_STICKY
+        }
+        captureBusy = true
+
         val resultCode = intent?.getIntExtra(EXTRA_RESULT_CODE, Activity.RESULT_CANCELED) ?: Activity.RESULT_CANCELED
         val data = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
             intent?.getParcelableExtra(EXTRA_DATA, Intent::class.java)
@@ -486,6 +499,7 @@ class ScreenCaptureService : Service() {
     }
 
     private fun complete(path: String?) {
+        captureBusy = false
         if (handleResultInService) {
             handleAutomationResult(path)
         } else {
@@ -638,6 +652,7 @@ class ScreenCaptureService : Service() {
     }
 
     override fun onDestroy() {
+        captureBusy = false
         runCatching { projection?.stop() }
         projection = null
         if (::captureHandler.isInitialized) captureHandler.removeCallbacksAndMessages(null)
