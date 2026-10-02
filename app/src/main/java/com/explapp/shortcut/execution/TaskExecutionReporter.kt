@@ -15,11 +15,13 @@ class TaskExecutionReporter(private val context: Context) {
     private val prefs = context.getSharedPreferences("task_execution_results", Context.MODE_PRIVATE)
 
     fun report(result: TaskExecutionResult) {
-        val updated = TaskExecutionHistory.append(history(), result)
-        prefs.edit()
-            .putString(KEY_LAST, encode(result).toString())
-            .putString(KEY_HISTORY, encodeList(updated).toString())
-            .apply()
+        synchronized(REPORT_LOCK) {
+            val updated = TaskExecutionHistory.append(history(), result)
+            prefs.edit()
+                .putString(KEY_LAST, encode(result).toString())
+                .putString(KEY_HISTORY, encodeList(updated).toString())
+                .apply()
+        }
         notify(result)
     }
 
@@ -125,5 +127,6 @@ class TaskExecutionReporter(private val context: Context) {
         private const val KEY_LAST = "last"
         private const val KEY_HISTORY = "history"
         private const val MAX_RECORDS = 200
+        private val REPORT_LOCK = Any()
     }
 }
