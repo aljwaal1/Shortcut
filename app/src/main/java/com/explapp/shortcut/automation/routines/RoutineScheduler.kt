@@ -152,10 +152,12 @@ class RoutineScheduler(private val context: Context) {
     fun cancel(id: String) {
         val alarm = context.getSystemService(AlarmManager::class.java)
         statePending(id, PendingIntent.FLAG_NO_CREATE or PendingIntent.FLAG_IMMUTABLE, time = true)?.let {
-            alarm.cancel(it); it.cancel()
+            runCatching { alarm.cancel(it) }
+            runCatching { it.cancel() }
         }
         statePending(id, PendingIntent.FLAG_NO_CREATE or PendingIntent.FLAG_IMMUTABLE, time = false)?.let {
-            alarm.cancel(it); it.cancel()
+            runCatching { alarm.cancel(it) }
+            runCatching { it.cancel() }
         }
         RoutineEdgeState(context).clear(id)
     }
