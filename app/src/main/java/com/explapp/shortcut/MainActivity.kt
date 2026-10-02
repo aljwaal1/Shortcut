@@ -3,6 +3,7 @@ package com.explapp.shortcut
 import android.os.Bundle
 import androidx.activity.compose.setContent
 import androidx.appcompat.app.AppCompatActivity
+import androidx.appcompat.app.AppCompatDelegate
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.getValue
@@ -19,6 +20,9 @@ import com.explapp.shortcut.ui.ShortcutTheme
 
 class MainActivity : AppCompatActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
+        val themeMode = getSharedPreferences("shortcut_preferences", MODE_PRIVATE)
+            .getInt("theme_mode", AppCompatDelegate.MODE_NIGHT_FOLLOW_SYSTEM)
+        AppCompatDelegate.setDefaultNightMode(themeMode)
         super.onCreate(savedInstanceState)
         runCatching { DynamicShortcutPublisher.publish(this) }
         setContent {
