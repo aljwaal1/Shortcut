@@ -32,6 +32,7 @@ class PersistentScreenCaptureService : Service() {
     private var reader: ImageReader? = null
     private var display: android.hardware.display.VirtualDisplay? = null
     private var captureRequested = false
+    private var captureInFlight = false
     private var pendingToken = ""
     private var pendingChatId = ""
     private var pendingCaption = ""
@@ -129,6 +130,7 @@ class PersistentScreenCaptureService : Service() {
                 cropped.recycle()
                 file
             }.onSuccess { file ->
+                captureInFlight = false
                 val saved = runCatching {
                     val output = ToolOutputStore(this).create(
                         "Screenshot_" + System.currentTimeMillis() + ".png",
@@ -168,6 +170,7 @@ class PersistentScreenCaptureService : Service() {
                     )
                 }
             }.onFailure {
+                captureInFlight = false
                 runCatching { image.close() }
                 notifyResult(saved = false, sent = false, reason = it.message)
             }
@@ -188,7 +191,23 @@ class PersistentScreenCaptureService : Service() {
     }
 
     private fun requestCapture(intent: Intent) {
-        if (!isSessionActive(this) || projection == null || reader == null) return
+        if (!isSessionActive(this) || projection == null || reader == null) {
+            notifyResult(
+                saved = false,
+                sent = false,
+                reason = local("Screen-capture session is not active.", "جلسة تصوير الشاشة غير نشطة."),
+            )
+            return
+        }
+        if (captureInFlight) {
+            notifyResult(
+                saved = false,
+                sent = false,
+                reason = local("A screenshot is already being processed. Try again in a few seconds.", "توجد لقطة شاشة قيد المعالجة. حاول مرة أخرى بعد بضع ثوانٍ."),
+            )
+            return
+        }
+        captureInFlight = true
 
         pendingToken = intent.getStringExtra(EXTRA_TELEGRAM_BOT_TOKEN).orEmpty()
         pendingChatId = intent.getStringExtra(EXTRA_TELEGRAM_CHAT_ID).orEmpty()
@@ -236,6 +255,7 @@ class PersistentScreenCaptureService : Service() {
         }
 
         if (!launchSucceeded) {
+            captureInFlight = false
             notifyResult(
                 saved = false,
                 sent = false,
@@ -258,6 +278,7 @@ class PersistentScreenCaptureService : Service() {
 
     private fun cleanupProjection() {
         captureRequested = false
+        captureInFlight = false
         runCatching { display?.release() }
         display = null
         runCatching { reader?.close() }
@@ -356,7 +377,7 @@ class PersistentScreenCaptureService : Service() {
             )
             getSystemService(NotificationManager::class.java).notify(
                 RESULT_NOTIFICATION_ID,
-                NotificationCompat.Builder(this, CHANNEL)
+                NotificationCompat.Builder(this, RESULT_CHANNEL)
                     .setSmallIcon(android.R.drawable.ic_menu_send)
                     .setContentTitle(local("Screenshot ready for Telegram", "لقطة الشاشة جاهزة لتيليجرام"))
                     .setContentText(local("Tap to choose the normal Telegram conversation and send.", "اضغط لاختيار محادثة تيليجرام العادية ثم الإرسال."))
