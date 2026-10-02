@@ -193,7 +193,14 @@ fun CreateMessageScreen(
                             },
                             label = { Text(messageRepeatLabel(option)) },
                         )
-                    } }
+                    }
+                    if (repeat == RepeatOption.WEEKLY) {
+                        WeeklyDayPicker(
+                            selectedIsoDay = weeklyDayIso ?: LocalDate.now().dayOfWeek.value,
+                            onSelected = { weeklyDayIso = it },
+                        )
+                    }
+                }
             }
         }
         item {
