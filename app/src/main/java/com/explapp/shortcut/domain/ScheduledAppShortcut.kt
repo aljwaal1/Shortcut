@@ -1,5 +1,6 @@
 package com.explapp.shortcut.domain
 
+import java.time.ZonedDateTime
 import java.util.UUID
 
 enum class RepeatOption(val isoWeekdays: Set<Int>) {
@@ -27,6 +28,17 @@ data class ScheduledAppShortcut(
             minute in 0..59 &&
             (weeklyDayIso == null || weeklyDayIso in 1..7)
 
-    fun duplicate(newId: String = UUID.randomUUID().toString()): ScheduledAppShortcut =
-        copy(id = newId, isEnabled = true)
+    fun duplicate(
+        newId: String = UUID.randomUUID().toString(),
+        now: ZonedDateTime = ZonedDateTime.now(),
+    ): ScheduledAppShortcut =
+        copy(
+            id = newId,
+            isEnabled = true,
+            oneShotEpochDay = if (repeat == RepeatOption.ONCE) {
+                ScheduleAnchor.nextOneShotEpochDay(now, hour, minute)
+            } else {
+                oneShotEpochDay
+            },
+        )
 }
