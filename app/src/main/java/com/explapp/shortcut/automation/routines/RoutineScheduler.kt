@@ -188,10 +188,10 @@ class RoutineAlarmReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent) {
         val id = intent.getStringExtra(RoutineScheduler.EXTRA_ID) ?: return
         val pendingResult = goAsync()
-        Thread {
+        Thread worker@{
             try {
                 val routine = RoutineStore(context).load()
-                    .firstOrNull { it.id == id && it.isEnabled && it.isValid() } ?: return@Thread
+                    .firstOrNull { it.id == id && it.isEnabled && it.isValid() } ?: return@worker
                 RoutineDispatcher(context).execute(routine, userInitiated = false)
                 runCatching { RoutineScheduler(context).schedule(routine) }
             } finally {
@@ -205,15 +205,15 @@ class RoutineStateReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent) {
         val id = intent.getStringExtra(RoutineScheduler.EXTRA_ID) ?: return
         val pendingResult = goAsync()
-        Thread {
+        Thread worker@{
             try {
                 val routine = RoutineStore(context).load()
-                    .firstOrNull { it.id == id && it.isEnabled && it.isValid() } ?: return@Thread
+                    .firstOrNull { it.id == id && it.isEnabled && it.isValid() } ?: return@worker
                 val state = RoutineEdgeState(context)
 
                 when (routine.trigger.type) {
             RoutineTriggerType.BATTERY_BELOW -> {
-                val threshold = routine.trigger.value.toIntOrNull() ?: return@Thread
+                val threshold = routine.trigger.value.toIntOrNull() ?: return@worker
                 val level = currentBatteryLevel(context)
                 val wasBelow = state.wasBelow(id)
                 val isBelow = BatteryThresholdEdge.isBelow(level, threshold)
@@ -234,7 +234,7 @@ class RoutineStateReceiver : BroadcastReceiver() {
                 state.setChargerState(id, connected)
             }
 
-                    else -> return@Thread
+                    else -> return@worker
                 }
 
                 runCatching { RoutineScheduler(context).schedule(routine) }
@@ -248,7 +248,7 @@ class RoutineStateReceiver : BroadcastReceiver() {
 class RoutineSystemEventReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent) {
         val pendingResult = goAsync()
-        Thread {
+        Thread worker@{
             try {
                 val dispatcher = RoutineDispatcher(context)
                 when (intent.action) {
