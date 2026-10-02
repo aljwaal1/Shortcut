@@ -93,9 +93,9 @@ private fun BackupTransferScreen(onBack: () -> Unit) {
             toolPrefs.replaceFavorites(payload.favoriteToolIds.mapNotNull { runCatching { ToolId.valueOf(it) }.getOrNull() })
             toolPrefs.replaceRecents(payload.recentToolIds.mapNotNull { runCatching { ToolId.valueOf(it) }.getOrNull() })
 
-            payload.shortcuts.filter { it.isEnabled }.forEach(appScheduler::schedule)
-            payload.messages.filter { it.isEnabled }.forEach(messageScheduler::schedule)
-            payload.routines.filter { it.isEnabled && it.isValid() }.forEach(routineScheduler::schedule)
+            payload.shortcuts.filter { it.isEnabled }.forEach { item -> runCatching { appScheduler.schedule(item) } }
+            payload.messages.filter { it.isEnabled }.forEach { item -> runCatching { messageScheduler.schedule(item) } }
+            payload.routines.filter { it.isEnabled && it.isValid() }.forEach { item -> runCatching { routineScheduler.schedule(item) } }
             status = if (ar) "تم الاستيراد بنجاح" else "Backup imported"
         }.onFailure { status = it.message.orEmpty() }
     }
