@@ -129,6 +129,7 @@ object BackupCodec {
             minute = requiredInt("minute"),
             repeat = enumValueOf(requiredString("repeat")),
             isEnabled = optionalBoolean("isEnabled") ?: true,
+            weeklyDayIso = optionalInt("weeklyDayIso"),
         )
         require(shortcut.name.isNotBlank()) { "Shortcut name is required" }
         require(shortcut.isValid()) { "Invalid shortcut" }
