@@ -6,32 +6,36 @@ import com.explapp.shortcut.domain.ScheduledMessage
 class MessageStore(context: Context) {
     private val preferences = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
 
-    fun load(): List<ScheduledMessage> {
+    fun load(): List<ScheduledMessage> = synchronized(LOCK) {
         val raw = preferences.getString(KEY_MESSAGES, "").orEmpty()
         val decoded = MessageCodec.decode(raw)
         if (raw.isNotBlank() && MessageCodec.needsMigration(raw)) save(decoded)
-        return decoded
+        decoded
     }
 
-    fun save(messages: List<ScheduledMessage>) {
+    fun save(messages: List<ScheduledMessage>) = synchronized(LOCK) {
         preferences.edit()
             .putString(KEY_MESSAGES, MessageCodec.encode(messages))
             .apply()
     }
 
-    fun upsert(message: ScheduledMessage): List<ScheduledMessage> =
+    fun upsert(message: ScheduledMessage): List<ScheduledMessage> = synchronized(LOCK) {
         ScheduledEntityCollection.upsertMessage(load(), message).also(::save)
+    }
 
     fun remove(message: ScheduledMessage) = removeById(message.id)
 
-    fun removeById(id: String) {
+    fun removeById(id: String) = synchronized(LOCK) {
         save(ScheduledEntityCollection.removeMessage(load(), id))
     }
 
-    fun findById(id: String): ScheduledMessage? = load().firstOrNull { it.id == id }
+    fun findById(id: String): ScheduledMessage? = synchronized(LOCK) {
+        load().firstOrNull { it.id == id }
+    }
 
     private companion object {
         const val PREFS_NAME = "message_store"
         const val KEY_MESSAGES = "scheduled_messages"
+        val LOCK = Any()
     }
 }
