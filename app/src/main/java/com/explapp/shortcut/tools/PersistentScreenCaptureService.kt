@@ -18,7 +18,7 @@ import android.media.projection.MediaProjectionManager
 import android.os.Build
 import android.os.Handler
 import android.os.IBinder
-import android.os.Looper
+import android.os.HandlerThread
 import androidx.core.app.NotificationCompat
 import android.content.ClipData
 import android.net.Uri
@@ -27,7 +27,8 @@ import java.io.File
 import java.io.FileOutputStream
 
 class PersistentScreenCaptureService : Service() {
-    private val handler = Handler(Looper.getMainLooper())
+    private lateinit var captureThread: HandlerThread
+    private lateinit var handler: Handler
     private var projection: MediaProjection? = null
     private var reader: ImageReader? = null
     private var display: android.hardware.display.VirtualDisplay? = null
@@ -43,6 +44,8 @@ class PersistentScreenCaptureService : Service() {
 
     override fun onCreate() {
         super.onCreate()
+        captureThread = HandlerThread("ShortcutPersistentCapture").apply { start() }
+        handler = Handler(captureThread.looper)
         setActive(false)
         createChannel()
         startAsForeground()
@@ -314,6 +317,8 @@ class PersistentScreenCaptureService : Service() {
     override fun onDestroy() {
         setActive(false)
         cleanupProjection()
+        if (::handler.isInitialized) handler.removeCallbacksAndMessages(null)
+        if (::captureThread.isInitialized) captureThread.quitSafely()
         super.onDestroy()
     }
 
