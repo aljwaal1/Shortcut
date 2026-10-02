@@ -8,10 +8,20 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.FileDownload
+import androidx.compose.material.icons.filled.FileUpload
+import androidx.compose.material.icons.filled.Security
 import androidx.compose.material3.Button
+import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.ElevatedCard
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -20,10 +30,12 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import com.explapp.shortcut.automation.routines.RoutineScheduler
 import com.explapp.shortcut.automation.routines.RoutineStore
@@ -107,14 +119,118 @@ private fun BackupTransferScreen(onBack: () -> Unit) {
     val open = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri -> uri?.let(::read) }
 
     Column(
-        modifier = Modifier.fillMaxSize().padding(24.dp),
-        verticalArrangement = Arrangement.spacedBy(16.dp),
+        modifier = Modifier.fillMaxSize().padding(20.dp),
+        verticalArrangement = Arrangement.spacedBy(14.dp),
     ) {
-        Text(if (ar) "النسخ الاحتياطي والاستعادة" else "Backup & Restore", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.ExtraBold)
-        Text(if (ar) "اختر بنفسك مكان حفظ ملف JSON. لا نحتاج صلاحية وصول شاملة للملفات." else "Choose the JSON destination yourself. Broad storage permission is not required.")
-        Button(onClick = { create.launch("shortcut-backup.json") }, modifier = Modifier.fillMaxWidth()) { Text(if (ar) "تصدير نسخة" else "Export backup") }
-        Button(onClick = { open.launch(arrayOf("application/json", "text/plain")) }, modifier = Modifier.fillMaxWidth()) { Text(if (ar) "استيراد نسخة" else "Import backup") }
-        if (status.isNotBlank()) Text(status, color = MaterialTheme.colorScheme.primary)
-        TextButton(onClick = onBack) { Text(if (ar) "رجوع" else "Back") }
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(10.dp),
+        ) {
+            IconButton(onClick = onBack) {
+                Icon(
+                    Icons.AutoMirrored.Filled.ArrowBack,
+                    contentDescription = if (ar) "رجوع" else "Back",
+                )
+            }
+            Column(Modifier.weight(1f)) {
+                Text(
+                    if (ar) "النسخ الاحتياطي والاستعادة" else "Backup & Restore",
+                    style = MaterialTheme.typography.headlineSmall,
+                    fontWeight = FontWeight.ExtraBold,
+                )
+                Text(
+                    if (ar) "احتفظ بإعداداتك محليًا وانقلها عند الحاجة"
+                    else "Keep your setup portable and under your control",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+        }
+
+        ElevatedCard(
+            modifier = Modifier.fillMaxWidth(),
+            colors = CardDefaults.elevatedCardColors(
+                containerColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.45f),
+            ),
+        ) {
+            Column(Modifier.fillMaxWidth().padding(18.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Icon(Icons.Default.FileUpload, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
+                Text(
+                    if (ar) "تصدير نسخة احتياطية" else "Export backup",
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold,
+                )
+                Text(
+                    if (ar) "يحفظ الاختصارات والرسائل والأتمتة والمفضلة في ملف JSON تختار مكانه بنفسك."
+                    else "Save shortcuts, messages, automations and favorites to a JSON file you choose.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                Button(
+                    onClick = { create.launch("shortcut-backup.json") },
+                    modifier = Modifier.fillMaxWidth(),
+                ) { Text(if (ar) "اختيار مكان الحفظ" else "Choose save location") }
+            }
+        }
+
+        ElevatedCard(
+            modifier = Modifier.fillMaxWidth(),
+            colors = CardDefaults.elevatedCardColors(
+                containerColor = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.45f),
+            ),
+        ) {
+            Column(Modifier.fillMaxWidth().padding(18.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Icon(Icons.Default.FileDownload, contentDescription = null, tint = MaterialTheme.colorScheme.secondary)
+                Text(
+                    if (ar) "استيراد نسخة" else "Import backup",
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold,
+                )
+                Text(
+                    if (ar) "يفحص الملف ثم يستبدل البيانات الحالية ويعيد جدولة المهام الصالحة."
+                    else "Validate a backup, replace the current data and reschedule valid tasks.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                Button(
+                    onClick = { open.launch(arrayOf("application/json", "text/plain")) },
+                    modifier = Modifier.fillMaxWidth(),
+                ) { Text(if (ar) "اختيار ملف" else "Choose file") }
+            }
+        }
+
+        ElevatedCard(
+            modifier = Modifier.fillMaxWidth(),
+            colors = CardDefaults.elevatedCardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
+        ) {
+            Row(
+                Modifier.fillMaxWidth().padding(16.dp),
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Icon(Icons.Default.Security, contentDescription = null, tint = Color(0xFF1B9C68))
+                Text(
+                    if (ar) "رموز بوت تيليجرام وكلمات الاعتماد لا تُصدّر داخل النسخة الاحتياطية."
+                    else "Telegram bot tokens and credentials are intentionally excluded from backups.",
+                    modifier = Modifier.weight(1f),
+                    style = MaterialTheme.typography.bodySmall,
+                )
+            }
+        }
+
+        if (status.isNotBlank()) {
+            ElevatedCard(
+                modifier = Modifier.fillMaxWidth(),
+                colors = CardDefaults.elevatedCardColors(containerColor = MaterialTheme.colorScheme.surface),
+            ) {
+                Text(
+                    status,
+                    modifier = Modifier.fillMaxWidth().padding(14.dp),
+                    color = MaterialTheme.colorScheme.primary,
+                    fontWeight = FontWeight.SemiBold,
+                )
+            }
+        }
     }
 }
