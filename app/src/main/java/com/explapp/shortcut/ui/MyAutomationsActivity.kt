@@ -1432,13 +1432,13 @@ private fun RoutineBuilderScreen(
                         RoutineActionType.CUSTOM_SCRIPT -> {
                             OutlinedTextField(
                                 value = value,
-                                onValueChange = { value = it },
+                                onValueChange = { value = it.take(32_000) },
                                 label = { Text(if (ar) "السكربت المخصص" else "Custom script") },
                                 placeholder = { Text("return input.toUpperCase();") },
                                 supportingText = {
                                     Text(
-                                        if (ar) "استخدمه للحسابات ومعالجة النصوص والبيانات والمنطق المخصص. يعمل داخل بيئة محدودة ولا يملك وصولًا مباشرًا إلى نظام الهاتف."
-                                        else "Use it for calculations, text/data processing, and custom logic. It runs in a restricted environment with no direct phone-system access.",
+                                        if (ar) "استخدمه للحسابات ومعالجة النصوص والبيانات والمنطق المخصص. يعمل داخل بيئة محدودة ولا يملك وصولًا مباشرًا إلى نظام الهاتف. الحد الأقصى 32,000 حرف."
+                                        else "Use it for calculations, text/data processing, and custom logic. It runs in a restricted environment with no direct phone-system access. Maximum 32,000 characters.",
                                     )
                                 },
                                 minLines = 5,
