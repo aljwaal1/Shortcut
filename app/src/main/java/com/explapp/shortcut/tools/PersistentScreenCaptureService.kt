@@ -107,11 +107,11 @@ class PersistentScreenCaptureService : Service() {
         }, handler)
 
         imageReader.setOnImageAvailableListener({ source ->
+            // Do not continuously consume display frames while the persistent session is idle.
+            // Let ImageReader backpressure pause production; requestCapture() drains the stale
+            // buffered frame immediately before asking for a fresh screenshot.
+            if (!captureRequested) return@setOnImageAvailableListener
             val image = source.acquireLatestImage() ?: return@setOnImageAvailableListener
-            if (!captureRequested) {
-                image.close()
-                return@setOnImageAvailableListener
-            }
             captureRequested = false
             runCatching {
                 val plane = image.planes[0]
@@ -265,7 +265,14 @@ class PersistentScreenCaptureService : Service() {
         }
 
         handler.postDelayed({
-            if (projection != null) captureRequested = true
+            if (projection != null) {
+                // Drain any frame buffered while idle so the next callback represents
+                // the screen after the requested delay, not an old frame.
+                runCatching { reader?.acquireLatestImage()?.close() }
+                captureRequested = true
+            } else {
+                captureInFlight = false
+            }
         }, delayMs)
     }
 
