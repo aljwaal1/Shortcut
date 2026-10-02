@@ -27,7 +27,7 @@ import android.os.Build
 import android.os.Bundle
 import android.os.Handler
 import android.os.IBinder
-import android.os.Looper
+import android.os.HandlerThread
 import android.os.SystemClock
 import android.widget.Toast
 import androidx.appcompat.app.AlertDialog
@@ -345,6 +345,8 @@ class ScreenCaptureActivity : AppCompatActivity() {
 }
 
 class ScreenCaptureService : Service() {
+    private lateinit var captureThread: HandlerThread
+    private lateinit var captureHandler: Handler
     private var projection: MediaProjection? = null
     private var handleResultInService = false
     private var telegramBotToken = ""
@@ -356,6 +358,8 @@ class ScreenCaptureService : Service() {
 
     override fun onCreate() {
         super.onCreate()
+        captureThread = HandlerThread("ShortcutOneShotCapture").apply { start() }
+        captureHandler = Handler(captureThread.looper)
         val manager = getSystemService(NotificationManager::class.java)
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             manager.createNotificationChannel(
@@ -396,7 +400,7 @@ class ScreenCaptureService : Service() {
         telegramChatId = intent?.getStringExtra(EXTRA_TELEGRAM_CHAT_ID).orEmpty()
         telegramCaption = intent?.getStringExtra(EXTRA_TELEGRAM_CAPTION).orEmpty()
         normalTelegramShare = intent?.getBooleanExtra(EXTRA_NORMAL_TELEGRAM_SHARE, false) == true
-        Handler(Looper.getMainLooper()).postDelayed({ capture(resultCode, data) }, delayMs)
+        captureHandler.postDelayed({ capture(resultCode, data) }, delayMs)
         return START_NOT_STICKY
     }
 
@@ -408,7 +412,7 @@ class ScreenCaptureService : Service() {
             return
         }
         projection = p
-        val handler = Handler(Looper.getMainLooper())
+        val handler = captureHandler
         val metrics = resources.displayMetrics
         val width = metrics.widthPixels
         val height = metrics.heightPixels
@@ -636,6 +640,8 @@ class ScreenCaptureService : Service() {
     override fun onDestroy() {
         runCatching { projection?.stop() }
         projection = null
+        if (::captureHandler.isInitialized) captureHandler.removeCallbacksAndMessages(null)
+        if (::captureThread.isInitialized) captureThread.quitSafely()
         super.onDestroy()
     }
 
