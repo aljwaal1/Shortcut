@@ -50,10 +50,12 @@ import com.explapp.shortcut.R
 import com.explapp.shortcut.domain.MessageDeliveryMode
 import com.explapp.shortcut.domain.MessagePlatform
 import com.explapp.shortcut.domain.RepeatOption
+import com.explapp.shortcut.domain.ScheduleAnchor
 import com.explapp.shortcut.domain.ScheduledMessage
 import com.explapp.shortcut.permissions.SchedulingPermissionPlan
 import com.explapp.shortcut.permissions.SchedulingPermissionStep
 import java.time.LocalDate
+import java.time.ZonedDateTime
 import java.util.UUID
 
 @Composable
@@ -99,19 +101,24 @@ fun CreateMessageScreen(
         MessagePlatform.WHATSAPP -> stringResource(R.string.template_whatsapp)
         MessagePlatform.TELEGRAM -> stringResource(R.string.template_telegram)
     }
+    val parsedHour = hour.toIntOrNull() ?: -1
+    val parsedMinute = minute.toIntOrNull() ?: -1
     val model = ScheduledMessage(
         id = stableId,
         name = name.ifBlank { defaultName },
         platform = platform,
         recipient = recipient,
         message = body,
-        hour = hour.toIntOrNull() ?: -1,
-        minute = minute.toIntOrNull() ?: -1,
+        hour = parsedHour,
+        minute = parsedMinute,
         repeat = repeat,
         isEnabled = initial?.isEnabled ?: true,
         deliveryMode = initial?.deliveryMode ?: MessageDeliveryMode.PREPARED,
         weeklyDayIso = if (repeat == RepeatOption.WEEKLY) {
             weeklyDayIso ?: LocalDate.now().dayOfWeek.value
+        } else null,
+        oneShotEpochDay = if (repeat == RepeatOption.ONCE && parsedHour in 0..23 && parsedMinute in 0..59) {
+            ScheduleAnchor.nextOneShotEpochDay(ZonedDateTime.now(), parsedHour, parsedMinute)
         } else null,
     )
 
