@@ -3,9 +3,11 @@ package com.explapp.shortcut.data
 import com.explapp.shortcut.domain.MessageDeliveryMode
 import com.explapp.shortcut.domain.MessagePlatform
 import com.explapp.shortcut.domain.RepeatOption
+import com.explapp.shortcut.domain.ScheduleAnchor
 import com.explapp.shortcut.domain.ScheduledMessage
 import java.nio.charset.StandardCharsets
 import java.util.Base64
+import java.time.ZonedDateTime
 import java.util.UUID
 
 object MessageCodec {
@@ -22,6 +24,7 @@ object MessageCodec {
             item.isEnabled.toString(),
             item.deliveryMode.name,
             item.weeklyDayIso?.toString().orEmpty(),
+            item.oneShotEpochDay?.toString().orEmpty(),
         ).joinToString("|")
     }
 
@@ -34,14 +37,15 @@ object MessageCodec {
     fun needsMigration(raw: String): Boolean = raw
         .lineSequence()
         .filter { it.isNotBlank() }
-        .any { it.split('|').size != 11 }
+        .any { it.split('|').size != 12 }
 
     private fun decodeLine(line: String): ScheduledMessage? {
         val parts = line.split('|')
         return when (parts.size) {
             7 -> decodeLegacy(parts)
             10 -> decodeCurrentV1(parts)
-            11 -> decodeCurrent(parts)
+            11 -> decodeCurrentV2(parts)
+            12 -> decodeCurrent(parts)
             else -> null
         }
     }
@@ -61,6 +65,7 @@ object MessageCodec {
             isEnabled = true,
             deliveryMode = MessageDeliveryMode.PREPARED,
             weeklyDayIso = if (repeat == RepeatOption.WEEKLY) java.time.LocalDate.now().dayOfWeek.value else null,
+            oneShotEpochDay = legacyOneShotAnchor(repeat, parts[4].toIntOrNull() ?: return null, parts[5].toIntOrNull() ?: return null),
         ).takeIf { it.isValid() }
     }
 
@@ -80,6 +85,29 @@ object MessageCodec {
             isEnabled = parts[8].toBooleanStrictOrNull() ?: true,
             deliveryMode = mode,
             weeklyDayIso = if (repeat == RepeatOption.WEEKLY) java.time.LocalDate.now().dayOfWeek.value else null,
+            oneShotEpochDay = legacyOneShotAnchor(repeat, parts[5].toIntOrNull() ?: return null, parts[6].toIntOrNull() ?: return null),
+        ).takeIf { it.isValid() }
+    }
+
+    private fun decodeCurrentV2(parts: List<String>): ScheduledMessage? {
+        val platform = runCatching { MessagePlatform.valueOf(parts[2]) }.getOrNull() ?: return null
+        val repeat = runCatching { RepeatOption.valueOf(parts[7]) }.getOrNull() ?: return null
+        val mode = runCatching { MessageDeliveryMode.valueOf(parts[9]) }.getOrNull() ?: MessageDeliveryMode.PREPARED
+        val hour = parts[5].toIntOrNull() ?: return null
+        val minute = parts[6].toIntOrNull() ?: return null
+        return ScheduledMessage(
+            id = decodeText(parts[0])?.takeIf { it.isNotBlank() } ?: return null,
+            name = decodeText(parts[1]) ?: return null,
+            platform = platform,
+            recipient = decodeText(parts[3]) ?: return null,
+            message = decodeText(parts[4]) ?: return null,
+            hour = hour,
+            minute = minute,
+            repeat = repeat,
+            isEnabled = parts[8].toBooleanStrictOrNull() ?: true,
+            deliveryMode = mode,
+            weeklyDayIso = parts[10].toIntOrNull(),
+            oneShotEpochDay = legacyOneShotAnchor(repeat, hour, minute),
         ).takeIf { it.isValid() }
     }
 
@@ -99,8 +127,16 @@ object MessageCodec {
             isEnabled = parts[8].toBooleanStrictOrNull() ?: true,
             deliveryMode = mode,
             weeklyDayIso = parts[10].toIntOrNull(),
+            oneShotEpochDay = parts[11].toLongOrNull(),
         ).takeIf { it.isValid() }
     }
+
+    private fun legacyOneShotAnchor(repeat: RepeatOption, hour: Int, minute: Int): Long? =
+        if (repeat == RepeatOption.ONCE) {
+            ScheduleAnchor.nextOneShotEpochDay(ZonedDateTime.now(), hour, minute)
+        } else {
+            null
+        }
 
     private fun encodeText(value: String): String =
         Base64.getUrlEncoder().withoutPadding()
