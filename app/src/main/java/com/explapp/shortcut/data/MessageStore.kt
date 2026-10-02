@@ -2,6 +2,8 @@ package com.explapp.shortcut.data
 
 import android.content.Context
 import com.explapp.shortcut.domain.ScheduledMessage
+import com.explapp.shortcut.domain.ScheduleAnchor
+import java.time.ZonedDateTime
 
 class MessageStore(context: Context) {
     private val preferences = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
@@ -9,8 +11,14 @@ class MessageStore(context: Context) {
     fun load(): List<ScheduledMessage> {
         val raw = preferences.getString(KEY_MESSAGES, "").orEmpty()
         val decoded = MessageCodec.decode(raw)
-        if (raw.isNotBlank() && MessageCodec.needsMigration(raw)) save(decoded)
-        return decoded
+        val now = ZonedDateTime.now()
+        val normalized = decoded.map { item ->
+            if (item.isEnabled && ScheduleAnchor.isExpiredOneShot(now, item.repeat, item.oneShotEpochDay, item.hour, item.minute)) {
+                item.copy(isEnabled = false)
+            } else item
+        }
+        if (raw.isNotBlank() && (MessageCodec.needsMigration(raw) || normalized != decoded)) save(normalized)
+        return normalized
     }
 
     fun save(messages: List<ScheduledMessage>) {
