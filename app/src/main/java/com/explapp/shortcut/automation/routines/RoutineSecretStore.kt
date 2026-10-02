@@ -41,6 +41,9 @@ internal class RoutineSecretStore(context: Context) {
         String(cipher.doFinal(encrypted), StandardCharsets.UTF_8)
     }.getOrDefault("")
 
+    fun keys(prefix: String): Set<String> =
+        prefs.all.keys.filterTo(linkedSetOf()) { it.startsWith(prefix) }
+
     fun remove(key: String) {
         prefs.edit().remove(key).apply()
     }
