@@ -2,6 +2,8 @@ package com.explapp.shortcut.data
 
 import android.content.Context
 import com.explapp.shortcut.domain.ScheduledAppShortcut
+import com.explapp.shortcut.domain.ScheduleAnchor
+import java.time.ZonedDateTime
 
 class ShortcutStore(context: Context) {
     private val preferences = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
@@ -9,8 +11,14 @@ class ShortcutStore(context: Context) {
     fun load(): List<ScheduledAppShortcut> {
         val raw = preferences.getString(KEY_SHORTCUTS, "").orEmpty()
         val decoded = ShortcutCodec.decode(raw)
-        if (raw.isNotBlank() && ShortcutCodec.needsMigration(raw)) save(decoded)
-        return decoded
+        val now = ZonedDateTime.now()
+        val normalized = decoded.map { item ->
+            if (item.isEnabled && ScheduleAnchor.isExpiredOneShot(now, item.repeat, item.oneShotEpochDay, item.hour, item.minute)) {
+                item.copy(isEnabled = false)
+            } else item
+        }
+        if (raw.isNotBlank() && (ShortcutCodec.needsMigration(raw) || normalized != decoded)) save(normalized)
+        return normalized
     }
 
     fun save(shortcuts: List<ScheduledAppShortcut>) {
