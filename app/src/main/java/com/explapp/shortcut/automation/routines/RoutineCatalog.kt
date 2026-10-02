@@ -41,21 +41,24 @@ object RoutineCatalog {
         RoutineActionType.OPEN_APP_SCREENSHOT,
         RoutineActionType.TAKE_SCREENSHOT,
         -> listOf(RoutineActionType.SEND_TELEGRAM_BOT, RoutineActionType.COPY_TO_CLIPBOARD, RoutineActionType.CUSTOM_SCRIPT)
-        RoutineActionType.READ_CLIPBOARD,
+        RoutineActionType.READ_CLIPBOARD -> listOf(
+            RoutineActionType.WEB_SEARCH,
+            RoutineActionType.COPY_TO_CLIPBOARD,
+            RoutineActionType.SHARE_TEXT,
+            RoutineActionType.CUSTOM_SCRIPT,
+        )
         RoutineActionType.SET_VARIABLE,
         RoutineActionType.CUSTOM_SCRIPT,
         -> listOf(RoutineActionType.COPY_TO_CLIPBOARD, RoutineActionType.SEND_TELEGRAM_BOT, RoutineActionType.SHOW_NOTIFICATION)
         RoutineActionType.SAVE_TEXT_FILE -> listOf(RoutineActionType.SHARE_FILE, RoutineActionType.SEND_TELEGRAM_BOT, RoutineActionType.SHOW_NOTIFICATION)
-        RoutineActionType.READ_CLIPBOARD,
-        RoutineActionType.COPY_TO_CLIPBOARD,
-        -> listOf(RoutineActionType.WEB_SEARCH, RoutineActionType.SHARE_TEXT, RoutineActionType.CUSTOM_SCRIPT)
+        RoutineActionType.COPY_TO_CLIPBOARD -> listOf(RoutineActionType.WEB_SEARCH, RoutineActionType.SHARE_TEXT, RoutineActionType.SHOW_NOTIFICATION)
         RoutineActionType.STOP_SHORTCUT -> emptyList()
         else -> listOf(RoutineActionType.SET_VARIABLE, RoutineActionType.WAIT, RoutineActionType.SHOW_NOTIFICATION)
     }
 
     fun triggerHint(type: RoutineTriggerType, ar: Boolean): String = when (type) {
         RoutineTriggerType.MANUAL -> if (ar) "يعمل فقط عندما تضغط تشغيل. مناسب للاختصارات التي تريد تنفيذها عند الطلب." else "Runs only when you tap Run. Best for shortcuts you want to start on demand."
-        RoutineTriggerType.TIME -> if (ar) "اكتب الوقت بصيغة 24 ساعة، مثل 08:00. سيحاول الاختصار التشغيل يوميًا في هذا الوقت." else "Enter a 24-hour time such as 08:00. The shortcut will try to run every day at that time."
+        RoutineTriggerType.TIME -> if (ar) "اختر الوقت ثم حدد التكرار: مرة واحدة أو يوميًا أو أسبوعيًا أو شهريًا أو سنويًا." else "Choose the time, then select whether it runs once, daily, weekly, monthly or yearly."
         RoutineTriggerType.CHARGER_CONNECTED -> if (ar) "يبدأ الاختصار عندما يتصل الهاتف بالشاحن." else "Starts when the phone is connected to a charger."
         RoutineTriggerType.CHARGER_DISCONNECTED -> if (ar) "يبدأ الاختصار عندما يُفصل الهاتف عن الشاحن." else "Starts when the phone is disconnected from the charger."
         RoutineTriggerType.BATTERY_BELOW -> if (ar) "اكتب نسبة مثل 20. يبدأ الاختصار عندما تنخفض البطارية إلى أقل من هذه النسبة." else "Enter a percentage such as 20. The shortcut starts when battery drops below it."
