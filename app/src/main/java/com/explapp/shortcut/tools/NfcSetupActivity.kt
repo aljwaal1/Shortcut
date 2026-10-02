@@ -116,6 +116,11 @@ class NfcSetupActivity : AppCompatActivity(), NfcAdapter.ReaderCallback {
 class NfcDispatchActivity : AppCompatActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        if (intent.action != NfcAdapter.ACTION_NDEF_DISCOVERED || !hasPhysicalNfcTag(intent)) {
+            finish()
+            return
+        }
+
         val data = intent.data
         when (data?.host) {
             "tool" -> {
@@ -129,5 +134,15 @@ class NfcDispatchActivity : AppCompatActivity() {
             }
         }
         finish()
+    }
+
+    private fun hasPhysicalNfcTag(intent: Intent): Boolean {
+        val tag = if (android.os.Build.VERSION.SDK_INT >= 33) {
+            intent.getParcelableExtra(NfcAdapter.EXTRA_TAG, Tag::class.java)
+        } else {
+            @Suppress("DEPRECATION")
+            intent.getParcelableExtra(NfcAdapter.EXTRA_TAG)
+        }
+        return tag != null
     }
 }
