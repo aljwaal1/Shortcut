@@ -332,10 +332,20 @@ private fun HomeScreen(
     onDeleteMessage: (ScheduledMessage) -> Unit,
 ) {
     val context = LocalContext.current
+    val lifecycleOwner = LocalLifecycleOwner.current
     val configuration = LocalConfiguration.current
     val ar = configuration.locales[0].language == "ar"
-    val recent = TaskExecutionReporter(context.applicationContext).last()
-    val advancedRoutines = remember(context) { RoutineStore(context.applicationContext).load() }
+    var dashboardRefresh by remember { mutableIntStateOf(0) }
+    DisposableEffect(lifecycleOwner) {
+        val observer = LifecycleEventObserver { _, event ->
+            if (event == Lifecycle.Event.ON_RESUME) dashboardRefresh++
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
+    }
+    val reporter = remember(context) { TaskExecutionReporter(context.applicationContext) }
+    val recent = remember(dashboardRefresh) { reporter.last() }
+    val advancedRoutines = remember(dashboardRefresh) { RoutineStore(context.applicationContext).load() }
     val toolCount = remember { ToolCatalog.all().size }
     LazyColumn(
         modifier = Modifier.fillMaxSize().padding(padding),
