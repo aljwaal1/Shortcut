@@ -16,12 +16,12 @@ class TaskExecutionTest {
     }
 
     @Test
-    fun preparedMessageIsNotReportedAsSentOrCompleted() {
+    fun preparedWorkIsNotReportedAsSentOrCompleted() {
         val result = TaskExecutionResult.prepared("Telegram reminder", startedAtMs = 100L, finishedAtMs = 300L)
 
         assertEquals(TaskExecutionStatus.PREPARED, result.status)
-        assertTrue(result.summaryEn.contains("Prepared"))
-        assertTrue(result.summaryAr.contains("جاهزة"))
+        assertTrue(result.summaryEn.contains("In progress"))
+        assertTrue(result.summaryAr.contains("قيد الإكمال"))
         assertFalse(result.summaryEn.contains("Sent", ignoreCase = true))
         assertFalse(result.summaryEn.contains("Completed", ignoreCase = true))
     }
