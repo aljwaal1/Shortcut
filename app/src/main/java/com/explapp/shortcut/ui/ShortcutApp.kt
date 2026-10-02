@@ -33,6 +33,8 @@ import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.Language
+import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.filled.Build
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.Button
 import androidx.compose.material3.CardDefaults
@@ -77,8 +79,12 @@ import com.explapp.shortcut.data.ShortcutStore
 import com.explapp.shortcut.domain.MessagePlatform
 import com.explapp.shortcut.domain.ScheduledAppShortcut
 import com.explapp.shortcut.domain.ScheduledMessage
+import com.explapp.shortcut.domain.RepeatOption
 import com.explapp.shortcut.domain.ShortcutCollection
 import com.explapp.shortcut.execution.TaskExecutionReporter
+import com.explapp.shortcut.automation.routines.RoutineStore
+import com.explapp.shortcut.search.CommandPaletteActivity
+import com.explapp.shortcut.tools.ToolCatalog
 import com.explapp.shortcut.scheduler.AndroidAlarmScheduler
 import com.explapp.shortcut.scheduler.AndroidMessageScheduler
 
@@ -327,6 +333,8 @@ private fun HomeScreen(
     val configuration = LocalConfiguration.current
     val ar = configuration.locales[0].language == "ar"
     val recent = TaskExecutionReporter(context.applicationContext).last()
+    val advancedRoutines = remember(context) { RoutineStore(context.applicationContext).load() }
+    val toolCount = remember { ToolCatalog.all().size }
     LazyColumn(
         modifier = Modifier.fillMaxSize().padding(padding),
         contentPadding = PaddingValues(18.dp),
@@ -335,15 +343,51 @@ private fun HomeScreen(
         item {
             ShortcutHero(
                 isArabic = ar,
-                activeCount = shortcuts.size + messages.size,
+                activeCount = shortcuts.size + messages.size + advancedRoutines.count { it.isEnabled },
                 onOpenTools = onOpenTools,
             )
         }
         item {
             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                ElevatedCard(
+                    onClick = { context.startActivity(Intent(context, MyAutomationsActivity::class.java)) },
+                    modifier = Modifier.weight(1f),
+                    colors = CardDefaults.elevatedCardColors(containerColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.62f)),
+                ) {
+                    Column(Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        AccentIcon(Icons.Default.AutoAwesome, MaterialTheme.colorScheme.primary)
+                        Text(if (ar) "استوديو الأتمتة" else "Automation studio", fontWeight = FontWeight.ExtraBold)
+                        Text(
+                            if (ar) "أنشئ مهام متعددة الخطوات وشغّلها يدويًا أو تلقائيًا"
+                            else "Build multi-step routines and run them manually or automatically",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                }
+                ElevatedCard(
+                    onClick = { context.startActivity(Intent(context, CommandPaletteActivity::class.java)) },
+                    modifier = Modifier.weight(1f),
+                    colors = CardDefaults.elevatedCardColors(containerColor = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.62f)),
+                ) {
+                    Column(Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        AccentIcon(Icons.Default.Search, MaterialTheme.colorScheme.secondary)
+                        Text(if (ar) "بحث سريع" else "Quick search", fontWeight = FontWeight.ExtraBold)
+                        Text(
+                            if (ar) "ابحث في الأدوات والاختصارات والقوالب من مكان واحد"
+                            else "Find tools, shortcuts and templates from one place",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                }
+            }
+        }
+        item {
+            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                 MetricTile(
                     label = stringResource(R.string.scheduled_automations),
-                    value = (shortcuts.size + messages.size).toString(),
+                    value = (shortcuts.size + messages.size + advancedRoutines.size).toString(),
                     icon = Icons.Default.AutoAwesome,
                     accent = MaterialTheme.colorScheme.primary,
                     modifier = Modifier.weight(1f),
@@ -360,9 +404,9 @@ private fun HomeScreen(
         item {
             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                 MetricTile(
-                    label = stringResource(R.string.ready_templates),
-                    value = "3",
-                    icon = Icons.Default.Add,
+                    label = if (ar) "الأدوات المتاحة" else "Available tools",
+                    value = toolCount.toString(),
+                    icon = Icons.Default.Build,
                     accent = MaterialTheme.colorScheme.tertiary,
                     modifier = Modifier.weight(1f),
                 )
@@ -373,12 +417,6 @@ private fun HomeScreen(
                     accent = Color(0xFF1B9C68),
                     modifier = Modifier.weight(1f),
                 )
-            }
-        }
-        item {
-            Button(onClick = onCreateShortcut, modifier = Modifier.fillMaxWidth()) {
-                Icon(Icons.Default.Add, contentDescription = null)
-                Text("  ${stringResource(R.string.create_shortcut)}", fontWeight = FontWeight.Bold)
             }
         }
         item {
@@ -412,7 +450,7 @@ private fun HomeScreen(
                             Text(shortcut.name, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
                             Text(shortcut.packageName, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                             Text(
-                                "%02d:%02d • %s".format(shortcut.hour, shortcut.minute, shortcut.repeat.name),
+                                "%02d:%02d • %s".format(shortcut.hour, shortcut.minute, repeatText(shortcut.repeat, ar)),
                                 style = MaterialTheme.typography.bodyMedium,
                                 color = MaterialTheme.colorScheme.primary,
                             )
@@ -452,7 +490,7 @@ private fun HomeScreen(
                             )
                             Text(message.recipient, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                             Text(
-                                "%02d:%02d • %s".format(message.hour, message.minute, message.repeat.name),
+                                "%02d:%02d • %s".format(message.hour, message.minute, repeatText(message.repeat, ar)),
                                 style = MaterialTheme.typography.bodyMedium,
                             )
                         }
@@ -722,6 +760,13 @@ private fun PermissionCard(title: String, description: String, granted: Boolean,
             if (action != null) Button(onClick = action) { Text(stringResource(R.string.allow_permission)) }
         }
     }
+}
+
+private fun repeatText(repeat: RepeatOption, ar: Boolean): String = when (repeat) {
+    RepeatOption.ONCE -> if (ar) "مرة واحدة" else "Once"
+    RepeatOption.DAILY -> if (ar) "يوميًا" else "Daily"
+    RepeatOption.WEEKDAYS -> if (ar) "أيام العمل" else "Weekdays"
+    RepeatOption.WEEKLY -> if (ar) "أسبوعيًا" else "Weekly"
 }
 
 private fun setAppLocale(tag: String) {
