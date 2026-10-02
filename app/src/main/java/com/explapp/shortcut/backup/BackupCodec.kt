@@ -104,6 +104,7 @@ object BackupCodec {
         put("repeat", repeat.name)
         put("isEnabled", isEnabled)
         weeklyDayIso?.let { put("weeklyDayIso", it) }
+        oneShotEpochDay?.let { put("oneShotEpochDay", it) }
     }
 
     private fun ScheduledMessage.toJson(): JsonObject = buildJsonObject {
@@ -118,6 +119,7 @@ object BackupCodec {
         put("isEnabled", isEnabled)
         put("deliveryMode", deliveryMode.name)
         weeklyDayIso?.let { put("weeklyDayIso", it) }
+        oneShotEpochDay?.let { put("oneShotEpochDay", it) }
     }
 
     private fun JsonObject.toShortcut(): ScheduledAppShortcut {
@@ -130,6 +132,7 @@ object BackupCodec {
             repeat = enumValueOf(requiredString("repeat")),
             isEnabled = optionalBoolean("isEnabled") ?: true,
             weeklyDayIso = optionalInt("weeklyDayIso"),
+            oneShotEpochDay = optionalLong("oneShotEpochDay"),
         )
         require(shortcut.name.isNotBlank()) { "Shortcut name is required" }
         require(shortcut.isValid()) { "Invalid shortcut" }
@@ -150,6 +153,7 @@ object BackupCodec {
             deliveryMode = optionalString("deliveryMode")?.let { runCatching { MessageDeliveryMode.valueOf(it) }.getOrNull() }
                 ?: MessageDeliveryMode.PREPARED,
             weeklyDayIso = optionalInt("weeklyDayIso"),
+            oneShotEpochDay = optionalLong("oneShotEpochDay"),
         )
         require(scheduledMessage.name.isNotBlank()) { "Message name is required" }
         require(scheduledMessage.isValid()) { "Invalid scheduled message" }
@@ -168,6 +172,9 @@ object BackupCodec {
 
     private fun JsonObject.optionalInt(key: String): Int? =
         this[key]?.jsonPrimitive?.intOrNull
+
+    private fun JsonObject.optionalLong(key: String): Long? =
+        this[key]?.jsonPrimitive?.content?.toLongOrNull()
 
     private fun JsonObject.requiredArray(key: String): JsonArray =
         this[key]?.jsonArray ?: error("Missing $key")
