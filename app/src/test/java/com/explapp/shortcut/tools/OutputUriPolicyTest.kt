@@ -18,4 +18,15 @@ class OutputUriPolicyTest {
     fun `unsupported uri scheme is rejected explicitly`() {
         assertEquals(OutputUriDelivery.UNSUPPORTED, OutputUriPolicy.deliveryFor("http"))
     }
+    @Test
+    fun `output names cannot traverse directories`() {
+        assertEquals("_secret.txt", ToolOutputNamePolicy.sanitize("../secret.txt"))
+        assertEquals("folder_file.txt", ToolOutputNamePolicy.sanitize("folder/file.txt"))
+    }
+
+    @Test
+    fun `blank unsafe output name gets safe fallback`() {
+        assertEquals("Shortcut_output", ToolOutputNamePolicy.sanitize("../"))
+    }
 }
+
