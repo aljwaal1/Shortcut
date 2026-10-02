@@ -17,8 +17,9 @@ class ShortcutCodecTest {
                 packageName = "com.google.android.apps.maps",
                 hour = 7,
                 minute = 30,
-                repeat = RepeatOption.WEEKDAYS,
+                repeat = RepeatOption.WEEKLY,
                 isEnabled = false,
+                weeklyDayIso = 1,
             ),
         )
 
