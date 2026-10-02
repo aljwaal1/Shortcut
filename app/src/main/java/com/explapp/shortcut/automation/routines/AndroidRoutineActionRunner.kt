@@ -216,7 +216,14 @@ class AndroidRoutineActionRunner(
                 variables["lastResult"] = output
                 RoutineActionResult.success(action)
             },
-            onFailure = { RoutineActionResult.failure(action, it.message ?: local("Script failed", "فشل تنفيذ السكربت")) },
+            onFailure = {
+                val reason = if (it.message == "Script timed out") {
+                    local("Script timed out", "انتهت مهلة تنفيذ السكربت")
+                } else {
+                    it.message ?: local("Script failed", "فشل تنفيذ السكربت")
+                }
+                RoutineActionResult.failure(action, reason)
+            },
         )
     }
 
