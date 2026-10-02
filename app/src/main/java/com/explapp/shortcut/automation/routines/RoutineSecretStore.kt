@@ -41,6 +41,10 @@ internal class RoutineSecretStore(context: Context) {
         String(cipher.doFinal(encrypted), StandardCharsets.UTF_8)
     }.getOrDefault("")
 
+    fun remove(key: String) {
+        prefs.edit().remove(key).apply()
+    }
+
     fun removePrefix(prefix: String) {
         val editor = prefs.edit()
         prefs.all.keys.filter { it.startsWith(prefix) }.forEach(editor::remove)
