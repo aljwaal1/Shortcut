@@ -265,7 +265,10 @@ class AndroidRoutineActionRunner(
                     .putExtra(PersistentScreenCaptureService.EXTRA_NORMAL_TELEGRAM_SHARE, action.parameters["normalTelegramShare"].toBoolean())
                 return runCatching {
                     ContextCompat.startForegroundService(context, captureIntent)
-                    RoutineActionResult.success(action)
+                    RoutineActionResult.prepared(
+                        action,
+                        local("Screenshot capture and delivery were queued", "تم وضع التقاط الشاشة والإرسال في قائمة التنفيذ"),
+                    )
                 }.getOrElse {
                     RoutineActionResult.failure(action, it.message ?: local("Persistent capture failed", "فشل التصوير المستمر"))
                 }
@@ -304,7 +307,10 @@ class AndroidRoutineActionRunner(
         if (userInitiated) {
             return runCatching {
                 context.startActivity(workflowIntent)
-                RoutineActionResult.success(action)
+                RoutineActionResult.prepared(
+                    action,
+                    local("Screen capture flow started", "بدأ مسار التقاط الشاشة"),
+                )
             }.getOrElse { RoutineActionResult.failure(action, it.message ?: it.javaClass.simpleName) }
         }
 
