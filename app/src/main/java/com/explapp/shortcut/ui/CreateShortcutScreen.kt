@@ -36,6 +36,7 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -58,6 +59,8 @@ import com.explapp.shortcut.domain.ScheduledAppShortcut
 import java.util.Locale
 import java.time.LocalDate
 import java.util.UUID
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 
 @Composable
 fun CreateShortcutScreen(
@@ -67,7 +70,14 @@ fun CreateShortcutScreen(
 ) {
     val context = LocalContext.current
     val ar = LocalConfiguration.current.locales[0].language == "ar"
-    val apps = remember { InstalledAppRepository(context).loadLaunchableApps() }
+    var apps by remember { mutableStateOf<List<InstalledApp>>(emptyList()) }
+    var appsLoaded by remember { mutableStateOf(false) }
+    LaunchedEffect(context) {
+        apps = withContext(Dispatchers.IO) {
+            InstalledAppRepository(context.applicationContext).loadLaunchableApps()
+        }
+        appsLoaded = true
+    }
     val alarmManager = remember(context) { context.getSystemService(AlarmManager::class.java) }
     val stableId = remember(initial?.id) { initial?.id ?: UUID.randomUUID().toString() }
 
@@ -188,8 +198,14 @@ fun CreateShortcutScreen(
             text = {
                 Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                     OutlinedTextField(value = query, onValueChange = { query = it }, modifier = Modifier.fillMaxWidth(), singleLine = true, leadingIcon = { Icon(Icons.Default.Search, contentDescription = null) }, placeholder = { Text(if (ar) "ابحث باسم التطبيق" else "Search by app name") })
-                    if (filteredApps.isEmpty()) Text(stringResource(R.string.no_apps_found), color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    else LazyColumn(modifier = Modifier.height(390.dp), verticalArrangement = Arrangement.spacedBy(3.dp)) {
+                    if (!appsLoaded) {
+                        Text(
+                            if (ar) "جارٍ تحميل التطبيقات…" else "Loading apps…",
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    } else if (filteredApps.isEmpty()) {
+                        Text(stringResource(R.string.no_apps_found), color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    } else LazyColumn(modifier = Modifier.height(390.dp), verticalArrangement = Arrangement.spacedBy(3.dp)) {
                         items(filteredApps, key = { it.packageName }) { app ->
                             TextButton(onClick = { selectedApp = app; if (name.isBlank()) name = app.label; showAppPicker = false }, modifier = Modifier.fillMaxWidth()) {
                                 Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.CenterVertically) {
