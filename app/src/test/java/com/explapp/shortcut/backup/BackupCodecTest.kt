@@ -22,7 +22,8 @@ class BackupCodecTest {
                 packageName = "com.example.work",
                 hour = 8,
                 minute = 30,
-                repeat = RepeatOption.WEEKDAYS,
+                repeat = RepeatOption.WEEKLY,
+                weeklyDayIso = 1,
             ),
         ),
         messages = listOf(
