@@ -8,6 +8,7 @@ import android.content.pm.PackageManager
 import android.net.Uri
 import android.os.Build
 import android.provider.Settings
+import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatDelegate
@@ -121,6 +122,44 @@ fun ShortcutApp(onOpenTools: () -> Unit = {}) {
     var editingMessage by remember { mutableStateOf<ScheduledMessage?>(null) }
     var showPermissions by remember { mutableStateOf(false) }
 
+    fun scheduleShortcut(item: ScheduledAppShortcut): ScheduledAppShortcut {
+        if (!item.isEnabled) {
+            runCatching { scheduler.cancelById(item.id) }
+            return item
+        }
+        if (scheduler.schedule(item)) return item
+        runCatching { scheduler.cancelById(item.id) }
+        Toast.makeText(
+            context,
+            if (context.resources.configuration.locales[0].language == "ar") {
+                "تعذر جدولة المهمة. تم حفظها كمتوقفة بدل إظهارها كمفعلة."
+            } else {
+                "Could not schedule this task. It was saved as paused instead of appearing active."
+            },
+            Toast.LENGTH_LONG,
+        ).show()
+        return item.copy(isEnabled = false)
+    }
+
+    fun scheduleMessage(item: ScheduledMessage): ScheduledMessage {
+        if (!item.isEnabled) {
+            runCatching { messageScheduler.cancelById(item.id) }
+            return item
+        }
+        if (messageScheduler.schedule(item)) return item
+        runCatching { messageScheduler.cancelById(item.id) }
+        Toast.makeText(
+            context,
+            if (context.resources.configuration.locales[0].language == "ar") {
+                "تعذر جدولة الرسالة. تم حفظها كمتوقفة بدل إظهارها كمفعلة."
+            } else {
+                "Could not schedule this message. It was saved as paused instead of appearing active."
+            },
+            Toast.LENGTH_LONG,
+        ).show()
+        return item.copy(isEnabled = false)
+    }
+
     LaunchedEffect(Unit) {
         shortcuts.filter { it.isEnabled }.forEach { shortcut ->
             runCatching { scheduler.schedule(shortcut) }
@@ -143,12 +182,10 @@ fun ShortcutApp(onOpenTools: () -> Unit = {}) {
             initial = editingShortcut,
             onCancel = { editingShortcut = null },
             onSave = { saved ->
-                val old = editingShortcut
-                if (old != null) runCatching { scheduler.cancelById(old.id) }
-                val index = shortcuts.indexOfFirst { it.id == saved.id }
-                if (index >= 0) shortcuts[index] = saved else shortcuts.add(saved)
+                val persisted = scheduleShortcut(saved)
+                val index = shortcuts.indexOfFirst { it.id == persisted.id }
+                if (index >= 0) shortcuts[index] = persisted else shortcuts.add(persisted)
                 store.save(shortcuts)
-                if (saved.isEnabled) runCatching { scheduler.schedule(saved) }
                 editingShortcut = null
             },
         )
@@ -157,21 +194,18 @@ fun ShortcutApp(onOpenTools: () -> Unit = {}) {
             initialPlatform = editingMessage?.platform ?: MessagePlatform.WHATSAPP,
             onCancel = { editingMessage = null },
             onSave = { saved ->
-                val old = editingMessage
-                if (old != null) runCatching { messageScheduler.cancelById(old.id) }
-                val index = messages.indexOfFirst { it.id == saved.id }
-                if (index >= 0) messages[index] = saved else messages.add(saved)
+                val persisted = scheduleMessage(saved)
+                val index = messages.indexOfFirst { it.id == persisted.id }
+                if (index >= 0) messages[index] = persisted else messages.add(persisted)
                 messageStore.save(messages)
-                if (saved.isEnabled) runCatching { messageScheduler.schedule(saved) }
                 editingMessage = null
             },
         )
         showBuilder -> CreateShortcutScreen(
             onCancel = { showBuilder = false },
             onSave = { shortcut ->
-                shortcuts.add(shortcut)
+                shortcuts.add(scheduleShortcut(shortcut))
                 store.save(shortcuts)
-                runCatching { scheduler.schedule(shortcut) }
                 showBuilder = false
             },
         )
@@ -179,9 +213,8 @@ fun ShortcutApp(onOpenTools: () -> Unit = {}) {
             initialPlatform = showMessageBuilder ?: MessagePlatform.WHATSAPP,
             onCancel = { showMessageBuilder = null },
             onSave = { message ->
-                messages.add(message)
+                messages.add(scheduleMessage(message))
                 messageStore.save(messages)
-                runCatching { messageScheduler.schedule(message) }
                 showMessageBuilder = null
             },
         )
