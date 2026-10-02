@@ -56,6 +56,7 @@ import com.explapp.shortcut.data.InstalledAppRepository
 import com.explapp.shortcut.domain.RepeatOption
 import com.explapp.shortcut.domain.ScheduledAppShortcut
 import java.util.Locale
+import java.time.LocalDate
 import java.util.UUID
 
 @Composable
@@ -77,6 +78,7 @@ fun CreateShortcutScreen(
     var hour by remember(initial?.id) { mutableIntStateOf(initial?.hour ?: 7) }
     var minute by remember(initial?.id) { mutableIntStateOf(initial?.minute ?: 30) }
     var repeat by remember(initial?.id) { mutableStateOf(initial?.repeat ?: RepeatOption.ONCE) }
+    var weeklyDayIso by remember(initial?.id) { mutableStateOf(initial?.weeklyDayIso) }
     var showAppPicker by remember { mutableStateOf(false) }
     var pendingSave by remember { mutableStateOf<ScheduledAppShortcut?>(null) }
 
@@ -104,6 +106,9 @@ fun CreateShortcutScreen(
         minute = minute,
         repeat = repeat,
         isEnabled = initial?.isEnabled ?: true,
+        weeklyDayIso = if (repeat == RepeatOption.WEEKLY) {
+            weeklyDayIso ?: LocalDate.now().dayOfWeek.value
+        } else null,
     )
 
     fun saveWithNeededPermissions() {
@@ -141,7 +146,18 @@ fun CreateShortcutScreen(
         item {
             BuilderSectionCard(title = stringResource(R.string.repeat), subtitle = if (ar) "اختر مرة واحدة أو تكرار تلقائي" else "Run once or repeat automatically", accent = MaterialTheme.colorScheme.primary) {
                 Column(verticalArrangement = Arrangement.spacedBy(7.dp)) {
-                    RepeatOption.entries.forEach { option -> FilterChip(selected = repeat == option, onClick = { repeat = option }, label = { Text(repeatLabel(option)) }) }
+                    RepeatOption.entries.forEach { option ->
+                        FilterChip(
+                            selected = repeat == option,
+                            onClick = {
+                                if (option == RepeatOption.WEEKLY && repeat != RepeatOption.WEEKLY) {
+                                    weeklyDayIso = LocalDate.now().dayOfWeek.value
+                                }
+                                repeat = option
+                            },
+                            label = { Text(repeatLabel(option)) },
+                        )
+                    }
                 }
             }
         }
