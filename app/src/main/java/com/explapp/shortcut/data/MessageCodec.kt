@@ -60,6 +60,7 @@ object MessageCodec {
             repeat = repeat,
             isEnabled = true,
             deliveryMode = MessageDeliveryMode.PREPARED,
+            weeklyDayIso = if (repeat == RepeatOption.WEEKLY) java.time.LocalDate.now().dayOfWeek.value else null,
         ).takeIf { it.isValid() }
     }
 
