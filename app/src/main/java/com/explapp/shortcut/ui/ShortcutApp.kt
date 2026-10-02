@@ -142,7 +142,7 @@ fun ShortcutApp(onOpenTools: () -> Unit = {}) {
             onCancel = { editingShortcut = null },
             onSave = { saved ->
                 val old = editingShortcut
-                if (old != null) scheduler.cancelById(old.id)
+                if (old != null) runCatching { scheduler.cancelById(old.id) }
                 val index = shortcuts.indexOfFirst { it.id == saved.id }
                 if (index >= 0) shortcuts[index] = saved else shortcuts.add(saved)
                 store.save(shortcuts)
@@ -156,7 +156,7 @@ fun ShortcutApp(onOpenTools: () -> Unit = {}) {
             onCancel = { editingMessage = null },
             onSave = { saved ->
                 val old = editingMessage
-                if (old != null) messageScheduler.cancelById(old.id)
+                if (old != null) runCatching { messageScheduler.cancelById(old.id) }
                 val index = messages.indexOfFirst { it.id == saved.id }
                 if (index >= 0) messages[index] = saved else messages.add(saved)
                 messageStore.save(messages)
@@ -192,14 +192,14 @@ fun ShortcutApp(onOpenTools: () -> Unit = {}) {
             onEditShortcut = { editingShortcut = it },
             onEditMessage = { editingMessage = it },
             onDeleteShortcut = { shortcut ->
-                scheduler.cancel(shortcut)
+                runCatching { scheduler.cancel(shortcut) }
                 val updated = ShortcutCollection.remove(shortcuts, shortcut)
                 shortcuts.clear()
                 shortcuts.addAll(updated)
                 store.save(updated)
             },
             onDeleteMessage = { message ->
-                messageScheduler.cancel(message)
+                runCatching { messageScheduler.cancel(message) }
                 messages.remove(message)
                 messageStore.save(messages)
             },
