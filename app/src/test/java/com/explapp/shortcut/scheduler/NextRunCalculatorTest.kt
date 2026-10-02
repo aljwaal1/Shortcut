@@ -44,6 +44,24 @@ class NextRunCalculatorTest {
     }
 
     @Test
+    fun expiredAnchoredOneShotDoesNotRollToAnotherDay() {
+        val now = ZonedDateTime.of(2026, 10, 3, 9, 0, 0, 0, zone)
+        val originalDay = ZonedDateTime.of(2026, 10, 2, 7, 30, 0, 0, zone).toLocalDate().toEpochDay()
+        val shortcut = ScheduledAppShortcut(
+            name = "One shot",
+            packageName = "pkg",
+            hour = 7,
+            minute = 30,
+            repeat = RepeatOption.ONCE,
+            oneShotEpochDay = originalDay,
+        )
+
+        val next = NextRunCalculator.nextRun(now, shortcut)
+
+        assertEquals(null, next)
+    }
+
+    @Test
     fun weeklyScheduleKeepsOriginalWeekdayAfterRebootOnAnotherDay() {
         val thursday = ZonedDateTime.of(2026, 9, 17, 9, 0, 0, 0, zone)
         val mondayIso = 1
