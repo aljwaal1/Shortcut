@@ -17,6 +17,7 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.FileDownload
 import androidx.compose.material.icons.filled.FileUpload
 import androidx.compose.material.icons.filled.Security
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ElevatedCard
@@ -59,6 +60,7 @@ private fun BackupTransferScreen(onBack: () -> Unit) {
     val context = LocalContext.current
     val ar = LocalConfiguration.current.locales[0].language == "ar"
     var status by remember { mutableStateOf("") }
+    var pendingImport by remember { mutableStateOf<BackupPayload?>(null) }
 
     fun write(uri: Uri) {
         val toolPrefs = ToolPreferencesStore(context)
@@ -80,8 +82,17 @@ private fun BackupTransferScreen(onBack: () -> Unit) {
         runCatching {
             val raw = context.contentResolver.openInputStream(uri)?.bufferedReader()?.use { it.readText() }
                 ?: error("Cannot open backup")
-            val payload = BackupCodec.decode(raw).getOrThrow()
+            BackupCodec.decode(raw).getOrThrow()
+        }.onSuccess { payload ->
+            pendingImport = payload
+            status = if (ar) "تم فحص النسخة. راجع التفاصيل ثم أكد الاستعادة." else "Backup validated. Review the details and confirm restore."
+        }.onFailure {
+            status = if (ar) "فشل فحص النسخة: " + (it.message ?: "خطأ غير معروف") else "Backup validation failed: " + (it.message ?: "Unknown error")
+        }
+    }
 
+    fun restore(payload: BackupPayload) {
+        runCatching {
             val shortcutStore = ShortcutStore(context)
             val messageStore = MessageStore(context)
             val routineStore = RoutineStore(context)
@@ -109,9 +120,10 @@ private fun BackupTransferScreen(onBack: () -> Unit) {
             payload.messages.filter { it.isEnabled }.forEach { item -> runCatching { messageScheduler.schedule(item) } }
             payload.routines.filter { it.isEnabled && it.isValid() }.forEach { item -> runCatching { routineScheduler.schedule(item) } }
         }.onSuccess {
-            status = if (ar) "تم الاستيراد بنجاح" else "Backup imported"
+            pendingImport = null
+            status = if (ar) "تمت الاستعادة بنجاح" else "Backup restored"
         }.onFailure {
-            status = if (ar) "فشل الاستيراد: " + (it.message ?: "خطأ غير معروف") else "Import failed: " + (it.message ?: "Unknown error")
+            status = if (ar) "فشلت الاستعادة: " + (it.message ?: "خطأ غير معروف") else "Restore failed: " + (it.message ?: "Unknown error")
         }
     }
 
@@ -232,5 +244,37 @@ private fun BackupTransferScreen(onBack: () -> Unit) {
                 )
             }
         }
+    }
+
+    pendingImport?.let { payload ->
+        AlertDialog(
+            onDismissRequest = { pendingImport = null },
+            title = { Text(if (ar) "استعادة هذه النسخة؟" else "Restore this backup?", fontWeight = FontWeight.Bold) },
+            text = {
+                Text(
+                    if (ar) {
+                        "ستستبدل البيانات الحالية بـ " +
+                            payload.shortcuts.size + " اختصار، و" +
+                            payload.messages.size + " رسالة، و" +
+                            payload.routines.size + " أتمتة. رموز البوت غير موجودة في النسخة لأسباب أمنية."
+                    } else {
+                        "Current data will be replaced with " +
+                            payload.shortcuts.size + " shortcuts, " +
+                            payload.messages.size + " messages and " +
+                            payload.routines.size + " automations. Bot tokens are excluded from backups for security."
+                    },
+                )
+            },
+            confirmButton = {
+                TextButton(onClick = { restore(payload) }) {
+                    Text(if (ar) "استعادة" else "Restore")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { pendingImport = null }) {
+                    Text(if (ar) "إلغاء" else "Cancel")
+                }
+            },
+        )
     }
 }
