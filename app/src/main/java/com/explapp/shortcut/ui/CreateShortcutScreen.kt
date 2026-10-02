@@ -55,9 +55,11 @@ import com.explapp.shortcut.R
 import com.explapp.shortcut.data.InstalledApp
 import com.explapp.shortcut.data.InstalledAppRepository
 import com.explapp.shortcut.domain.RepeatOption
+import com.explapp.shortcut.domain.ScheduleAnchor
 import com.explapp.shortcut.domain.ScheduledAppShortcut
 import java.util.Locale
 import java.time.LocalDate
+import java.time.ZonedDateTime
 import java.util.UUID
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -118,6 +120,9 @@ fun CreateShortcutScreen(
         isEnabled = initial?.isEnabled ?: true,
         weeklyDayIso = if (repeat == RepeatOption.WEEKLY) {
             weeklyDayIso ?: LocalDate.now().dayOfWeek.value
+        } else null,
+        oneShotEpochDay = if (repeat == RepeatOption.ONCE) {
+            ScheduleAnchor.nextOneShotEpochDay(ZonedDateTime.now(), hour, minute)
         } else null,
     )
 
