@@ -4,6 +4,11 @@
     <string name="home">الرئيسية</string>
     <string name="templates">القوالب</string>
     <string name="tools">الأدوات</string>
+    <string name="dynamic_new_automation">أتمتة جديدة</string>
+    <string name="dynamic_search">بحث</string>
+    <string name="dynamic_app_usage">استخدام التطبيقات</string>
+    <string name="widget_automations">الأتمتة</string>
+    <string name="widget_usage">الاستخدام</string>
     <string name="history">السجل</string>
     <string name="settings">الإعدادات</string>
     <string name="create_shortcut">إنشاء اختصار</string>
