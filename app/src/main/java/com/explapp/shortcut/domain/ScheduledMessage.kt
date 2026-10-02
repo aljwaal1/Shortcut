@@ -24,6 +24,7 @@ data class ScheduledMessage(
     val isEnabled: Boolean = true,
     val deliveryMode: MessageDeliveryMode = MessageDeliveryMode.PREPARED,
     val weeklyDayIso: Int? = null,
+    val oneShotEpochDay: Long? = null,
 ) {
     fun isValid(): Boolean =
         id.isNotBlank() &&
