@@ -13,7 +13,7 @@ class AndroidAlarmScheduler(
     fun schedule(shortcut: ScheduledAppShortcut) {
         if (!shortcut.isEnabled || !shortcut.isValid()) return
         val alarmManager = context.getSystemService(AlarmManager::class.java)
-        val triggerAt = NextRunCalculator.nextRun(ZonedDateTime.now(), shortcut)
+        val triggerAt = NextRunCalculator.nextRun(ZonedDateTime.now(), shortcut) ?: return
         val pendingIntent = PendingIntent.getBroadcast(
             context,
             SchedulerIdentity.requestCode(shortcut.id),
