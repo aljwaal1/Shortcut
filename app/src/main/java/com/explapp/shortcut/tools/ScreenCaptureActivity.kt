@@ -499,7 +499,6 @@ class ScreenCaptureService : Service() {
     }
 
     private fun complete(path: String?) {
-        captureBusy = false
         if (handleResultInService) {
             handleAutomationResult(path)
         } else {
