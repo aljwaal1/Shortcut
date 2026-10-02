@@ -22,6 +22,7 @@ import androidx.compose.material.icons.filled.Image
 import androidx.compose.material.icons.filled.SettingsSuggest
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.icons.filled.StarBorder
+import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ElevatedCard
 import androidx.compose.material3.Icon
@@ -29,6 +30,7 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -44,6 +46,7 @@ import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import java.util.Locale
 import com.explapp.shortcut.ui.VisualIdentity
 
 @Composable
@@ -54,9 +57,19 @@ fun ToolHubScreen(
     val isArabic = LocalConfiguration.current.locales[0].language == "ar"
     val context = LocalContext.current
     val store = remember(context) { ToolPreferencesStore(context.applicationContext) }
-    val all = ToolCatalog.all()
+    val all = remember { ToolCatalog.all() }
     var favorites by remember { mutableStateOf(store.favorites()) }
     var recents by remember { mutableStateOf(store.recents()) }
+    var query by remember { mutableStateOf("") }
+    val filtered = remember(all, query, isArabic) {
+        val q = query.trim().lowercase(Locale.getDefault())
+        if (q.isBlank()) all else all.filter { tool ->
+            val haystack = listOf(tool.titleAr, tool.titleEn, tool.id.name, tool.section.name)
+                .joinToString(" ")
+                .lowercase(Locale.getDefault())
+            q.split(Regex("\\s+")).all { token -> haystack.contains(token) }
+        }
+    }
 
     fun openTool(tool: ShortcutTool) {
         recents = store.recordRecent(tool.id)
@@ -68,8 +81,19 @@ fun ToolHubScreen(
         verticalArrangement = Arrangement.spacedBy(14.dp),
     ) {
         item { ToolHubHero(isArabic = isArabic, onBack = onBack) }
+        item {
+            OutlinedTextField(
+                value = query,
+                onValueChange = { query = it },
+                leadingIcon = { Icon(Icons.Default.Search, contentDescription = null) },
+                label = { Text(if (isArabic) "ابحث عن أداة" else "Search tools") },
+                placeholder = { Text(if (isArabic) "مثال: PDF، صورة، QR، بطارية..." else "Example: PDF, image, QR, battery...") },
+                singleLine = true,
+                modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp),
+            )
+        }
 
-        val favoriteTools = favorites.mapNotNull { id -> all.firstOrNull { it.id == id } }
+        val favoriteTools = favorites.mapNotNull { id -> filtered.firstOrNull { it.id == id } }
         if (favoriteTools.isNotEmpty()) {
             item {
                 QuickSectionHeader(
@@ -91,7 +115,7 @@ fun ToolHubScreen(
             }
         }
 
-        val recentTools = recents.mapNotNull { id -> all.firstOrNull { it.id == id } }
+        val recentTools = recents.mapNotNull { id -> filtered.firstOrNull { it.id == id } }
         if (recentTools.isNotEmpty()) {
             item {
                 QuickSectionHeader(
@@ -113,8 +137,32 @@ fun ToolHubScreen(
             }
         }
 
+        if (filtered.isEmpty()) {
+            item {
+                ElevatedCard(
+                    modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp),
+                    colors = CardDefaults.elevatedCardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
+                ) {
+                    Column(Modifier.fillMaxWidth().padding(22.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                        Text(
+                            if (isArabic) "لم نجد أداة مطابقة" else "No matching tool",
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.Bold,
+                        )
+                        Text(
+                            if (isArabic) "جرّب كلمة أقصر مثل: PDF أو صورة أو QR."
+                            else "Try a shorter keyword such as PDF, image or QR.",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                }
+            }
+        }
+
         ToolSection.entries.forEach { section ->
-            val sectionTools = all.filter { it.section == section }
+            val sectionTools = filtered.filter { it.section == section }
+            if (sectionTools.isEmpty()) return@forEach
             item { SectionHeader(section = section, isArabic = isArabic, count = sectionTools.size) }
             sectionTools.chunked(2).forEach { pair ->
                 item {
