@@ -3,6 +3,7 @@ package com.explapp.shortcut.ui
 import android.content.Intent
 import android.net.Uri
 import android.os.Bundle
+import android.widget.Toast
 import androidx.activity.compose.setContent
 import androidx.appcompat.app.AppCompatActivity
 import androidx.compose.foundation.layout.Arrangement
@@ -66,18 +67,47 @@ private fun ScheduledTasksManagerScreen(onBack: () -> Unit) {
     var pendingDeleteMessage by remember { mutableStateOf<ScheduledMessage?>(null) }
 
     fun replaceShortcut(item: ScheduledAppShortcut) {
-        val index = shortcuts.indexOfFirst { it.id == item.id }
-        if (index >= 0) shortcuts[index] = item else shortcuts += item
+        val persisted = when {
+            !item.isEnabled -> {
+                runCatching { appScheduler.cancelById(item.id) }
+                item
+            }
+            appScheduler.schedule(item) -> item
+            else -> {
+                runCatching { appScheduler.cancelById(item.id) }
+                Toast.makeText(
+                    context,
+                    if (ar) "تعذر جدولة المهمة، لذلك تم إيقافها." else "Scheduling failed, so the task was paused.",
+                    Toast.LENGTH_LONG,
+                ).show()
+                item.copy(isEnabled = false)
+            }
+        }
+        val index = shortcuts.indexOfFirst { it.id == persisted.id }
+        if (index >= 0) shortcuts[index] = persisted else shortcuts += persisted
         shortcutStore.save(shortcuts)
-        runCatching { appScheduler.cancelById(item.id) }
-        if (item.isEnabled) runCatching { appScheduler.schedule(item) }
     }
+
     fun replaceMessage(item: ScheduledMessage) {
-        val index = messages.indexOfFirst { it.id == item.id }
-        if (index >= 0) messages[index] = item else messages += item
+        val persisted = when {
+            !item.isEnabled -> {
+                runCatching { messageScheduler.cancelById(item.id) }
+                item
+            }
+            messageScheduler.schedule(item) -> item
+            else -> {
+                runCatching { messageScheduler.cancelById(item.id) }
+                Toast.makeText(
+                    context,
+                    if (ar) "تعذر جدولة الرسالة، لذلك تم إيقافها." else "Scheduling failed, so the message was paused.",
+                    Toast.LENGTH_LONG,
+                ).show()
+                item.copy(isEnabled = false)
+            }
+        }
+        val index = messages.indexOfFirst { it.id == persisted.id }
+        if (index >= 0) messages[index] = persisted else messages += persisted
         messageStore.save(messages)
-        runCatching { messageScheduler.cancelById(item.id) }
-        if (item.isEnabled) runCatching { messageScheduler.schedule(item) }
     }
 
     when {
