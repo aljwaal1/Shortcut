@@ -19,7 +19,8 @@ class RoutineExecutionWorker(
         val routineId = inputData.getString(KEY_ROUTINE_ID).orEmpty()
         if (routineId.isBlank()) return@withContext Result.success()
 
-        val routine = RoutineStore(applicationContext)
+        val store = RoutineStore(applicationContext)
+        val routine = store
             .load()
             .firstOrNull { it.id == routineId && it.isEnabled && it.isValid() }
             ?: return@withContext Result.success()
@@ -27,7 +28,13 @@ class RoutineExecutionWorker(
         // RoutineDispatcher records the actual routine result in execution history.
         // The Worker itself succeeds even when a user-defined action fails; retrying
         // the whole routine could duplicate actions that already completed.
-        RoutineDispatcher(applicationContext).execute(routine, userInitiated = false)
+        try {
+            RoutineDispatcher(applicationContext).execute(routine, userInitiated = false)
+        } finally {
+            if (RoutineWork.shouldDisableAfterAttempt(routine)) {
+                store.upsert(routine.copy(isEnabled = false, updatedAtMs = System.currentTimeMillis()))
+            }
+        }
         Result.success()
     }
 
@@ -60,6 +67,10 @@ object RoutineWork {
     }
 
     internal fun uniqueName(routineId: String): String = "shortcut-routine:$routineId"
+
+    internal fun shouldDisableAfterAttempt(routine: AutomationRoutine): Boolean =
+        routine.trigger.type == RoutineTriggerType.TIME &&
+            routine.trigger.repeat == RoutineRepeat.ONCE
 
     private const val TAG = "shortcut-routine-execution"
 }
