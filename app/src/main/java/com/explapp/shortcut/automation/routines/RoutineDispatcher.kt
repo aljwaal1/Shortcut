@@ -2,6 +2,7 @@ package com.explapp.shortcut.automation.routines
 
 import android.content.Context
 import com.explapp.shortcut.execution.TaskExecutionReporter
+import java.util.concurrent.ConcurrentHashMap
 
 class RoutineDispatcher(private val context: Context) {
     fun executeAsync(
@@ -21,11 +22,31 @@ class RoutineDispatcher(private val context: Context) {
         .map { execute(it, userInitiated = false) }
 
     fun execute(routine: AutomationRoutine, userInitiated: Boolean): RoutineRunResult {
-        val result = RoutineExecutor(
-            AndroidRoutineActionRunner(context, userInitiated),
-            AndroidRoutineConditionEvaluator(context),
-        ).execute(routine)
-        TaskExecutionReporter(context).report(result.toTaskExecutionResult())
-        return result
+        val startedAt = System.currentTimeMillis()
+        if (!runningRoutineIds.add(routine.id)) {
+            return RoutineRunResult(
+                routineId = routine.id,
+                routineName = routine.name,
+                status = RoutineRunStatus.PREPARED,
+                actionResults = emptyList(),
+                startedAtMs = startedAt,
+                finishedAtMs = System.currentTimeMillis(),
+            )
+        }
+
+        return try {
+            val result = RoutineExecutor(
+                AndroidRoutineActionRunner(context, userInitiated),
+                AndroidRoutineConditionEvaluator(context),
+            ).execute(routine, startedAtMs = startedAt)
+            TaskExecutionReporter(context).report(result.toTaskExecutionResult())
+            result
+        } finally {
+            runningRoutineIds.remove(routine.id)
+        }
+    }
+
+    companion object {
+        private val runningRoutineIds = ConcurrentHashMap.newKeySet<String>()
     }
 }
