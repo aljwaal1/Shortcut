@@ -21,6 +21,7 @@ object MessageCodec {
             item.repeat.name,
             item.isEnabled.toString(),
             item.deliveryMode.name,
+            item.weeklyDayIso?.toString().orEmpty(),
         ).joinToString("|")
     }
 
@@ -33,13 +34,14 @@ object MessageCodec {
     fun needsMigration(raw: String): Boolean = raw
         .lineSequence()
         .filter { it.isNotBlank() }
-        .any { it.split('|').size == 7 }
+        .any { it.split('|').size != 11 }
 
     private fun decodeLine(line: String): ScheduledMessage? {
         val parts = line.split('|')
         return when (parts.size) {
             7 -> decodeLegacy(parts)
-            10 -> decodeCurrent(parts)
+            10 -> decodeCurrentV1(parts)
+            11 -> decodeCurrent(parts)
             else -> null
         }
     }
@@ -61,6 +63,25 @@ object MessageCodec {
         ).takeIf { it.isValid() }
     }
 
+    private fun decodeCurrentV1(parts: List<String>): ScheduledMessage? {
+        val platform = runCatching { MessagePlatform.valueOf(parts[2]) }.getOrNull() ?: return null
+        val repeat = runCatching { RepeatOption.valueOf(parts[7]) }.getOrNull() ?: return null
+        val mode = runCatching { MessageDeliveryMode.valueOf(parts[9]) }.getOrNull() ?: MessageDeliveryMode.PREPARED
+        return ScheduledMessage(
+            id = decodeText(parts[0])?.takeIf { it.isNotBlank() } ?: return null,
+            name = decodeText(parts[1]) ?: return null,
+            platform = platform,
+            recipient = decodeText(parts[3]) ?: return null,
+            message = decodeText(parts[4]) ?: return null,
+            hour = parts[5].toIntOrNull() ?: return null,
+            minute = parts[6].toIntOrNull() ?: return null,
+            repeat = repeat,
+            isEnabled = parts[8].toBooleanStrictOrNull() ?: true,
+            deliveryMode = mode,
+            weeklyDayIso = if (repeat == RepeatOption.WEEKLY) java.time.LocalDate.now().dayOfWeek.value else null,
+        ).takeIf { it.isValid() }
+    }
+
     private fun decodeCurrent(parts: List<String>): ScheduledMessage? {
         val platform = runCatching { MessagePlatform.valueOf(parts[2]) }.getOrNull() ?: return null
         val repeat = runCatching { RepeatOption.valueOf(parts[7]) }.getOrNull() ?: return null
@@ -76,6 +97,7 @@ object MessageCodec {
             repeat = repeat,
             isEnabled = parts[8].toBooleanStrictOrNull() ?: true,
             deliveryMode = mode,
+            weeklyDayIso = parts[10].toIntOrNull(),
         ).takeIf { it.isValid() }
     }
 
