@@ -107,6 +107,7 @@ private enum class MainTab(val label: Int, val icon: ImageVector) {
 @Composable
 fun ShortcutApp(onOpenTools: () -> Unit = {}) {
     val context = LocalContext.current
+    val ar = LocalConfiguration.current.locales[0].language == "ar"
     val store = remember(context) { ShortcutStore(context.applicationContext) }
     val scheduler = remember(context) { AndroidAlarmScheduler(context.applicationContext) }
     val messageStore = remember(context) { MessageStore(context.applicationContext) }
@@ -131,7 +132,7 @@ fun ShortcutApp(onOpenTools: () -> Unit = {}) {
         runCatching { scheduler.cancelById(item.id) }
         Toast.makeText(
             context,
-            if (context.resources.configuration.locales[0].language == "ar") {
+            if (ar) {
                 "تعذر جدولة المهمة. تم حفظها كمتوقفة بدل إظهارها كمفعلة."
             } else {
                 "Could not schedule this task. It was saved as paused instead of appearing active."
@@ -150,7 +151,7 @@ fun ShortcutApp(onOpenTools: () -> Unit = {}) {
         runCatching { messageScheduler.cancelById(item.id) }
         Toast.makeText(
             context,
-            if (context.resources.configuration.locales[0].language == "ar") {
+            if (ar) {
                 "تعذر جدولة الرسالة. تم حفظها كمتوقفة بدل إظهارها كمفعلة."
             } else {
                 "Could not schedule this message. It was saved as paused instead of appearing active."
