@@ -1,5 +1,6 @@
 package com.explapp.shortcut.domain
 
+import java.time.ZonedDateTime
 import java.util.UUID
 
 enum class MessagePlatform {
@@ -35,6 +36,17 @@ data class ScheduledMessage(
             (weeklyDayIso == null || weeklyDayIso in 1..7) &&
             (deliveryMode == MessageDeliveryMode.PREPARED || platform == MessagePlatform.TELEGRAM)
 
-    fun duplicate(newId: String = UUID.randomUUID().toString()): ScheduledMessage =
-        copy(id = newId, isEnabled = true)
+    fun duplicate(
+        newId: String = UUID.randomUUID().toString(),
+        now: ZonedDateTime = ZonedDateTime.now(),
+    ): ScheduledMessage =
+        copy(
+            id = newId,
+            isEnabled = true,
+            oneShotEpochDay = if (repeat == RepeatOption.ONCE) {
+                ScheduleAnchor.nextOneShotEpochDay(now, hour, minute)
+            } else {
+                oneShotEpochDay
+            },
+        )
 }
