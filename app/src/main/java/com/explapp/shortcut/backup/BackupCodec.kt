@@ -15,6 +15,7 @@ import kotlinx.serialization.json.booleanOrNull
 import kotlinx.serialization.json.buildJsonArray
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.int
+import kotlinx.serialization.json.intOrNull
 import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
@@ -102,6 +103,7 @@ object BackupCodec {
         put("minute", minute)
         put("repeat", repeat.name)
         put("isEnabled", isEnabled)
+        weeklyDayIso?.let { put("weeklyDayIso", it) }
     }
 
     private fun ScheduledMessage.toJson(): JsonObject = buildJsonObject {
@@ -115,6 +117,7 @@ object BackupCodec {
         put("repeat", repeat.name)
         put("isEnabled", isEnabled)
         put("deliveryMode", deliveryMode.name)
+        weeklyDayIso?.let { put("weeklyDayIso", it) }
     }
 
     private fun JsonObject.toShortcut(): ScheduledAppShortcut {
@@ -145,6 +148,7 @@ object BackupCodec {
             isEnabled = optionalBoolean("isEnabled") ?: true,
             deliveryMode = optionalString("deliveryMode")?.let { runCatching { MessageDeliveryMode.valueOf(it) }.getOrNull() }
                 ?: MessageDeliveryMode.PREPARED,
+            weeklyDayIso = optionalInt("weeklyDayIso"),
         )
         require(scheduledMessage.name.isNotBlank()) { "Message name is required" }
         require(scheduledMessage.isValid()) { "Invalid scheduled message" }
@@ -160,6 +164,9 @@ object BackupCodec {
 
     private fun JsonObject.requiredInt(key: String): Int =
         this[key]?.jsonPrimitive?.int ?: error("Missing $key")
+
+    private fun JsonObject.optionalInt(key: String): Int? =
+        this[key]?.jsonPrimitive?.intOrNull
 
     private fun JsonObject.requiredArray(key: String): JsonArray =
         this[key]?.jsonArray ?: error("Missing $key")
