@@ -10,10 +10,10 @@ import java.time.ZonedDateTime
 class AndroidAlarmScheduler(
     private val context: Context,
 ) {
-    fun schedule(shortcut: ScheduledAppShortcut) {
-        if (!shortcut.isEnabled || !shortcut.isValid()) return
+    fun schedule(shortcut: ScheduledAppShortcut): Boolean {
+        if (!shortcut.isEnabled || !shortcut.isValid()) return false
         val alarmManager = context.getSystemService(AlarmManager::class.java)
-        val triggerAt = NextRunCalculator.nextRun(ZonedDateTime.now(), shortcut) ?: return
+        val triggerAt = NextRunCalculator.nextRun(ZonedDateTime.now(), shortcut) ?: return false
         val pendingIntent = PendingIntent.getBroadcast(
             context,
             SchedulerIdentity.requestCode(shortcut.id),
@@ -24,7 +24,7 @@ class AndroidAlarmScheduler(
         val triggerAtMillis = triggerAt.toInstant().toEpochMilli()
         val canUseExact = Build.VERSION.SDK_INT < Build.VERSION_CODES.S || alarmManager.canScheduleExactAlarms()
 
-        runCatching {
+        return runCatching {
             if (canUseExact) {
                 alarmManager.setExactAndAllowWhileIdle(
                     AlarmManager.RTC_WAKEUP,
@@ -38,7 +38,8 @@ class AndroidAlarmScheduler(
                     pendingIntent,
                 )
             }
-        }
+            true
+        }.getOrDefault(false)
     }
 
     fun cancel(shortcut: ScheduledAppShortcut) = cancelById(shortcut.id)
