@@ -1,8 +1,10 @@
 package com.explapp.shortcut.ui
 
+import android.Manifest
 import android.app.AlarmManager
 import android.app.TimePickerDialog
 import android.content.Intent
+import android.content.pm.PackageManager
 import android.net.Uri
 import android.os.Build
 import android.provider.Settings
@@ -53,6 +55,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.core.content.ContextCompat
 import androidx.core.graphics.drawable.toBitmap
 import com.explapp.shortcut.R
 import com.explapp.shortcut.data.InstalledApp
@@ -126,6 +129,21 @@ fun CreateShortcutScreen(
         }
     }
 
+    val notificationPermissionLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
+        if (!granted) {
+            Toast.makeText(
+                context,
+                if (ar) {
+                    "تم حفظ المهمة بدون إشعارات. إذا منع Android فتح التطبيق بالخلفية فلن يتوفر زر «فتح الآن» الاحتياطي."
+                } else {
+                    "The task will be saved without notifications. If Android blocks background opening, the Open now fallback will be unavailable."
+                },
+                Toast.LENGTH_LONG,
+            ).show()
+        }
+        requestExactAlarmOrSave()
+    }
+
     val model = ScheduledAppShortcut(
         id = stableId,
         name = name.ifBlank { selectedApp?.label.orEmpty() },
@@ -144,7 +162,14 @@ fun CreateShortcutScreen(
 
     fun saveWithNeededPermissions() {
         pendingSave = model
-        requestExactAlarmOrSave()
+        val notificationsGranted =
+            Build.VERSION.SDK_INT < 33 ||
+                ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) == PackageManager.PERMISSION_GRANTED
+        if (!notificationsGranted && Build.VERSION.SDK_INT >= 33) {
+            notificationPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
+        } else {
+            requestExactAlarmOrSave()
+        }
     }
 
     LazyColumn(modifier = Modifier.fillMaxSize(), contentPadding = androidx.compose.foundation.layout.PaddingValues(18.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
