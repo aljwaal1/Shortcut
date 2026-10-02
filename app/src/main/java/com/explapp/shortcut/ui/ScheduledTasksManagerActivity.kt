@@ -244,12 +244,14 @@ private fun ScheduledTasksManagerScreen(onBack: () -> Unit) {
 
 private fun nextRunLabel(item: ScheduledAppShortcut, ar: Boolean): String {
     if (!item.isEnabled) return if (ar) "متوقفة" else "Paused"
-    val next = ScheduledTaskActions.nextRun(ZonedDateTime.now(), item) ?: return if (ar) "متوقفة" else "Paused"
+    val next = ScheduledTaskActions.nextRun(ZonedDateTime.now(), item)
+        ?: return if (ar) "انتهى موعد التشغيل" else "Scheduled time has expired"
     return (if (ar) "التشغيل التالي: " else "Next run: ") + next.format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm"))
 }
 
 private fun nextRunLabel(item: ScheduledMessage, ar: Boolean): String {
     if (!item.isEnabled) return if (ar) "متوقفة" else "Paused"
-    val next = ScheduledTaskActions.nextRun(ZonedDateTime.now(), item) ?: return if (ar) "متوقفة" else "Paused"
+    val next = ScheduledTaskActions.nextRun(ZonedDateTime.now(), item)
+        ?: return if (ar) "انتهى موعد التشغيل" else "Scheduled time has expired"
     return (if (ar) "التشغيل التالي: " else "Next run: ") + next.format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm"))
 }
