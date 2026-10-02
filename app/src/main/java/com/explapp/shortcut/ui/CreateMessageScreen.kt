@@ -53,6 +53,7 @@ import com.explapp.shortcut.domain.RepeatOption
 import com.explapp.shortcut.domain.ScheduledMessage
 import com.explapp.shortcut.permissions.SchedulingPermissionPlan
 import com.explapp.shortcut.permissions.SchedulingPermissionStep
+import java.time.LocalDate
 import java.util.UUID
 
 @Composable
@@ -73,6 +74,7 @@ fun CreateMessageScreen(
     var hour by remember(initial?.id) { mutableStateOf((initial?.hour ?: 8).toString()) }
     var minute by remember(initial?.id) { mutableStateOf("%02d".format(initial?.minute ?: 0)) }
     var repeat by remember(initial?.id) { mutableStateOf(initial?.repeat ?: RepeatOption.ONCE) }
+    var weeklyDayIso by remember(initial?.id) { mutableStateOf(initial?.weeklyDayIso) }
     var pendingSave by remember { mutableStateOf<ScheduledMessage?>(null) }
     var permissionError by remember { mutableStateOf(false) }
 
@@ -108,6 +110,9 @@ fun CreateMessageScreen(
         repeat = repeat,
         isEnabled = initial?.isEnabled ?: true,
         deliveryMode = initial?.deliveryMode ?: MessageDeliveryMode.PREPARED,
+        weeklyDayIso = if (repeat == RepeatOption.WEEKLY) {
+            weeklyDayIso ?: LocalDate.now().dayOfWeek.value
+        } else null,
     )
 
     fun saveWithNeededPermissions() {
@@ -158,7 +163,18 @@ fun CreateMessageScreen(
         }
         item {
             MessageSectionCard(title = stringResource(R.string.repeat), subtitle = if (ar) "اختر عدد مرات تجهيز الرسالة" else "Choose how often the message should be prepared", accent = MaterialTheme.colorScheme.primary) {
-                Column(verticalArrangement = Arrangement.spacedBy(7.dp)) { RepeatOption.entries.forEach { option -> FilterChip(selected = repeat == option, onClick = { repeat = option }, label = { Text(messageRepeatLabel(option)) }) } }
+                Column(verticalArrangement = Arrangement.spacedBy(7.dp)) { RepeatOption.entries.forEach { option ->
+                        FilterChip(
+                            selected = repeat == option,
+                            onClick = {
+                                if (option == RepeatOption.WEEKLY && repeat != RepeatOption.WEEKLY) {
+                                    weeklyDayIso = LocalDate.now().dayOfWeek.value
+                                }
+                                repeat = option
+                            },
+                            label = { Text(messageRepeatLabel(option)) },
+                        )
+                    } }
             }
         }
         item {
