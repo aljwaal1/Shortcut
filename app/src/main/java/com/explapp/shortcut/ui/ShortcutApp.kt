@@ -75,6 +75,7 @@ import androidx.core.os.LocaleListCompat
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import com.explapp.shortcut.R
+import com.explapp.shortcut.MainActivity
 import com.explapp.shortcut.backup.BackupTransferActivity
 import com.explapp.shortcut.data.MessageStore
 import com.explapp.shortcut.data.ShortcutStore
@@ -87,6 +88,7 @@ import com.explapp.shortcut.execution.TaskExecutionReporter
 import com.explapp.shortcut.automation.routines.RoutineStore
 import com.explapp.shortcut.search.CommandPaletteActivity
 import com.explapp.shortcut.tools.ToolCatalog
+import com.explapp.shortcut.tools.PersistentScreenCaptureService
 import com.explapp.shortcut.scheduler.AndroidAlarmScheduler
 import com.explapp.shortcut.scheduler.AndroidMessageScheduler
 
@@ -517,6 +519,64 @@ private fun HomeScreen(
             }
         }
         item {
+            val notificationsReady = Build.VERSION.SDK_INT < 33 ||
+                ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) == PackageManager.PERMISSION_GRANTED
+            val alarmManager = remember(context) { context.getSystemService(AlarmManager::class.java) }
+            val exactReady = Build.VERSION.SDK_INT < Build.VERSION_CODES.S || alarmManager.canScheduleExactAlarms()
+            val captureReady = PersistentScreenCaptureService.isSessionActive(context)
+
+            ElevatedCard(
+                modifier = Modifier.fillMaxWidth(),
+                colors = CardDefaults.elevatedCardColors(containerColor = MaterialTheme.colorScheme.surface),
+            ) {
+                Column(Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Column(Modifier.weight(1f)) {
+                            Text(
+                                if (ar) "جاهزية الأتمتة" else "Automation readiness",
+                                style = MaterialTheme.typography.titleMedium,
+                                fontWeight = FontWeight.ExtraBold,
+                            )
+                            Text(
+                                if (ar) "حالة أهم المتطلبات التي تؤثر على التنفيذ"
+                                else "Key requirements that affect reliable execution",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                        }
+                        TextButton(onClick = {
+                            context.startActivity(Intent(context, MainActivity::class.java).apply {
+                                addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP)
+                            })
+                        }) {
+                            Text(if (ar) "تحديث" else "Refresh")
+                        }
+                    }
+                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        ReadinessPill(
+                            label = if (ar) "الإشعارات" else "Notifications",
+                            ready = notificationsReady,
+                            modifier = Modifier.weight(1f),
+                        )
+                        ReadinessPill(
+                            label = if (ar) "الوقت الدقيق" else "Exact time",
+                            ready = exactReady,
+                            modifier = Modifier.weight(1f),
+                        )
+                        ReadinessPill(
+                            label = if (ar) "التصوير" else "Capture",
+                            ready = captureReady,
+                            modifier = Modifier.weight(1f),
+                        )
+                    }
+                }
+            }
+        }
+        item {
             SectionLabel(
                 title = if (ar) "آخر تنفيذ" else "Latest run",
                 subtitle = if (ar) "تعرف فورًا إن كانت المهمة نجحت أو فشلت" else "See immediately whether the latest task succeeded",
@@ -632,6 +692,34 @@ private fun HomeScreen(
             },
             dismissButton = { TextButton(onClick = { pendingDeleteMessage = null }) { Text(if (ar) "إلغاء" else "Cancel") } },
         )
+    }
+}
+
+@Composable
+private fun ReadinessPill(
+    label: String,
+    ready: Boolean,
+    modifier: Modifier = Modifier,
+) {
+    val accent = if (ready) Color(0xFF1B9C68) else MaterialTheme.colorScheme.tertiary
+    Surface(
+        modifier = modifier,
+        shape = MaterialTheme.shapes.medium,
+        color = accent.copy(alpha = 0.10f),
+    ) {
+        Column(
+            modifier = Modifier.padding(horizontal = 10.dp, vertical = 9.dp),
+            verticalArrangement = Arrangement.spacedBy(2.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+        ) {
+            Text(
+                if (ready) "✓" else "!",
+                color = accent,
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.ExtraBold,
+            )
+            Text(label, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurface)
+        }
     }
 }
 
