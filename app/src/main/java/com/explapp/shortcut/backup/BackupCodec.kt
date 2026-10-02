@@ -79,7 +79,9 @@ object BackupCodec {
         require(messagesJson.size <= MAX_ITEMS_PER_SECTION) { "Too many messages" }
 
         val routinesRaw = root["routines"]?.let { json.encodeToString(kotlinx.serialization.json.JsonElement.serializer(), it) } ?: "[]"
-        val routines = RoutineCodec.decode(routinesRaw).take(MAX_ITEMS_PER_SECTION)
+        val decodedRoutines = RoutineCodec.decode(routinesRaw)
+        require(decodedRoutines.size <= MAX_ITEMS_PER_SECTION) { "Too many routines" }
+        val routines = decodedRoutines.map { it.copy(isEnabled = false) }
 
         BackupPayload(
             shortcuts = shortcutsJson.map { it.jsonObject.toShortcut() },
