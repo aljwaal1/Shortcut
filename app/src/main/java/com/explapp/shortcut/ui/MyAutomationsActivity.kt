@@ -1400,7 +1400,9 @@ private fun RoutineBuilderScreen(
                             OutlinedTextField(
                                 value = params["chatId"].orEmpty(),
                                 onValueChange = { params = params + ("chatId" to it) },
-                                label = { Text(if (ar) "معرّف المحادثة" else "Chat ID") },
+                                label = { Text(if (ar) "اسم مستخدم تيليجرام" else "Telegram username") },
+                                placeholder = { Text(if (ar) "مثال: @username أو username" else "Example: @username or username") },
+                                supportingText = { Text(if (ar) "يجب أن يكون المستخدم قد بدأ البوت وأرسل له رسالة واحدة على الأقل ليتم العثور على المحادثة الخاصة." else "For a private chat, the user must have started the bot and sent it at least one message so Shortcut can resolve the destination.") },
                                 modifier = Modifier.fillMaxWidth(),
                             )
                             OutlinedTextField(
@@ -1992,7 +1994,7 @@ private fun actionSummary(action: RoutineAction, appLabel: String?, ar: Boolean)
     RoutineActionType.WAIT,
     RoutineActionType.TAKE_SCREENSHOT,
     -> "${(action.value.toLongOrNull() ?: action.secondaryValue.toLongOrNull() ?: 0L) / 1000.0} ${if (ar) "ث" else "s"}"
-    RoutineActionType.SEND_TELEGRAM_BOT -> (if (ar) "معرّف المحادثة: " else "Chat ID: ") + action.parameters["chatId"].orEmpty()
+    RoutineActionType.SEND_TELEGRAM_BOT -> (if (ar) "مستخدم تيليجرام: " else "Telegram user: ") + action.parameters["chatId"].orEmpty()
     RoutineActionType.CUSTOM_SCRIPT -> action.value.lineSequence().firstOrNull().orEmpty().take(80)
     RoutineActionType.SET_VARIABLE -> (if (ar) "المتغير: " else "Variable: ") + action.value
     RoutineActionType.READ_CLIPBOARD -> (if (ar) "يحفظ في: " else "Stores in: ") + action.value
