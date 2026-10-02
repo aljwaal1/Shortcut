@@ -6,7 +6,7 @@ class RoutineStore(context: Context) {
     private val prefs = context.getSharedPreferences("automation_routines", Context.MODE_PRIVATE)
     private val secrets = RoutineSecretStore(context.applicationContext)
 
-    fun load(): List<AutomationRoutine> {
+    fun load(): List<AutomationRoutine> = synchronized(LOCK) {
         val decoded = RoutineCodec.decode(prefs.getString(KEY, "[]").orEmpty())
         var migrated = false
         val hydrated = decoded.map { routine ->
@@ -37,10 +37,10 @@ class RoutineStore(context: Context) {
             )
         }
         if (migrated) save(hydrated)
-        return hydrated
+        hydrated
     }
 
-    fun save(items: List<AutomationRoutine>) {
+    fun save(items: List<AutomationRoutine>) = synchronized(LOCK) {
         val distinct = items.distinctBy { it.id }
         val protected = distinct.map { routine ->
             val orphanedSecrets = secrets.keys("${routine.id}:").toMutableSet()
@@ -69,14 +69,14 @@ class RoutineStore(context: Context) {
         prefs.edit().putString(KEY, RoutineCodec.encode(protected)).apply()
     }
 
-    fun upsert(item: AutomationRoutine) {
+    fun upsert(item: AutomationRoutine) = synchronized(LOCK) {
         val current = load().toMutableList()
         val index = current.indexOfFirst { it.id == item.id }
         if (index >= 0) current[index] = item else current += item
         save(current)
     }
 
-    fun removeById(id: String) {
+    fun removeById(id: String) = synchronized(LOCK) {
         secrets.removePrefix("$id:")
         save(load().filterNot { it.id == id })
     }
@@ -88,5 +88,6 @@ class RoutineStore(context: Context) {
         private const val KEY = "items"
         private const val SECRET_MARKER = "__shortcut_secret_v1__"
         private val SECRET_KEYS = setOf("botToken", "telegramBotToken")
+        private val LOCK = Any()
     }
 }
