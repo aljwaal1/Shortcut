@@ -66,14 +66,14 @@ private fun ScheduledTasksManagerScreen(onBack: () -> Unit) {
         val index = shortcuts.indexOfFirst { it.id == item.id }
         if (index >= 0) shortcuts[index] = item else shortcuts += item
         shortcutStore.save(shortcuts)
-        appScheduler.cancelById(item.id)
+        runCatching { appScheduler.cancelById(item.id) }
         if (item.isEnabled) runCatching { appScheduler.schedule(item) }
     }
     fun replaceMessage(item: ScheduledMessage) {
         val index = messages.indexOfFirst { it.id == item.id }
         if (index >= 0) messages[index] = item else messages += item
         messageStore.save(messages)
-        messageScheduler.cancelById(item.id)
+        runCatching { messageScheduler.cancelById(item.id) }
         if (item.isEnabled) runCatching { messageScheduler.schedule(item) }
     }
 
@@ -160,7 +160,7 @@ private fun ScheduledTasksManagerScreen(onBack: () -> Unit) {
                             }) { Text(if (ar) "تشغيل الآن" else "Run now") }
                             TextButton(onClick = { replaceShortcut(item.duplicate()) }) { Text(if (ar) "نسخ" else "Duplicate") }
                             TextButton(onClick = {
-                                appScheduler.cancelById(item.id)
+                                runCatching { appScheduler.cancelById(item.id) }
                                 shortcuts.removeAll { it.id == item.id }
                                 shortcutStore.save(shortcuts)
                             }) { Text(if (ar) "حذف" else "Delete") }
@@ -186,7 +186,7 @@ private fun ScheduledTasksManagerScreen(onBack: () -> Unit) {
                             }) { Text(if (ar) "تشغيل الآن" else "Run now") }
                             TextButton(onClick = { replaceMessage(item.duplicate()) }) { Text(if (ar) "نسخ" else "Duplicate") }
                             TextButton(onClick = {
-                                messageScheduler.cancelById(item.id)
+                                runCatching { messageScheduler.cancelById(item.id) }
                                 messages.removeAll { it.id == item.id }
                                 messageStore.save(messages)
                             }) { Text(if (ar) "حذف" else "Delete") }
