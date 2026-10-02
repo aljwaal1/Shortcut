@@ -13,7 +13,7 @@ class AndroidMessageScheduler(
     fun schedule(message: ScheduledMessage) {
         if (!message.isEnabled || !message.isValid()) return
         val alarmManager = context.getSystemService(AlarmManager::class.java)
-        val triggerAt = NextRunCalculator.nextRun(ZonedDateTime.now(), message)
+        val triggerAt = NextRunCalculator.nextRun(ZonedDateTime.now(), message) ?: return
         val pendingIntent = PendingIntent.getBroadcast(
             context,
             SchedulerIdentity.requestCode(message.id),
