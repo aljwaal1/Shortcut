@@ -5,6 +5,7 @@ import android.content.Intent
 import android.content.pm.ShortcutInfo
 import android.content.pm.ShortcutManager
 import android.graphics.drawable.Icon
+import com.explapp.shortcut.R
 import com.explapp.shortcut.search.CommandPaletteActivity
 import com.explapp.shortcut.tools.QuickFileActivity
 import com.explapp.shortcut.ui.MyAutomationsActivity
@@ -15,17 +16,17 @@ object DynamicShortcutPublisher {
         val manager = context.getSystemService(ShortcutManager::class.java) ?: return
         val shortcuts = listOf(
             ShortcutInfo.Builder(context, "new_automation")
-                .setShortLabel("New automation")
+                .setShortLabel(context.getString(R.string.dynamic_new_automation))
                 .setIcon(Icon.createWithResource(context, android.R.drawable.ic_input_add))
                 .setIntent(Intent(context, MyAutomationsActivity::class.java).setAction(Intent.ACTION_VIEW))
                 .build(),
             ShortcutInfo.Builder(context, "command_search")
-                .setShortLabel("Search")
+                .setShortLabel(context.getString(R.string.dynamic_search))
                 .setIcon(Icon.createWithResource(context, android.R.drawable.ic_menu_search))
                 .setIntent(Intent(context, CommandPaletteActivity::class.java).setAction(Intent.ACTION_VIEW))
                 .build(),
             ShortcutInfo.Builder(context, "app_usage")
-                .setShortLabel("App usage")
+                .setShortLabel(context.getString(R.string.dynamic_app_usage))
                 .setIcon(Icon.createWithResource(context, android.R.drawable.ic_menu_recent_history))
                 .setIntent(Intent(context, AppUsageActivity::class.java).setAction(Intent.ACTION_VIEW))
                 .build(),
