@@ -127,7 +127,7 @@ class AndroidRoutineActionRunner(
 
     private fun readClipboard(action: RoutineAction): RoutineActionResult {
         val name = action.value.trim()
-        if (name.isBlank()) return RoutineActionResult.failure(action, "Variable name is required")
+        if (name.isBlank()) return RoutineActionResult.failure(action, local("Variable name is required", "يلزم إدخال اسم المتغير"))
         val clipboard = context.getSystemService(ClipboardManager::class.java)
         val text = clipboard.primaryClip?.getItemAt(0)?.coerceToText(context)?.toString().orEmpty()
         variables[name] = text
@@ -360,9 +360,9 @@ class AndroidRoutineActionRunner(
         intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
         if (!userInitiated) {
             return if (showNotification(local("Shortcut action ready", "إجراء الاختصار جاهز"), action.value.ifBlank { action.type.name }, intent)) {
-                RoutineActionResult.prepared(action, "User action required")
+                RoutineActionResult.prepared(action, local("User action required", "يلزم إجراء من المستخدم"))
             } else {
-                RoutineActionResult.failure(action, "Notification permission is required")
+                RoutineActionResult.failure(action, local("Notification permission is required", "يلزم السماح بالإشعارات"))
             }
         }
         return runCatching {
