@@ -1,7 +1,12 @@
 package com.explapp.shortcut.automation.routines
 
+import android.app.NotificationChannel
+import android.app.NotificationManager
 import android.content.Context
+import android.os.Build
+import androidx.core.app.NotificationCompat
 import androidx.work.CoroutineWorker
+import androidx.work.ForegroundInfo
 import androidx.work.ExistingWorkPolicy
 import androidx.work.OneTimeWorkRequestBuilder
 import androidx.work.OutOfQuotaPolicy
@@ -15,6 +20,27 @@ class RoutineExecutionWorker(
     appContext: Context,
     params: WorkerParameters,
 ) : CoroutineWorker(appContext, params) {
+    override suspend fun getForegroundInfo(): ForegroundInfo {
+        val manager = applicationContext.getSystemService(NotificationManager::class.java)
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            manager.createNotificationChannel(
+                NotificationChannel(
+                    CHANNEL_ID,
+                    local("Automation execution", "تنفيذ الأتمتة"),
+                    NotificationManager.IMPORTANCE_LOW,
+                ),
+            )
+        }
+        val notification = NotificationCompat.Builder(applicationContext, CHANNEL_ID)
+            .setSmallIcon(android.R.drawable.ic_menu_manage)
+            .setContentTitle(local("Shortcut automation", "أتمتة Shortcut"))
+            .setContentText(local("Running a scheduled automation…", "جارٍ تنفيذ أتمتة مجدولة…"))
+            .setOngoing(true)
+            .setPriority(NotificationCompat.PRIORITY_LOW)
+            .build()
+        return ForegroundInfo(NOTIFICATION_ID, notification)
+    }
+
     override suspend fun doWork(): Result = withContext(Dispatchers.IO) {
         val routineId = inputData.getString(KEY_ROUTINE_ID).orEmpty()
         if (routineId.isBlank()) return@withContext Result.success()
@@ -38,8 +64,13 @@ class RoutineExecutionWorker(
         Result.success()
     }
 
+    private fun local(en: String, ar: String): String =
+        if (applicationContext.resources.configuration.locales[0].language == "ar") ar else en
+
     companion object {
         const val KEY_ROUTINE_ID = "routine_id"
+        private const val CHANNEL_ID = "routine_worker"
+        private const val NOTIFICATION_ID = 9411
     }
 }
 
