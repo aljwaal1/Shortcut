@@ -28,8 +28,8 @@ class CrashLogStore(context: Context) {
         prefs.edit()
             .putLong(KEY_TIME, System.currentTimeMillis())
             .putString(KEY_THREAD, thread.name.take(120))
-            .putString(KEY_SUMMARY, summary)
-            .putString(KEY_STACK, error.stackTraceToString().take(MAX_STACK_CHARS))
+            .putString(KEY_SUMMARY, redactSecrets(summary))
+            .putString(KEY_STACK, redactSecrets(error.stackTraceToString()).take(MAX_STACK_CHARS))
             .commit()
     }
 
@@ -48,6 +48,9 @@ class CrashLogStore(context: Context) {
         prefs.edit().clear().apply()
     }
 
+    private fun redactSecrets(value: String): String =
+        TELEGRAM_BOT_TOKEN.replace(value, "[REDACTED_BOT_TOKEN]")
+
     companion object {
         private const val PREFS = "shortcut_crash_log"
         private const val KEY_TIME = "time"
@@ -55,5 +58,6 @@ class CrashLogStore(context: Context) {
         private const val KEY_SUMMARY = "summary"
         private const val KEY_STACK = "stack"
         private const val MAX_STACK_CHARS = 16_000
+        private val TELEGRAM_BOT_TOKEN = Regex("""\b\d{6,12}:[A-Za-z0-9_-]{20,}\b""")
     }
 }
