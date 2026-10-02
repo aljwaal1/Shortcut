@@ -9,29 +9,30 @@ import android.provider.Settings
 import androidx.appcompat.app.AppCompatActivity
 import androidx.activity.compose.setContent
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
+import androidx.lifecycle.lifecycleScope
 import com.explapp.shortcut.ui.ShortcutTheme
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import java.util.Calendar
 
 class AppUsageActivity : AppCompatActivity() {
     private val prefs by lazy { getSharedPreferences("app_usage_tracker", MODE_PRIVATE) }
-    private var refreshTick by mutableIntStateOf(0)
     private var enabledState by mutableStateOf(false)
+    private var dashboardState by mutableStateOf<UsageDashboard?>(null)
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enabledState = prefs.getBoolean(KEY_ENABLED, false)
         setContent {
             ShortcutTheme {
-                val tick = refreshTick
                 val hasAccess = hasUsageAccess()
-                val dashboard = if (enabledState && hasAccess) loadDashboard(tick) else null
                 AppUsageDashboard(
                     enabled = enabledState,
                     hasAccess = hasAccess,
-                    dashboard = dashboard,
+                    dashboard = dashboardState,
                     onToggle = { enabled ->
                         if (enabled) {
                             prefs.edit().putBoolean(KEY_ENABLED, true).apply()
@@ -39,10 +40,15 @@ class AppUsageActivity : AppCompatActivity() {
                                 prefs.edit().putLong(KEY_ENABLED_AT, System.currentTimeMillis()).apply()
                             }
                             enabledState = true
-                            if (!hasUsageAccess()) openUsageAccess()
+                            if (!hasUsageAccess()) {
+                                openUsageAccess()
+                            } else {
+                                refreshDashboard()
+                            }
                         } else {
                             prefs.edit().putBoolean(KEY_ENABLED, false).apply()
                             enabledState = false
+                            dashboardState = null
                         }
                     },
                     onOpenUsageAccess = ::openUsageAccess,
@@ -53,15 +59,25 @@ class AppUsageActivity : AppCompatActivity() {
 
     override fun onResume() {
         super.onResume()
-        refreshTick++
+        refreshDashboard()
     }
 
     private fun openUsageAccess() {
         startActivity(Intent(Settings.ACTION_USAGE_ACCESS_SETTINGS))
     }
 
-    private fun loadDashboard(refreshKey: Int): UsageDashboard {
-        refreshKey.hashCode()
+    private fun refreshDashboard() {
+        if (!enabledState || !hasUsageAccess()) {
+            dashboardState = null
+            return
+        }
+        lifecycleScope.launch {
+            val dashboard = withContext(Dispatchers.IO) { loadDashboard() }
+            dashboardState = if (enabledState && hasUsageAccess()) dashboard else null
+        }
+    }
+
+    private fun loadDashboard(): UsageDashboard {
         val manager = getSystemService(UsageStatsManager::class.java)
         val now = System.currentTimeMillis()
         val starts = (6 downTo 0).map { offset -> startOfDay(offset) }
