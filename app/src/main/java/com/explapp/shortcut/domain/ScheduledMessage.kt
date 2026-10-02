@@ -23,6 +23,7 @@ data class ScheduledMessage(
     val repeat: RepeatOption,
     val isEnabled: Boolean = true,
     val deliveryMode: MessageDeliveryMode = MessageDeliveryMode.PREPARED,
+    val weeklyDayIso: Int? = null,
 ) {
     fun isValid(): Boolean =
         id.isNotBlank() &&
@@ -30,6 +31,7 @@ data class ScheduledMessage(
             message.isNotBlank() &&
             hour in 0..23 &&
             minute in 0..59 &&
+            (weeklyDayIso == null || weeklyDayIso in 1..7) &&
             (deliveryMode == MessageDeliveryMode.PREPARED || platform == MessagePlatform.TELEGRAM)
 
     fun duplicate(newId: String = UUID.randomUUID().toString()): ScheduledMessage =
