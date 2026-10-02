@@ -44,6 +44,24 @@ class NextRunCalculatorTest {
     }
 
     @Test
+    fun weeklyScheduleKeepsOriginalWeekdayAfterRebootOnAnotherDay() {
+        val thursday = ZonedDateTime.of(2026, 9, 17, 9, 0, 0, 0, zone)
+        val mondayIso = 1
+        val shortcut = ScheduledAppShortcut(
+            name = "Weekly maps",
+            packageName = "pkg",
+            hour = 7,
+            minute = 30,
+            repeat = RepeatOption.WEEKLY,
+            weeklyDayIso = mondayIso,
+        )
+
+        val next = NextRunCalculator.nextRun(thursday, shortcut)
+
+        assertEquals(ZonedDateTime.of(2026, 9, 21, 7, 30, 0, 0, zone), next)
+    }
+
+    @Test
     fun weekdaysScheduleSkipsWeekend() {
         val friday = ZonedDateTime.of(2026, 9, 18, 20, 0, 0, 0, zone)
         val shortcut = ScheduledAppShortcut(
