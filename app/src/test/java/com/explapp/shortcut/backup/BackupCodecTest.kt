@@ -4,6 +4,11 @@ import com.explapp.shortcut.domain.MessagePlatform
 import com.explapp.shortcut.domain.RepeatOption
 import com.explapp.shortcut.domain.ScheduledAppShortcut
 import com.explapp.shortcut.domain.ScheduledMessage
+import com.explapp.shortcut.automation.routines.AutomationRoutine
+import com.explapp.shortcut.automation.routines.RoutineAction
+import com.explapp.shortcut.automation.routines.RoutineActionType
+import com.explapp.shortcut.automation.routines.RoutineTrigger
+import com.explapp.shortcut.automation.routines.RoutineTriggerType
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
@@ -31,6 +36,14 @@ class BackupCodecTest {
                 repeat = RepeatOption.DAILY,
             ),
         ),
+        routines = listOf(
+            AutomationRoutine(
+                name = "Imported routine",
+                isEnabled = true,
+                trigger = RoutineTrigger(RoutineTriggerType.MANUAL),
+                actions = listOf(RoutineAction(RoutineActionType.SHOW_NOTIFICATION, value = "Hi")),
+            ),
+        ),
         unlockWifiMapsEnabled = true,
     )
 
@@ -41,6 +54,8 @@ class BackupCodecTest {
 
         assertEquals(sample.shortcuts, decoded.shortcuts)
         assertEquals(sample.messages, decoded.messages)
+        assertEquals(1, decoded.routines.size)
+        assertFalse(decoded.routines.single().isEnabled)
         assertFalse(decoded.unlockWifiMapsEnabled)
     }
 
