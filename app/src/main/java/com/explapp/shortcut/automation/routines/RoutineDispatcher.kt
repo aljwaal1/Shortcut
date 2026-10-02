@@ -4,6 +4,17 @@ import android.content.Context
 import com.explapp.shortcut.execution.TaskExecutionReporter
 
 class RoutineDispatcher(private val context: Context) {
+    fun executeAsync(
+        routine: AutomationRoutine,
+        userInitiated: Boolean,
+        onComplete: ((RoutineRunResult) -> Unit)? = null,
+    ) {
+        Thread {
+            val result = execute(routine, userInitiated)
+            onComplete?.invoke(result)
+        }.start()
+    }
+
     fun dispatch(event: RoutineEvent): List<RoutineRunResult> = RoutineStore(context)
         .load()
         .filter { RoutineTriggerMatcher.matches(it, event) }
