@@ -40,6 +40,7 @@ class RoutineValidationTest {
         assertFalse(RoutineAction(RoutineActionType.WAIT, "10").isValid())
         assertTrue(RoutineAction(RoutineActionType.TAKE_SCREENSHOT, "5000").isValid())
         assertTrue(RoutineAction(RoutineActionType.CUSTOM_SCRIPT, "return input;").isValid())
+        assertFalse(RoutineAction(RoutineActionType.CUSTOM_SCRIPT, "x".repeat(32_001)).isValid())
         assertTrue(RoutineAction(RoutineActionType.SET_VARIABLE, "name", "value").isValid())
         assertTrue(RoutineAction(RoutineActionType.READ_CLIPBOARD, "clipboardText").isValid())
         assertTrue(RoutineAction(RoutineActionType.COPY_TO_CLIPBOARD, "hello").isValid())
