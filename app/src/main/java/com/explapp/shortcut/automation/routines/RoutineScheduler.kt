@@ -188,7 +188,7 @@ class RoutineAlarmReceiver : BroadcastReceiver() {
             try {
                 val routine = RoutineStore(context).load()
                     .firstOrNull { it.id == id && it.isEnabled && it.isValid() } ?: return@worker
-                RoutineDispatcher(context).execute(routine, userInitiated = false)
+                RoutineWork.enqueue(context, routine.id)
                 runCatching { RoutineScheduler(context).schedule(routine) }
             } finally {
                 pendingResult.finish()
@@ -214,7 +214,7 @@ class RoutineStateReceiver : BroadcastReceiver() {
                 val wasBelow = state.wasBelow(id)
                 val isBelow = BatteryThresholdEdge.isBelow(level, threshold)
                 if (BatteryThresholdEdge.shouldFire(wasBelow, level, threshold)) {
-                    RoutineDispatcher(context).execute(routine, userInitiated = false)
+                    RoutineWork.enqueue(context, routine.id)
                 }
                 state.setBelow(id, isBelow)
             }
@@ -225,7 +225,7 @@ class RoutineStateReceiver : BroadcastReceiver() {
                 val connected = isDeviceCharging(context)
                 val previous = state.chargerState(id)
                 if (ChargerEdge.shouldFire(routine.trigger.type, previous, connected)) {
-                    RoutineDispatcher(context).execute(routine, userInitiated = false)
+                    RoutineWork.enqueue(context, routine.id)
                 }
                 state.setChargerState(id, connected)
             }
@@ -246,15 +246,16 @@ class RoutineSystemEventReceiver : BroadcastReceiver() {
         val pendingResult = goAsync()
         Thread worker@{
             try {
-                val dispatcher = RoutineDispatcher(context)
                 when (intent.action) {
                     Intent.ACTION_BOOT_COMPLETED -> {
-                        dispatcher.dispatch(RoutineEvent(RoutineTriggerType.BOOT))
+                        RoutineWork.enqueueMatching(context, RoutineEvent(RoutineTriggerType.BOOT))
                         reschedule(context)
                     }
                     Intent.ACTION_MY_PACKAGE_REPLACED -> reschedule(context)
-                    Intent.ACTION_POWER_CONNECTED -> dispatcher.dispatch(RoutineEvent(RoutineTriggerType.CHARGER_CONNECTED))
-                    Intent.ACTION_POWER_DISCONNECTED -> dispatcher.dispatch(RoutineEvent(RoutineTriggerType.CHARGER_DISCONNECTED))
+                    Intent.ACTION_POWER_CONNECTED ->
+                        RoutineWork.enqueueMatching(context, RoutineEvent(RoutineTriggerType.CHARGER_CONNECTED))
+                    Intent.ACTION_POWER_DISCONNECTED ->
+                        RoutineWork.enqueueMatching(context, RoutineEvent(RoutineTriggerType.CHARGER_DISCONNECTED))
                 }
             } finally {
                 pendingResult.finish()
