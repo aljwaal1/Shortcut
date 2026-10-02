@@ -6,6 +6,7 @@ import android.content.Intent
 import android.net.Uri
 import android.os.Build
 import android.provider.Settings
+import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.Image
@@ -99,7 +100,18 @@ fun CreateShortcutScreen(
         pendingSave = null
     }
 
-    val exactAlarmLauncher = rememberLauncherForActivityResult(ActivityResultContracts.StartActivityForResult()) { finishPendingSave() }
+    val exactAlarmLauncher = rememberLauncherForActivityResult(ActivityResultContracts.StartActivityForResult()) {
+        val exactGranted = Build.VERSION.SDK_INT < Build.VERSION_CODES.S || alarmManager.canScheduleExactAlarms()
+        if (!exactGranted) {
+            Toast.makeText(
+                context,
+                if (ar) "لم تُمنح الجدولة الدقيقة. سيستخدم Shortcut توقيت Android التقريبي لهذا الموعد."
+                else "Precise scheduling was not granted. Shortcut will use Android's approximate timing for this task.",
+                Toast.LENGTH_LONG,
+            ).show()
+        }
+        finishPendingSave()
+    }
 
     fun requestExactAlarmOrSave() {
         val exactGranted = Build.VERSION.SDK_INT < Build.VERSION_CODES.S || alarmManager.canScheduleExactAlarms()
