@@ -39,26 +39,28 @@ class RoutineStore(context: Context) {
     fun save(items: List<AutomationRoutine>) {
         val distinct = items.distinctBy { it.id }
         val protected = distinct.map { routine ->
-            // Rewrite the routine's secret namespace from the hydrated in-memory model.
-            // This removes tokens left behind by deleted/reordered actions.
-            secrets.removePrefix("${routine.id}:")
-            routine.copy(
+            val orphanedSecrets = secrets.keys("${routine.id}:").toMutableSet()
+            val protectedRoutine = routine.copy(
                 actions = routine.actions.mapIndexed { index, action ->
                     val updated = action.parameters.toMutableMap()
                     SECRET_KEYS.forEach { key ->
+                        val storageKey = secretKey(routine.id, index, key)
                         val value = updated[key].orEmpty()
                         if (value.isBlank() || value == SECRET_MARKER) {
                             updated.remove(key)
                         } else {
-                            check(secrets.put(secretKey(routine.id, index, key), value)) {
+                            check(secrets.put(storageKey, value)) {
                                 "Could not store automation credential securely"
                             }
+                            orphanedSecrets.remove(storageKey)
                             updated[key] = SECRET_MARKER
                         }
                     }
                     action.copy(parameters = updated)
                 },
             )
+            orphanedSecrets.forEach(secrets::remove)
+            protectedRoutine
         }
         prefs.edit().putString(KEY, RoutineCodec.encode(protected)).apply()
     }
