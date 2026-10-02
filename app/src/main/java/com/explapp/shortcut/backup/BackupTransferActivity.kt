@@ -69,22 +69,23 @@ private fun BackupTransferScreen(onBack: () -> Unit) {
 
     fun write(uri: Uri) {
         scope.launch {
-        val toolPrefs = ToolPreferencesStore(context)
-        val payload = BackupPayload(
-            shortcuts = ShortcutStore(context).load(),
-            messages = MessageStore(context).load(),
-            routines = RoutineStore(context).load(),
-            favoriteToolIds = toolPrefs.favorites().map { it.name },
-            recentToolIds = toolPrefs.recents().map { it.name },
-        )
-        val result = withContext(Dispatchers.IO) {
-            runCatching {
-                context.contentResolver.openOutputStream(uri)?.bufferedWriter()?.use { it.write(BackupCodec.encode(payload)) }
-                    ?: error("Cannot open destination")
+            val result = withContext(Dispatchers.IO) {
+                runCatching {
+                    val toolPrefs = ToolPreferencesStore(context)
+                    val payload = BackupPayload(
+                        shortcuts = ShortcutStore(context).load(),
+                        messages = MessageStore(context).load(),
+                        routines = RoutineStore(context).load(),
+                        favoriteToolIds = toolPrefs.favorites().map { it.name },
+                        recentToolIds = toolPrefs.recents().map { it.name },
+                    )
+                    context.contentResolver.openOutputStream(uri)?.bufferedWriter()?.use {
+                        it.write(BackupCodec.encode(payload))
+                    } ?: error("Cannot open destination")
+                }
             }
-        }
-        result.onSuccess { status = if (ar) "تم تصدير النسخة الاحتياطية" else "Backup exported" }
-            .onFailure { status = it.message.orEmpty() }
+            result.onSuccess { status = if (ar) "تم تصدير النسخة الاحتياطية" else "Backup exported" }
+                .onFailure { status = it.message.orEmpty() }
         }
     }
 
