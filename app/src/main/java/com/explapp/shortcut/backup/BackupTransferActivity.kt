@@ -68,8 +68,8 @@ private fun BackupTransferScreen(onBack: () -> Unit) {
         runCatching {
             val raw = context.contentResolver.openInputStream(uri)?.bufferedReader()?.use { it.readText() }
                 ?: error("Cannot open backup")
-            BackupCodec.decode(raw).getOrThrow()
-        }.onSuccess { payload ->
+            val payload = BackupCodec.decode(raw).getOrThrow()
+
             val shortcutStore = ShortcutStore(context)
             val messageStore = MessageStore(context)
             val routineStore = RoutineStore(context)
@@ -83,9 +83,9 @@ private fun BackupTransferScreen(onBack: () -> Unit) {
                 messageIds = messageStore.load().map { it.id },
                 routineIds = routineStore.load().map { it.id },
             )
-            cancellation.shortcutIds.forEach(appScheduler::cancelById)
-            cancellation.messageIds.forEach(messageScheduler::cancelById)
-            cancellation.routineIds.forEach(routineScheduler::cancel)
+            cancellation.shortcutIds.forEach { id -> runCatching { appScheduler.cancelById(id) } }
+            cancellation.messageIds.forEach { id -> runCatching { messageScheduler.cancelById(id) } }
+            cancellation.routineIds.forEach { id -> runCatching { routineScheduler.cancel(id) } }
 
             shortcutStore.save(payload.shortcuts)
             messageStore.save(payload.messages)
@@ -96,8 +96,11 @@ private fun BackupTransferScreen(onBack: () -> Unit) {
             payload.shortcuts.filter { it.isEnabled }.forEach { item -> runCatching { appScheduler.schedule(item) } }
             payload.messages.filter { it.isEnabled }.forEach { item -> runCatching { messageScheduler.schedule(item) } }
             payload.routines.filter { it.isEnabled && it.isValid() }.forEach { item -> runCatching { routineScheduler.schedule(item) } }
+        }.onSuccess {
             status = if (ar) "تم الاستيراد بنجاح" else "Backup imported"
-        }.onFailure { status = it.message.orEmpty() }
+        }.onFailure {
+            status = if (ar) "فشل الاستيراد: " + (it.message ?: "خطأ غير معروف") else "Import failed: " + (it.message ?: "Unknown error")
+        }
     }
 
     val create = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("application/json")) { uri -> uri?.let(::write) }
