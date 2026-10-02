@@ -20,9 +20,9 @@ class MessageCodecTest {
                 message = "صباح الخير | good morning",
                 hour = 8,
                 minute = 5,
-                repeat = RepeatOption.WEEKLY,
+                repeat = RepeatOption.ONCE,
                 isEnabled = false,
-                weeklyDayIso = 2,
+                oneShotEpochDay = 20_001L,
             ),
         )
 
