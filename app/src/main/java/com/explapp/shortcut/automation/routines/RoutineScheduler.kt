@@ -52,13 +52,7 @@ class RoutineScheduler(private val context: Context) {
             RoutineTriggerType.BATTERY_BELOW -> scheduleStatePoll(routine)
             RoutineTriggerType.CHARGER_CONNECTED,
             RoutineTriggerType.CHARGER_DISCONNECTED,
-            -> {
-                val state = RoutineEdgeState(context)
-                if (state.chargerState(routine.id) == null) {
-                    state.setChargerState(routine.id, isDeviceCharging(context))
-                }
-                scheduleStatePoll(routine)
-            }
+            -> Unit // System power broadcasts trigger these routines directly; no polling needed.
             else -> Unit
         }
     }
@@ -257,6 +251,8 @@ class RoutineSystemEventReceiver : BroadcastReceiver() {
                         reschedule(context)
                     }
                     Intent.ACTION_MY_PACKAGE_REPLACED -> reschedule(context)
+                    Intent.ACTION_POWER_CONNECTED -> dispatcher.dispatch(RoutineEvent(RoutineTriggerType.CHARGER_CONNECTED))
+                    Intent.ACTION_POWER_DISCONNECTED -> dispatcher.dispatch(RoutineEvent(RoutineTriggerType.CHARGER_DISCONNECTED))
                 }
             } finally {
                 pendingResult.finish()
