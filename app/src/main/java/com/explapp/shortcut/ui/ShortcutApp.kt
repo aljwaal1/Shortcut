@@ -84,6 +84,7 @@ import com.explapp.shortcut.domain.ScheduledMessage
 import com.explapp.shortcut.domain.RepeatOption
 import com.explapp.shortcut.domain.ShortcutCollection
 import com.explapp.shortcut.execution.TaskExecutionReporter
+import com.explapp.shortcut.quality.CrashLogStore
 import com.explapp.shortcut.automation.routines.RoutineStore
 import com.explapp.shortcut.search.CommandPaletteActivity
 import com.explapp.shortcut.tools.ToolCatalog
@@ -783,6 +784,8 @@ private fun SettingsScreen(padding: PaddingValues, onOpenPermissions: () -> Unit
     val context = LocalContext.current
     val configuration = LocalConfiguration.current
     val ar = configuration.locales[0].language == "ar"
+    val crashStore = remember(context) { CrashLogStore(context.applicationContext) }
+    var crashRecord by remember { mutableStateOf(crashStore.last()) }
     var infoDialog by rememberSaveable { mutableStateOf<String?>(null) }
     val versionName = remember(context) {
         runCatching {
@@ -958,6 +961,36 @@ private fun SettingsScreen(padding: PaddingValues, onOpenPermissions: () -> Unit
                 }
             }
         }
+        if (crashRecord != null) {
+            item {
+                ElevatedCard(
+                    onClick = { infoDialog = "crash" },
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = CardDefaults.elevatedCardColors(containerColor = MaterialTheme.colorScheme.error.copy(alpha = 0.07f)),
+                ) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth().padding(17.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(12.dp),
+                    ) {
+                        AccentIcon(Icons.Default.History, MaterialTheme.colorScheme.error)
+                        Column(Modifier.weight(1f)) {
+                            Text(
+                                if (ar) "آخر توقف غير متوقع" else "Last unexpected crash",
+                                style = MaterialTheme.typography.titleMedium,
+                                fontWeight = FontWeight.Bold,
+                            )
+                            Text(
+                                crashRecord?.displayTime().orEmpty(),
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                        }
+                        Text("→", color = MaterialTheme.colorScheme.error)
+                    }
+                }
+            }
+        }
         item {
             ElevatedCard(
                 onClick = { infoDialog = "privacy" },
@@ -1001,22 +1034,40 @@ private fun SettingsScreen(padding: PaddingValues, onOpenPermissions: () -> Unit
 
     infoDialog?.let { dialog ->
         val isPrivacy = dialog == "privacy"
+        val isCrash = dialog == "crash"
         AlertDialog(
             onDismissRequest = { infoDialog = null },
             title = {
                 Text(
-                    if (isPrivacy) stringResource(R.string.privacy) else stringResource(R.string.about),
+                    when {
+                        isCrash -> if (ar) "تفاصيل آخر توقف" else "Last crash details"
+                        isPrivacy -> stringResource(R.string.privacy)
+                        else -> stringResource(R.string.about)
+                    },
                     fontWeight = FontWeight.ExtraBold,
                 )
             },
             text = {
                 Text(
-                    if (isPrivacy) {
-                        if (ar) "يعمل Shortcut محليًا قدر الإمكان ولا يحتاج إلى حساب. لا يرسل بياناتك إلى خادم خاص بالتطبيق. بعض الميزات تتصل بخدمات خارجية فقط عندما تطلب ذلك، مثل Telegram Bot API أو فتح روابط خارجية. يمكنك مراجعة الصلاحيات من صفحة الصلاحيات."
-                        else "Shortcut works locally whenever possible and does not require an account. It does not send your data to an app-owned server. Some features contact external services only when you request them, such as the Telegram Bot API or opening external links. You can review permissions from the Permissions screen."
-                    } else {
-                        if (ar) "Shortcut $versionName — تطبيق أندرويد محلي للأتمتة والأدوات اليومية. صُمم ليجمع الجدولة والأدوات والاختصارات في واجهة واحدة سريعة."
-                        else "Shortcut $versionName — a local-first Android automation and utility app designed to combine scheduling, tools and shortcuts in one fast interface."
+                    when {
+                        isCrash -> {
+                            val record = crashRecord
+                            if (record == null) {
+                                if (ar) "لا توجد تفاصيل متاحة." else "No crash details available."
+                            } else {
+                                record.displayTime() + "\n" +
+                                    (if (ar) "المسار: " else "Thread: ") + record.threadName + "\n\n" +
+                                    record.summary + "\n\n" + record.stackTrace.take(5000)
+                            }
+                        }
+                        isPrivacy -> {
+                            if (ar) "يعمل Shortcut محليًا قدر الإمكان ولا يحتاج إلى حساب. لا يرسل بياناتك إلى خادم خاص بالتطبيق. بعض الميزات تتصل بخدمات خارجية فقط عندما تطلب ذلك، مثل Telegram Bot API أو فتح روابط خارجية. يمكنك مراجعة الصلاحيات من صفحة الصلاحيات."
+                            else "Shortcut works locally whenever possible and does not require an account. It does not send your data to an app-owned server. Some features contact external services only when you request them, such as the Telegram Bot API or opening external links. You can review permissions from the Permissions screen."
+                        }
+                        else -> {
+                            if (ar) "Shortcut $versionName — تطبيق أندرويد محلي للأتمتة والأدوات اليومية. صُمم ليجمع الجدولة والأدوات والاختصارات في واجهة واحدة سريعة."
+                            else "Shortcut $versionName — a local-first Android automation and utility app designed to combine scheduling, tools and shortcuts in one fast interface."
+                        }
                     },
                 )
             },
@@ -1025,6 +1076,17 @@ private fun SettingsScreen(padding: PaddingValues, onOpenPermissions: () -> Unit
                     Text(if (ar) "حسنًا" else "OK")
                 }
             },
+            dismissButton = if (isCrash) {
+                {
+                    TextButton(onClick = {
+                        crashStore.clear()
+                        crashRecord = null
+                        infoDialog = null
+                    }) {
+                        Text(if (ar) "مسح السجل" else "Clear log")
+                    }
+                }
+            } else null,
         )
     }
 }
