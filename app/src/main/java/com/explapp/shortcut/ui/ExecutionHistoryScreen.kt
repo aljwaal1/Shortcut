@@ -110,7 +110,8 @@ fun ExecutionHistoryScreen(padding: PaddingValues) {
                     }
                     if (result.status == TaskExecutionStatus.PREPARED) {
                         Text(
-                            if (ar) "تم تجهيز الرسالة؛ لم يتم تسجيلها كمرسلة." else "Message prepared; it was not recorded as sent.",
+                            if (ar) "بدأ التنفيذ ويحتاج إكمال إجراء أو نتيجة غير متزامنة؛ لا يُسجّل كنجاح قبل اكتماله."
+                            else "Execution started and awaits user action or an asynchronous result; it is not recorded as completed yet.",
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
