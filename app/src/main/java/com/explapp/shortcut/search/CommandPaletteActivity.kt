@@ -16,8 +16,11 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.ElevatedCard
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.material3.Icon
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -36,6 +39,7 @@ import com.explapp.shortcut.data.ShortcutStore
 import com.explapp.shortcut.tools.ToolCatalog
 import com.explapp.shortcut.tools.ToolId
 import com.explapp.shortcut.tools.ToolRouter
+import com.explapp.shortcut.tools.ToolPreferencesStore
 import com.explapp.shortcut.ui.MyAutomationsActivity
 import com.explapp.shortcut.ui.ScheduledTasksManagerActivity
 import com.explapp.shortcut.ui.ShortcutTheme
@@ -57,6 +61,7 @@ private fun CommandPaletteScreen(onBack: () -> Unit) {
     val scheduledShortcuts = remember { ShortcutStore(context).load() }
     val scheduledMessages = remember { MessageStore(context).load() }
     val templates = remember { RoutineTemplateCatalog.templates() }
+    val toolPrefs = remember(context) { ToolPreferencesStore(context.applicationContext) }
 
     val all = remember(routines, tools, scheduledShortcuts, scheduledMessages, templates, ar) {
         buildList {
@@ -80,10 +85,30 @@ private fun CommandPaletteScreen(onBack: () -> Unit) {
             OutlinedTextField(
                 value = query,
                 onValueChange = { query = it },
-                label = { Text(if (ar) "ابحث في الأدوات والأتمتة والقوالب" else "Search tools, automations and templates") },
+                label = { Text(if (ar) "ابحث في كل شيء" else "Search everything") },
+                placeholder = { Text(if (ar) "اسم أداة، اختصار، تطبيق أو قالب..." else "Tool, shortcut, app or template...") },
+                leadingIcon = { Icon(Icons.Default.Search, contentDescription = null) },
                 modifier = Modifier.fillMaxWidth(),
                 singleLine = true,
             )
+        }
+        if (filtered.isEmpty()) {
+            item {
+                ElevatedCard(modifier = Modifier.fillMaxWidth()) {
+                    Column(Modifier.fillMaxWidth().padding(20.dp), verticalArrangement = Arrangement.spacedBy(5.dp)) {
+                        Text(
+                            if (ar) "لا توجد نتائج" else "No results",
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.Bold,
+                        )
+                        Text(
+                            if (ar) "جرّب اسمًا أقصر أو كلمة مختلفة." else "Try a shorter name or a different keyword.",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                }
+            }
         }
         items(filtered, key = { it.id }) { item ->
             ElevatedCard(
@@ -92,7 +117,10 @@ private fun CommandPaletteScreen(onBack: () -> Unit) {
                     when {
                         item.id.startsWith("tool:") -> {
                             val id = runCatching { ToolId.valueOf(item.id.substringAfter(':')) }.getOrNull()
-                            if (id != null) context.startActivity(ToolRouter.intent(context, id))
+                            if (id != null) {
+                                toolPrefs.recordRecent(id)
+                                context.startActivity(ToolRouter.intent(context, id))
+                            }
                         }
                         item.id.startsWith("routine:") -> routines.firstOrNull { it.id == item.id.substringAfter(':') }
                             ?.let { RoutineDispatcher(context).execute(it, userInitiated = true) }
@@ -103,7 +131,16 @@ private fun CommandPaletteScreen(onBack: () -> Unit) {
             ) {
                 Column(Modifier.padding(14.dp)) {
                     Text(item.label, fontWeight = FontWeight.Bold)
-                    Text(item.kind.name, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Text(
+                        when (item.kind) {
+                            CommandKind.TOOL -> if (ar) "أداة" else "Tool"
+                            CommandKind.ROUTINE -> if (ar) "أتمتة" else "Automation"
+                            CommandKind.SCHEDULED -> if (ar) "مهمة مجدولة" else "Scheduled task"
+                            CommandKind.TEMPLATE -> if (ar) "قالب" else "Template"
+                        },
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
                 }
             }
         }
