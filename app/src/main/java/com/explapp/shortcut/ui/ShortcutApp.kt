@@ -618,6 +618,53 @@ private fun SettingsScreen(padding: PaddingValues, onOpenPermissions: () -> Unit
         }
         item {
             ElevatedCard(
+                modifier = Modifier.fillMaxWidth(),
+                colors = CardDefaults.elevatedCardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.65f)),
+            ) {
+                Column(Modifier.padding(18.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                        AccentIcon(Icons.Default.Settings, MaterialTheme.colorScheme.tertiary)
+                        Text(stringResource(R.string.theme), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                    }
+                    val currentThemeMode = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+                        .getInt("theme_mode", AppCompatDelegate.MODE_NIGHT_FOLLOW_SYSTEM)
+                    Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                        TextButton(onClick = {
+                            context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit()
+                                .putInt("theme_mode", AppCompatDelegate.MODE_NIGHT_FOLLOW_SYSTEM).apply()
+                            AppCompatDelegate.setDefaultNightMode(AppCompatDelegate.MODE_NIGHT_FOLLOW_SYSTEM)
+                        }) {
+                            Text(if (ar) "النظام" else "System")
+                        }
+                        TextButton(onClick = {
+                            context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit()
+                                .putInt("theme_mode", AppCompatDelegate.MODE_NIGHT_NO).apply()
+                            AppCompatDelegate.setDefaultNightMode(AppCompatDelegate.MODE_NIGHT_NO)
+                        }) {
+                            Text(if (ar) "فاتح" else "Light")
+                        }
+                        TextButton(onClick = {
+                            context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit()
+                                .putInt("theme_mode", AppCompatDelegate.MODE_NIGHT_YES).apply()
+                            AppCompatDelegate.setDefaultNightMode(AppCompatDelegate.MODE_NIGHT_YES)
+                        }) {
+                            Text(if (ar) "داكن" else "Dark")
+                        }
+                    }
+                    Text(
+                        when (currentThemeMode) {
+                            AppCompatDelegate.MODE_NIGHT_NO -> if (ar) "المظهر الحالي: فاتح" else "Current appearance: Light"
+                            AppCompatDelegate.MODE_NIGHT_YES -> if (ar) "المظهر الحالي: داكن" else "Current appearance: Dark"
+                            else -> if (ar) "المظهر الحالي: حسب النظام" else "Current appearance: System"
+                        },
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+            }
+        }
+        item {
+            ElevatedCard(
                 onClick = onOpenPermissions,
                 modifier = Modifier.fillMaxWidth(),
                 colors = CardDefaults.elevatedCardColors(containerColor = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.55f)),
