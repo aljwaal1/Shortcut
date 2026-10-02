@@ -81,7 +81,11 @@ class TaskExecutionReporter(private val context: Context) {
         val manager = context.getSystemService(NotificationManager::class.java)
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             manager.createNotificationChannel(
-                NotificationChannel(CHANNEL, "Task results", NotificationManager.IMPORTANCE_DEFAULT),
+                NotificationChannel(
+                    CHANNEL,
+                    if (context.resources.configuration.locales[0].language == "ar") "نتائج المهام" else "Task results",
+                    NotificationManager.IMPORTANCE_DEFAULT,
+                ),
             )
         }
         val ar = context.resources.configuration.locales[0].language == "ar"
@@ -94,14 +98,18 @@ class TaskExecutionReporter(private val context: Context) {
                 append(result.reason)
             }
         }
-        val icon = if (result.status == TaskExecutionStatus.SUCCESS) android.R.drawable.checkbox_on_background
-        else android.R.drawable.ic_delete
+        val icon = when (result.status) {
+            TaskExecutionStatus.SUCCESS -> android.R.drawable.checkbox_on_background
+            TaskExecutionStatus.PREPARED -> android.R.drawable.ic_popup_sync
+            TaskExecutionStatus.FAILURE -> android.R.drawable.ic_delete
+        }
         manager.notify(
             (result.taskName.hashCode() * 31 + result.finishedAtMs.hashCode()),
             NotificationCompat.Builder(context, CHANNEL)
                 .setSmallIcon(icon)
                 .setContentTitle(title)
-                .setContentText(detail)
+                .setContentText(detail.take(220))
+                .setStyle(NotificationCompat.BigTextStyle().bigText(detail))
                 .setAutoCancel(true)
                 .build(),
         )
