@@ -309,46 +309,88 @@ class ToolActivity : AppCompatActivity() {
     }
 
     private fun zipFiles(uris: List<Uri>) {
-        runCatching {
-            val bytes = ByteArrayOutputStream()
-            ZipOutputStream(bytes).use { zip ->
-                uris.forEachIndexed { index, uri ->
-                    val name = queryNameAndSize(uri).first.ifBlank { "file_$index" }
-                    zip.putNextEntry(ZipEntry(name))
-                    contentResolver.openInputStream(uri).use { input -> requireNotNull(input).copyTo(zip) }
-                    zip.closeEntry()
+        Thread {
+            val result = runCatching {
+                val output = createOutputUri(
+                    "Shortcut_${System.currentTimeMillis()}.zip",
+                    "application/zip",
+                    images = false,
+                )
+                contentResolver.openOutputStream(output).use { raw ->
+                    ZipOutputStream(requireNotNull(raw).buffered()).use { zip ->
+                        uris.forEachIndexed { index, uri ->
+                            val name = queryNameAndSize(uri).first.ifBlank { "file_$index" }
+                            zip.putNextEntry(ZipEntry(name))
+                            contentResolver.openInputStream(uri).use { input ->
+                                requireNotNull(input).copyTo(zip, DEFAULT_BUFFER_SIZE)
+                            }
+                            zip.closeEntry()
+                        }
+                    }
                 }
+                output
             }
-            saveBytes(bytes.toByteArray(), "Shortcut_${System.currentTimeMillis()}.zip", "application/zip")
-        }.onSuccess { toast(local("ZIP saved", "تم حفظ ZIP")) }
-            .onFailure(::showError)
-        finish()
+            runOnUiThread {
+                result.onSuccess {
+                    toast(local("ZIP saved", "تم حفظ ZIP"))
+                    finish()
+                }.onFailure(::showError)
+            }
+        }.start()
     }
 
     private fun unzip(uri: Uri) {
-        runCatching {
-            val dir = File(getExternalFilesDir(Environment.DIRECTORY_DOWNLOADS), "Unzipped_${System.currentTimeMillis()}")
-                .apply { mkdirs() }
-            contentResolver.openInputStream(uri).use { input ->
-                ZipInputStream(requireNotNull(input)).use { zip ->
-                    var entry = zip.nextEntry
-                    while (entry != null) {
-                        val output = File(dir, entry.name).canonicalFile
-                        require(output.path.startsWith(dir.canonicalPath)) { "Unsafe ZIP entry" }
-                        if (entry.isDirectory) {
-                            output.mkdirs()
-                        } else {
-                            output.parentFile?.mkdirs()
-                            FileOutputStream(output).use { zip.copyTo(it) }
+        Thread {
+            val result = runCatching {
+                val dir = File(
+                    getExternalFilesDir(Environment.DIRECTORY_DOWNLOADS),
+                    "Unzipped_${System.currentTimeMillis()}",
+                ).apply { mkdirs() }
+                val rootPath = dir.canonicalFile.path
+                var totalBytes = 0L
+                var entryCount = 0
+
+                contentResolver.openInputStream(uri).use { input ->
+                    ZipInputStream(requireNotNull(input).buffered()).use { zip ->
+                        var entry = zip.nextEntry
+                        val buffer = ByteArray(DEFAULT_BUFFER_SIZE)
+                        while (entry != null) {
+                            entryCount++
+                            require(entryCount <= MAX_UNZIP_ENTRIES) { "ZIP contains too many entries" }
+
+                            val output = File(dir, entry.name).canonicalFile
+                            require(
+                                output.path == rootPath ||
+                                    output.path.startsWith(rootPath + File.separator),
+                            ) { "Unsafe ZIP entry" }
+
+                            if (entry.isDirectory) {
+                                output.mkdirs()
+                            } else {
+                                output.parentFile?.mkdirs()
+                                FileOutputStream(output).buffered().use { out ->
+                                    while (true) {
+                                        val read = zip.read(buffer)
+                                        if (read <= 0) break
+                                        totalBytes += read
+                                        require(totalBytes <= MAX_UNZIP_BYTES) { "ZIP expands beyond the safety limit" }
+                                        out.write(buffer, 0, read)
+                                    }
+                                }
+                            }
+                            zip.closeEntry()
+                            entry = zip.nextEntry
                         }
-                        zip.closeEntry()
-                        entry = zip.nextEntry
                     }
                 }
+                dir.absolutePath
             }
-            dir.absolutePath
-        }.onSuccess { showTextResult(local("Unzipped to:\n$it", "تم فك الملفات إلى:\n$it")) }
-            .onFailure(::showError)
+            runOnUiThread {
+                result.onSuccess {
+                    showTextResult(local("Unzipped to:\n$it", "تم فك الملفات إلى:\n$it"))
+                }.onFailure(::showError)
+            }
+        }.start()
     }
 
     private fun promptQr() {
@@ -758,6 +800,14 @@ class ToolActivity : AppCompatActivity() {
 
     private fun local(en: String, ar: String): String =
         if (resources.configuration.locales[0].language == "ar") ar else en
+
+    companion object {
+        private const val MAX_UNZIP_ENTRIES = 2_000
+        private const val MAX_UNZIP_BYTES = 1_073_741_824L
+        private const val REQUEST_LOCATION = 3101
+        private const val REQUEST_MEDIA = 3102
+        const val EXTRA_TOOL = "tool"
+    }
 
     companion object {
         const val EXTRA_TOOL = "tool"
