@@ -67,14 +67,14 @@ private fun ScheduledTasksManagerScreen(onBack: () -> Unit) {
         if (index >= 0) shortcuts[index] = item else shortcuts += item
         shortcutStore.save(shortcuts)
         appScheduler.cancelById(item.id)
-        if (item.isEnabled) appScheduler.schedule(item)
+        if (item.isEnabled) runCatching { appScheduler.schedule(item) }
     }
     fun replaceMessage(item: ScheduledMessage) {
         val index = messages.indexOfFirst { it.id == item.id }
         if (index >= 0) messages[index] = item else messages += item
         messageStore.save(messages)
         messageScheduler.cancelById(item.id)
-        if (item.isEnabled) messageScheduler.schedule(item)
+        if (item.isEnabled) runCatching { messageScheduler.schedule(item) }
     }
 
     when {
@@ -101,6 +101,25 @@ private fun ScheduledTasksManagerScreen(onBack: () -> Unit) {
                         Text(if (ar) "تعديل • إيقاف • تشغيل الآن • نسخ" else "Edit • Pause • Run now • Duplicate")
                     }
                     TextButton(onClick = onBack) { Text(if (ar) "رجوع" else "Back") }
+                }
+            }
+            if (shortcuts.isEmpty() && messages.isEmpty()) {
+                item {
+                    ElevatedCard(Modifier.fillMaxWidth()) {
+                        Column(Modifier.fillMaxWidth().padding(20.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                            Text(
+                                if (ar) "لا توجد مهام مجدولة" else "No scheduled tasks",
+                                style = MaterialTheme.typography.titleMedium,
+                                fontWeight = FontWeight.Bold,
+                            )
+                            Text(
+                                if (ar) "أنشئ اختصارًا أو رسالة مجدولة وستظهر هنا لإدارتها."
+                                else "Create a shortcut or scheduled message and it will appear here.",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                        }
+                    }
                 }
             }
             items(shortcuts, key = { it.id }) { item ->
