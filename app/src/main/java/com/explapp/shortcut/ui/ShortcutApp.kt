@@ -96,6 +96,7 @@ private const val KEY_ONBOARDING = "onboarding_complete"
 private enum class MainTab(val label: Int, val icon: ImageVector) {
     HOME(R.string.home, Icons.Default.Home),
     TEMPLATES(R.string.templates, Icons.Default.AutoAwesome),
+    TOOLS(R.string.tools, Icons.Default.Build),
     HISTORY(R.string.history, Icons.Default.History),
     SETTINGS(R.string.settings, Icons.Default.Settings),
 }
@@ -285,7 +286,9 @@ private fun MainShell(
                 MainTab.entries.forEach { tab ->
                     NavigationBarItem(
                         selected = selected == tab,
-                        onClick = { selected = tab },
+                        onClick = {
+                            if (tab == MainTab.TOOLS) onOpenTools() else selected = tab
+                        },
                         icon = { Icon(tab.icon, contentDescription = null) },
                         label = { Text(stringResource(tab.label)) },
                     )
@@ -317,6 +320,7 @@ private fun MainShell(
                 onDeleteMessage = onDeleteMessage,
             )
             MainTab.TEMPLATES -> TemplatesScreen(padding, onCreateShortcut, onCreateMessage)
+            MainTab.TOOLS -> Unit
             MainTab.HISTORY -> ExecutionHistoryScreen(padding)
             MainTab.SETTINGS -> SettingsScreen(padding, onOpenPermissions)
         }
