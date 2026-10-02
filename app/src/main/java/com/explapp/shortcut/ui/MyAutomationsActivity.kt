@@ -251,7 +251,7 @@ private fun MyAutomationsScreen(onBack: () -> Unit) {
                             Switch(checked = routine.isEnabled, onCheckedChange = { enabled -> upsert(routine.copy(isEnabled = enabled)) })
                         }
                         Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                            TextButton(onClick = { RoutineDispatcher(context).execute(routine, userInitiated = true) }) { Text(if (ar) "تشغيل" else "Run") }
+                            TextButton(onClick = { RoutineDispatcher(context).executeAsync(routine, userInitiated = true) }) { Text(if (ar) "تشغيل" else "Run") }
                             TextButton(onClick = { editing = routine }) { Text(if (ar) "تعديل" else "Edit") }
                             TextButton(onClick = { upsert(routine.duplicate()) }) { Text(if (ar) "نسخ" else "Copy") }
                             TextButton(onClick = {
