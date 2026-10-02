@@ -804,12 +804,6 @@ class ToolActivity : AppCompatActivity() {
     companion object {
         private const val MAX_UNZIP_ENTRIES = 2_000
         private const val MAX_UNZIP_BYTES = 1_073_741_824L
-        private const val REQUEST_LOCATION = 3101
-        private const val REQUEST_MEDIA = 3102
-        const val EXTRA_TOOL = "tool"
-    }
-
-    companion object {
         const val EXTRA_TOOL = "tool"
         private const val REQUEST_LOCATION = 3001
         private const val REQUEST_MEDIA = 3002
