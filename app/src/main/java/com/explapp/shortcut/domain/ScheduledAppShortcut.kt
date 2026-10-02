@@ -17,12 +17,14 @@ data class ScheduledAppShortcut(
     val minute: Int,
     val repeat: RepeatOption,
     val isEnabled: Boolean = true,
+    val weeklyDayIso: Int? = null,
 ) {
     fun isValid(): Boolean =
         id.isNotBlank() &&
             packageName.isNotBlank() &&
             hour in 0..23 &&
-            minute in 0..59
+            minute in 0..59 &&
+            (weeklyDayIso == null || weeklyDayIso in 1..7)
 
     fun duplicate(newId: String = UUID.randomUUID().toString()): ScheduledAppShortcut =
         copy(id = newId, isEnabled = true)
