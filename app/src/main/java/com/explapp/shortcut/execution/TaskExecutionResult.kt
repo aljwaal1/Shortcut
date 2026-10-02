@@ -14,14 +14,14 @@ data class TaskExecutionResult(
     val summaryEn: String
         get() = when (status) {
             TaskExecutionStatus.SUCCESS -> "Completed: $taskName"
-            TaskExecutionStatus.PREPARED -> "Prepared: $taskName"
+            TaskExecutionStatus.PREPARED -> "In progress: $taskName"
             TaskExecutionStatus.FAILURE -> "Failed: $taskName${reason?.let { " — $it" } ?: ""}"
         }
 
     val summaryAr: String
         get() = when (status) {
             TaskExecutionStatus.SUCCESS -> "تم تنفيذ المهمة: $taskName"
-            TaskExecutionStatus.PREPARED -> "الرسالة جاهزة: $taskName"
+            TaskExecutionStatus.PREPARED -> "قيد الإكمال: $taskName"
             TaskExecutionStatus.FAILURE -> "فشلت المهمة: $taskName${reason?.let { " — $it" } ?: ""}"
         }
 
