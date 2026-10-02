@@ -36,6 +36,7 @@ import androidx.compose.material.icons.filled.Language
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Build
 import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ElevatedCard
@@ -49,6 +50,7 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -573,13 +575,18 @@ private fun SettingsScreen(padding: PaddingValues, onOpenPermissions: () -> Unit
     val context = LocalContext.current
     val configuration = LocalConfiguration.current
     val ar = configuration.locales[0].language == "ar"
-    val rows = listOf(
-        R.string.contact_us,
-        R.string.feedback,
-        R.string.report_problem,
-        R.string.privacy,
-        R.string.about,
-    )
+    var infoDialog by rememberSaveable { mutableStateOf<String?>(null) }
+    val versionName = remember(context) {
+        runCatching {
+            context.packageManager.getPackageInfo(context.packageName, 0).versionName.orEmpty()
+        }.getOrDefault("")
+    }
+
+    fun openProjectPage(path: String = "") {
+        val base = "https://github.com/aljwaal1/Shortcut"
+        val uri = Uri.parse(if (path.isBlank()) base else base + "/" + path)
+        runCatching { context.startActivity(Intent(Intent.ACTION_VIEW, uri)) }
+    }
     LazyColumn(
         modifier = Modifier.fillMaxSize().padding(padding),
         contentPadding = PaddingValues(18.dp),
@@ -650,18 +657,120 @@ private fun SettingsScreen(padding: PaddingValues, onOpenPermissions: () -> Unit
                 }
             }
         }
-        items(rows) { label ->
-            ElevatedCard(modifier = Modifier.fillMaxWidth()) {
+        item {
+            ElevatedCard(
+                onClick = { openProjectPage("issues/new") },
+                modifier = Modifier.fillMaxWidth(),
+            ) {
                 Row(
                     modifier = Modifier.fillMaxWidth().padding(17.dp),
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(12.dp),
                 ) {
                     AccentIcon(Icons.Default.AutoAwesome, MaterialTheme.colorScheme.tertiary)
-                    Text(stringResource(label), modifier = Modifier.weight(1f), style = MaterialTheme.typography.titleMedium)
+                    Column(Modifier.weight(1f)) {
+                        Text(stringResource(R.string.report_problem), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                        Text(
+                            if (ar) "افتح صفحة المشروع واكتب المشكلة بالتفصيل" else "Open the project page and describe the issue",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                    Text("→", color = MaterialTheme.colorScheme.tertiary)
                 }
             }
         }
+        item {
+            ElevatedCard(
+                onClick = { openProjectPage("issues") },
+                modifier = Modifier.fillMaxWidth(),
+            ) {
+                Row(
+                    modifier = Modifier.fillMaxWidth().padding(17.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(12.dp),
+                ) {
+                    AccentIcon(Icons.Default.AutoAwesome, MaterialTheme.colorScheme.secondary)
+                    Column(Modifier.weight(1f)) {
+                        Text(stringResource(R.string.feedback), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                        Text(
+                            if (ar) "شارك اقتراحك أو تابع الملاحظات الحالية" else "Share an idea or review existing feedback",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                    Text("→", color = MaterialTheme.colorScheme.secondary)
+                }
+            }
+        }
+        item {
+            ElevatedCard(
+                onClick = { infoDialog = "privacy" },
+                modifier = Modifier.fillMaxWidth(),
+            ) {
+                Row(
+                    modifier = Modifier.fillMaxWidth().padding(17.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(12.dp),
+                ) {
+                    AccentIcon(Icons.Default.Settings, MaterialTheme.colorScheme.primary)
+                    Text(stringResource(R.string.privacy), modifier = Modifier.weight(1f), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                    Text("→", color = MaterialTheme.colorScheme.primary)
+                }
+            }
+        }
+        item {
+            ElevatedCard(
+                onClick = { infoDialog = "about" },
+                modifier = Modifier.fillMaxWidth(),
+            ) {
+                Row(
+                    modifier = Modifier.fillMaxWidth().padding(17.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(12.dp),
+                ) {
+                    AccentIcon(Icons.Default.AutoAwesome, MaterialTheme.colorScheme.tertiary)
+                    Column(Modifier.weight(1f)) {
+                        Text(stringResource(R.string.about), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                        Text(
+                            if (ar) "الإصدار $versionName" else "Version $versionName",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                    Text("→", color = MaterialTheme.colorScheme.tertiary)
+                }
+            }
+        }
+    }
+
+    infoDialog?.let { dialog ->
+        val isPrivacy = dialog == "privacy"
+        AlertDialog(
+            onDismissRequest = { infoDialog = null },
+            title = {
+                Text(
+                    if (isPrivacy) stringResource(R.string.privacy) else stringResource(R.string.about),
+                    fontWeight = FontWeight.ExtraBold,
+                )
+            },
+            text = {
+                Text(
+                    if (isPrivacy) {
+                        if (ar) "يعمل Shortcut محليًا قدر الإمكان ولا يحتاج إلى حساب. لا يرسل بياناتك إلى خادم خاص بالتطبيق. بعض الميزات تتصل بخدمات خارجية فقط عندما تطلب ذلك، مثل Telegram Bot API أو فتح روابط خارجية. يمكنك مراجعة الصلاحيات من صفحة الصلاحيات."
+                        else "Shortcut works locally whenever possible and does not require an account. It does not send your data to an app-owned server. Some features contact external services only when you request them, such as the Telegram Bot API or opening external links. You can review permissions from the Permissions screen."
+                    } else {
+                        if (ar) "Shortcut $versionName — تطبيق أندرويد محلي للأتمتة والأدوات اليومية. صُمم ليجمع الجدولة والأدوات والاختصارات في واجهة واحدة سريعة."
+                        else "Shortcut $versionName — a local-first Android automation and utility app designed to combine scheduling, tools and shortcuts in one fast interface."
+                    },
+                )
+            },
+            confirmButton = {
+                TextButton(onClick = { infoDialog = null }) {
+                    Text(if (ar) "حسنًا" else "OK")
+                }
+            },
+        )
     }
 }
 
