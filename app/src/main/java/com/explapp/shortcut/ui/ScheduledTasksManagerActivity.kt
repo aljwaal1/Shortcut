@@ -108,6 +108,25 @@ private fun ScheduledTasksManagerScreen(onBack: () -> Unit) {
                     ElevatedCard(Modifier.fillMaxWidth()) {
                         Column(Modifier.fillMaxWidth().padding(20.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
                             Text(
+                                if (ar) "لا توجد مهام مجدولة بعد" else "No scheduled tasks yet",
+                                style = MaterialTheme.typography.titleMedium,
+                                fontWeight = FontWeight.Bold,
+                            )
+                            Text(
+                                if (ar) "أنشئ اختصارًا أو رسالة مجدولة من الصفحة الرئيسية."
+                                else "Create a scheduled shortcut or message from the Home screen.",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                        }
+                    }
+                }
+            }
+            if (shortcuts.isEmpty() && messages.isEmpty()) {
+                item {
+                    ElevatedCard(Modifier.fillMaxWidth()) {
+                        Column(Modifier.fillMaxWidth().padding(20.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                            Text(
                                 if (ar) "لا توجد مهام مجدولة" else "No scheduled tasks",
                                 style = MaterialTheme.typography.titleMedium,
                                 fontWeight = FontWeight.Bold,
@@ -136,7 +155,7 @@ private fun ScheduledTasksManagerScreen(onBack: () -> Unit) {
                             TextButton(onClick = { editingShortcut = item }) { Text(if (ar) "تعديل" else "Edit") }
                             TextButton(onClick = {
                                 context.packageManager.getLaunchIntentForPackage(item.packageName)?.let {
-                                    context.startActivity(it.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+                                    runCatching { context.startActivity(it.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)) }
                                 }
                             }) { Text(if (ar) "تشغيل الآن" else "Run now") }
                             TextButton(onClick = { replaceShortcut(item.duplicate()) }) { Text(if (ar) "نسخ" else "Duplicate") }
@@ -163,7 +182,7 @@ private fun ScheduledTasksManagerScreen(onBack: () -> Unit) {
                             TextButton(onClick = { editingMessage = item }) { Text(if (ar) "تعديل" else "Edit") }
                             TextButton(onClick = {
                                 val link = MessageDeepLinkFactory.build(item.platform, item.recipient, item.message)
-                                context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(link)))
+                                runCatching { context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(link))) }
                             }) { Text(if (ar) "تشغيل الآن" else "Run now") }
                             TextButton(onClick = { replaceMessage(item.duplicate()) }) { Text(if (ar) "نسخ" else "Duplicate") }
                             TextButton(onClick = {
