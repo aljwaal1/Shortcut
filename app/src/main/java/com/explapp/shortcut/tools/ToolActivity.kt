@@ -180,47 +180,80 @@ class ToolActivity : AppCompatActivity() {
         }
     }
 
-    private fun mergeImages(uris: List<Uri>, vertical: Boolean) {
-        runCatching {
-            val bitmaps = uris.map { loadScaledBitmap(it, 1600) }
-            val width = if (vertical) bitmaps.maxOf { it.width } else bitmaps.sumOf { it.width }
-            val height = if (vertical) bitmaps.sumOf { it.height } else bitmaps.maxOf { it.height }
-            require(width > 0 && height > 0 && width.toLong() * height <= 40_000_000L) { "Result is too large" }
-            val result = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
-            val canvas = Canvas(result)
-            var x = 0f
-            var y = 0f
-            bitmaps.forEach { bitmap ->
-                canvas.drawBitmap(bitmap, x, y, null)
-                if (vertical) y += bitmap.height else x += bitmap.width
+    private fun <T> runBackground(
+        work: () -> T,
+        onSuccess: (T) -> Unit,
+    ) {
+        Thread {
+            val result = runCatching(work)
+            runOnUiThread {
+                if (isFinishing || isDestroyed) return@runOnUiThread
+                result.onSuccess(onSuccess).onFailure(::showError)
             }
-            saveBitmap(result, "Merged_${System.currentTimeMillis()}.jpg", "image/jpeg", Bitmap.CompressFormat.JPEG, 92)
-            bitmaps.forEach(Bitmap::recycle)
-            result.recycle()
-        }.onSuccess { toast(local("Merged image saved", "تم حفظ الصورة المدمجة")) }
-            .onFailure(::showError)
-        finish()
+        }.start()
+    }
+
+    private fun mergeImages(uris: List<Uri>, vertical: Boolean) {
+        runBackground(
+            work = {
+                val bitmaps = uris.map { loadScaledBitmap(it, 1600) }
+                try {
+                    val width = if (vertical) bitmaps.maxOf { it.width } else bitmaps.sumOf { it.width }
+                    val height = if (vertical) bitmaps.sumOf { it.height } else bitmaps.maxOf { it.height }
+                    require(width > 0 && height > 0 && width.toLong() * height <= 40_000_000L) { "Result is too large" }
+                    val result = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
+                    try {
+                        val canvas = Canvas(result)
+                        var x = 0f
+                        var y = 0f
+                        bitmaps.forEach { bitmap ->
+                            canvas.drawBitmap(bitmap, x, y, null)
+                            if (vertical) y += bitmap.height else x += bitmap.width
+                        }
+                        saveBitmap(result, "Merged_${System.currentTimeMillis()}.jpg", "image/jpeg", Bitmap.CompressFormat.JPEG, 92)
+                    } finally {
+                        result.recycle()
+                    }
+                } finally {
+                    bitmaps.forEach { if (!it.isRecycled) it.recycle() }
+                }
+            },
+            onSuccess = {
+                toast(local("Merged image saved", "تم حفظ الصورة المدمجة"))
+                finish()
+            },
+        )
     }
 
     private fun imagesToPdf(uris: List<Uri>) {
-        runCatching {
-            val pdf = PdfDocument()
-            uris.forEachIndexed { index, uri ->
-                val bitmap = loadScaledBitmap(uri, 1800)
-                val page = pdf.startPage(PdfDocument.PageInfo.Builder(bitmap.width, bitmap.height, index + 1).create())
-                page.canvas.drawBitmap(bitmap, 0f, 0f, null)
-                pdf.finishPage(page)
-                bitmap.recycle()
-            }
-            val bytes = ByteArrayOutputStream().use { out ->
-                pdf.writeTo(out)
-                pdf.close()
-                out.toByteArray()
-            }
-            saveBytes(bytes, "Images_${System.currentTimeMillis()}.pdf", "application/pdf")
-        }.onSuccess { toast(local("PDF saved", "تم حفظ PDF")) }
-            .onFailure(::showError)
-        finish()
+        runBackground(
+            work = {
+                val pdf = PdfDocument()
+                try {
+                    uris.forEachIndexed { index, uri ->
+                        val bitmap = loadScaledBitmap(uri, 1800)
+                        try {
+                            val page = pdf.startPage(PdfDocument.PageInfo.Builder(bitmap.width, bitmap.height, index + 1).create())
+                            page.canvas.drawBitmap(bitmap, 0f, 0f, null)
+                            pdf.finishPage(page)
+                        } finally {
+                            bitmap.recycle()
+                        }
+                    }
+                    val output = createOutputUri("Images_${System.currentTimeMillis()}.pdf", "application/pdf", images = false)
+                    contentResolver.openOutputStream(output).use { out ->
+                        pdf.writeTo(requireNotNull(out))
+                    }
+                    output
+                } finally {
+                    pdf.close()
+                }
+            },
+            onSuccess = {
+                toast(local("PDF saved", "تم حفظ PDF"))
+                finish()
+            },
+        )
     }
 
     private fun ocr(uri: Uri) {
@@ -247,24 +280,33 @@ class ToolActivity : AppCompatActivity() {
     }
 
     private fun extractPdfText(uri: Uri) {
-        runCatching {
-            PDFBoxResourceLoader.init(applicationContext)
-            contentResolver.openInputStream(uri).use { input ->
-                requireNotNull(input)
-                PDDocument.load(input).use { document -> PDFTextStripper().getText(document) }
-            }
-        }.onSuccess(::showTextResult)
-            .onFailure(::showError)
+        runBackground(
+            work = {
+                PDFBoxResourceLoader.init(applicationContext)
+                contentResolver.openInputStream(uri).use { input ->
+                    requireNotNull(input)
+                    PDDocument.load(input).use { document -> PDFTextStripper().getText(document) }
+                }
+            },
+            onSuccess = ::showTextResult,
+        )
     }
 
     private fun convertToJpeg(uri: Uri) {
-        runCatching {
-            val bitmap = loadScaledBitmap(uri, 2400)
-            saveBitmap(bitmap, "Converted_${System.currentTimeMillis()}.jpg", "image/jpeg", Bitmap.CompressFormat.JPEG, 92)
-            bitmap.recycle()
-        }.onSuccess { toast(local("JPEG saved without copied metadata", "تم حفظ JPEG دون نسخ بيانات metadata")) }
-            .onFailure(::showError)
-        finish()
+        runBackground(
+            work = {
+                val bitmap = loadScaledBitmap(uri, 2400)
+                try {
+                    saveBitmap(bitmap, "Converted_${System.currentTimeMillis()}.jpg", "image/jpeg", Bitmap.CompressFormat.JPEG, 92)
+                } finally {
+                    bitmap.recycle()
+                }
+            },
+            onSuccess = {
+                toast(local("JPEG saved without copied metadata", "تم حفظ JPEG دون نسخ بيانات metadata"))
+                finish()
+            },
+        )
     }
 
     private fun showImageInfo(uri: Uri) {
@@ -290,13 +332,20 @@ class ToolActivity : AppCompatActivity() {
     }
 
     private fun compressResize(uri: Uri) {
-        runCatching {
-            val bitmap = loadScaledBitmap(uri, 1600)
-            saveBitmap(bitmap, "Compressed_${System.currentTimeMillis()}.jpg", "image/jpeg", Bitmap.CompressFormat.JPEG, 82)
-            bitmap.recycle()
-        }.onSuccess { toast(local("Compressed image saved", "تم حفظ الصورة المضغوطة")) }
-            .onFailure(::showError)
-        finish()
+        runBackground(
+            work = {
+                val bitmap = loadScaledBitmap(uri, 1600)
+                try {
+                    saveBitmap(bitmap, "Compressed_${System.currentTimeMillis()}.jpg", "image/jpeg", Bitmap.CompressFormat.JPEG, 82)
+                } finally {
+                    bitmap.recycle()
+                }
+            },
+            onSuccess = {
+                toast(local("Compressed image saved", "تم حفظ الصورة المضغوطة"))
+                finish()
+            },
+        )
     }
 
     private fun editImage(uri: Uri) {
