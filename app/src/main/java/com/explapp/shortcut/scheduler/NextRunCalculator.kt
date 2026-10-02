@@ -4,15 +4,30 @@ import com.explapp.shortcut.domain.RepeatOption
 import com.explapp.shortcut.domain.ScheduledAppShortcut
 import com.explapp.shortcut.domain.ScheduledMessage
 import java.time.DayOfWeek
+import java.time.LocalDate
 import java.time.ZonedDateTime
 import java.time.temporal.TemporalAdjusters
 
 object NextRunCalculator {
-    fun nextRun(now: ZonedDateTime, shortcut: ScheduledAppShortcut): ZonedDateTime =
-        nextRun(now, shortcut.hour, shortcut.minute, shortcut.repeat, shortcut.weeklyDayIso)
+    fun nextRun(now: ZonedDateTime, shortcut: ScheduledAppShortcut): ZonedDateTime? =
+        nextRun(
+            now = now,
+            hour = shortcut.hour,
+            minute = shortcut.minute,
+            repeat = shortcut.repeat,
+            weeklyDayIso = shortcut.weeklyDayIso,
+            oneShotEpochDay = shortcut.oneShotEpochDay,
+        )
 
-    fun nextRun(now: ZonedDateTime, message: ScheduledMessage): ZonedDateTime =
-        nextRun(now, message.hour, message.minute, message.repeat, message.weeklyDayIso)
+    fun nextRun(now: ZonedDateTime, message: ScheduledMessage): ZonedDateTime? =
+        nextRun(
+            now = now,
+            hour = message.hour,
+            minute = message.minute,
+            repeat = message.repeat,
+            weeklyDayIso = message.weeklyDayIso,
+            oneShotEpochDay = message.oneShotEpochDay,
+        )
 
     private fun nextRun(
         now: ZonedDateTime,
@@ -20,7 +35,8 @@ object NextRunCalculator {
         minute: Int,
         repeat: RepeatOption,
         weeklyDayIso: Int?,
-    ): ZonedDateTime {
+        oneShotEpochDay: Long?,
+    ): ZonedDateTime? {
         val todayAtTime = now
             .withHour(hour)
             .withMinute(minute)
@@ -28,9 +44,20 @@ object NextRunCalculator {
             .withNano(0)
 
         return when (repeat) {
-            RepeatOption.ONCE,
-            RepeatOption.DAILY,
-            -> if (todayAtTime.isAfter(now)) todayAtTime else todayAtTime.plusDays(1)
+            RepeatOption.ONCE -> {
+                if (oneShotEpochDay == null) {
+                    if (todayAtTime.isAfter(now)) todayAtTime else todayAtTime.plusDays(1)
+                } else {
+                    val anchored = LocalDate.ofEpochDay(oneShotEpochDay)
+                        .atTime(hour, minute)
+                        .atZone(now.zone)
+                        .withSecond(0)
+                        .withNano(0)
+                    anchored.takeIf { it.isAfter(now) }
+                }
+            }
+
+            RepeatOption.DAILY -> if (todayAtTime.isAfter(now)) todayAtTime else todayAtTime.plusDays(1)
 
             RepeatOption.WEEKLY -> {
                 val targetDay = DayOfWeek.of(weeklyDayIso ?: now.dayOfWeek.value)
