@@ -16,6 +16,7 @@ object ShortcutCodec {
             shortcut.minute.toString(),
             shortcut.repeat.name,
             shortcut.isEnabled.toString(),
+            shortcut.weeklyDayIso?.toString().orEmpty(),
         ).joinToString("|")
     }
 
@@ -28,13 +29,14 @@ object ShortcutCodec {
     fun needsMigration(raw: String): Boolean = raw
         .lineSequence()
         .filter { it.isNotBlank() }
-        .any { it.split('|').size == 5 }
+        .any { it.split('|').size != 8 }
 
     private fun decodeLine(line: String): ScheduledAppShortcut? {
         val parts = line.split('|')
         return when (parts.size) {
             5 -> decodeLegacy(parts)
-            7 -> decodeCurrent(parts)
+            7 -> decodeCurrentV1(parts)
+            8 -> decodeCurrent(parts)
             else -> null
         }
     }
@@ -52,6 +54,20 @@ object ShortcutCodec {
         ).takeIf { it.isValid() }
     }
 
+    private fun decodeCurrentV1(parts: List<String>): ScheduledAppShortcut? {
+        val repeat = runCatching { RepeatOption.valueOf(parts[5]) }.getOrNull() ?: return null
+        return ScheduledAppShortcut(
+            id = decodeText(parts[0])?.takeIf { it.isNotBlank() } ?: return null,
+            name = decodeText(parts[1]) ?: return null,
+            packageName = decodeText(parts[2]) ?: return null,
+            hour = parts[3].toIntOrNull() ?: return null,
+            minute = parts[4].toIntOrNull() ?: return null,
+            repeat = repeat,
+            isEnabled = parts[6].toBooleanStrictOrNull() ?: true,
+            weeklyDayIso = if (repeat == RepeatOption.WEEKLY) java.time.LocalDate.now().dayOfWeek.value else null,
+        ).takeIf { it.isValid() }
+    }
+
     private fun decodeCurrent(parts: List<String>): ScheduledAppShortcut? {
         val repeat = runCatching { RepeatOption.valueOf(parts[5]) }.getOrNull() ?: return null
         return ScheduledAppShortcut(
@@ -62,6 +78,7 @@ object ShortcutCodec {
             minute = parts[4].toIntOrNull() ?: return null,
             repeat = repeat,
             isEnabled = parts[6].toBooleanStrictOrNull() ?: true,
+            weeklyDayIso = parts[7].toIntOrNull(),
         ).takeIf { it.isValid() }
     }
 
