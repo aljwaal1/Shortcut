@@ -14,10 +14,11 @@ object ToolOutputNamePolicy {
         val cleaned = raw
             .replace(Regex("""[\\/\u0000-\u001F\u007F]"""), "_")
             .replace("..", "_")
+            .replace(Regex("_+"), "_")
             .trim()
             .trim('.')
             .take(MAX_NAME_LENGTH)
-        return cleaned.ifBlank { "Shortcut_output" }
+        return cleaned.takeIf { value -> value.any(Char::isLetterOrDigit) } ?: "Shortcut_output"
     }
 
     private const val MAX_NAME_LENGTH = 120
