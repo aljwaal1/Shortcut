@@ -14,6 +14,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ElevatedCard
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Switch
@@ -61,6 +62,8 @@ private fun ScheduledTasksManagerScreen(onBack: () -> Unit) {
     val messages = remember { mutableStateListOf<ScheduledMessage>().apply { addAll(messageStore.load()) } }
     var editingShortcut by remember { mutableStateOf<ScheduledAppShortcut?>(null) }
     var editingMessage by remember { mutableStateOf<ScheduledMessage?>(null) }
+    var pendingDeleteShortcut by remember { mutableStateOf<ScheduledAppShortcut?>(null) }
+    var pendingDeleteMessage by remember { mutableStateOf<ScheduledMessage?>(null) }
 
     fun replaceShortcut(item: ScheduledAppShortcut) {
         val index = shortcuts.indexOfFirst { it.id == item.id }
@@ -122,25 +125,6 @@ private fun ScheduledTasksManagerScreen(onBack: () -> Unit) {
                     }
                 }
             }
-            if (shortcuts.isEmpty() && messages.isEmpty()) {
-                item {
-                    ElevatedCard(Modifier.fillMaxWidth()) {
-                        Column(Modifier.fillMaxWidth().padding(20.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                            Text(
-                                if (ar) "لا توجد مهام مجدولة" else "No scheduled tasks",
-                                style = MaterialTheme.typography.titleMedium,
-                                fontWeight = FontWeight.Bold,
-                            )
-                            Text(
-                                if (ar) "أنشئ اختصارًا أو رسالة مجدولة وستظهر هنا لإدارتها."
-                                else "Create a shortcut or scheduled message and it will appear here.",
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            )
-                        }
-                    }
-                }
-            }
             items(shortcuts, key = { it.id }) { item ->
                 ElevatedCard(Modifier.fillMaxWidth()) {
                     Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
@@ -159,11 +143,7 @@ private fun ScheduledTasksManagerScreen(onBack: () -> Unit) {
                                 }
                             }) { Text(if (ar) "تشغيل الآن" else "Run now") }
                             TextButton(onClick = { replaceShortcut(item.duplicate()) }) { Text(if (ar) "نسخ" else "Duplicate") }
-                            TextButton(onClick = {
-                                runCatching { appScheduler.cancelById(item.id) }
-                                shortcuts.removeAll { it.id == item.id }
-                                shortcutStore.save(shortcuts)
-                            }) { Text(if (ar) "حذف" else "Delete") }
+                            TextButton(onClick = { pendingDeleteShortcut = item }) { Text(if (ar) "حذف" else "Delete") }
                         }
                     }
                 }
@@ -185,16 +165,50 @@ private fun ScheduledTasksManagerScreen(onBack: () -> Unit) {
                                 runCatching { context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(link))) }
                             }) { Text(if (ar) "تشغيل الآن" else "Run now") }
                             TextButton(onClick = { replaceMessage(item.duplicate()) }) { Text(if (ar) "نسخ" else "Duplicate") }
-                            TextButton(onClick = {
-                                runCatching { messageScheduler.cancelById(item.id) }
-                                messages.removeAll { it.id == item.id }
-                                messageStore.save(messages)
-                            }) { Text(if (ar) "حذف" else "Delete") }
+                            TextButton(onClick = { pendingDeleteMessage = item }) { Text(if (ar) "حذف" else "Delete") }
                         }
                     }
                 }
             }
         }
+    }
+
+    pendingDeleteShortcut?.let { item ->
+        AlertDialog(
+            onDismissRequest = { pendingDeleteShortcut = null },
+            title = { Text(if (ar) "حذف المهمة؟" else "Delete task?") },
+            text = { Text(if (ar) "سيتم حذف «" + item.name + "» وإلغاء جدولتها." else "“" + item.name + "” will be deleted and unscheduled.") },
+            confirmButton = {
+                TextButton(onClick = {
+                    runCatching { appScheduler.cancelById(item.id) }
+                    shortcuts.removeAll { it.id == item.id }
+                    shortcutStore.save(shortcuts)
+                    pendingDeleteShortcut = null
+                }) { Text(if (ar) "حذف" else "Delete") }
+            },
+            dismissButton = {
+                TextButton(onClick = { pendingDeleteShortcut = null }) { Text(if (ar) "إلغاء" else "Cancel") }
+            },
+        )
+    }
+
+    pendingDeleteMessage?.let { item ->
+        AlertDialog(
+            onDismissRequest = { pendingDeleteMessage = null },
+            title = { Text(if (ar) "حذف الرسالة المجدولة؟" else "Delete scheduled message?") },
+            text = { Text(if (ar) "سيتم حذف «" + item.name + "» وإلغاء جدولتها." else "“" + item.name + "” will be deleted and unscheduled.") },
+            confirmButton = {
+                TextButton(onClick = {
+                    runCatching { messageScheduler.cancelById(item.id) }
+                    messages.removeAll { it.id == item.id }
+                    messageStore.save(messages)
+                    pendingDeleteMessage = null
+                }) { Text(if (ar) "حذف" else "Delete") }
+            },
+            dismissButton = {
+                TextButton(onClick = { pendingDeleteMessage = null }) { Text(if (ar) "إلغاء" else "Cancel") }
+            },
+        )
     }
 }
 
