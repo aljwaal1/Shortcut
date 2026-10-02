@@ -125,7 +125,7 @@ data class RoutineAction(
                 parameters["chatId"].orEmpty().isNotBlank() &&
                 (secondaryValue.isNotBlank() || parameters["attachment"].orEmpty().isNotBlank())
 
-        RoutineActionType.CUSTOM_SCRIPT -> value.isNotBlank()
+        RoutineActionType.CUSTOM_SCRIPT -> value.isNotBlank() && value.length <= MAX_CUSTOM_SCRIPT_CHARS
         RoutineActionType.SET_VARIABLE -> value.isNotBlank()
         RoutineActionType.READ_CLIPBOARD -> value.isNotBlank()
         RoutineActionType.COPY_TO_CLIPBOARD -> value.isNotBlank()
@@ -137,6 +137,8 @@ data class RoutineAction(
         else -> value.isNotBlank()
     }
 }
+
+private const val MAX_CUSTOM_SCRIPT_CHARS = 32_000
 
 data class AutomationRoutine(
     val id: String = UUID.randomUUID().toString(),
