@@ -50,6 +50,31 @@ class ScheduledTaskActionsTest {
     }
 
     @Test
+    fun duplicateOneShotGetsFreshExecutionDate() {
+        val zone = ZoneId.of("UTC")
+        val original = ScheduledAppShortcut(
+            id = "old",
+            name = "Once",
+            packageName = "pkg",
+            hour = 9,
+            minute = 0,
+            repeat = RepeatOption.ONCE,
+            oneShotEpochDay = ZonedDateTime.of(2026, 9, 10, 9, 0, 0, 0, zone).toLocalDate().toEpochDay(),
+        )
+
+        val copy = original.duplicate(
+            newId = "new",
+            now = ZonedDateTime.of(2026, 9, 17, 10, 0, 0, 0, zone),
+        )
+
+        assertEquals(
+            ZonedDateTime.of(2026, 9, 18, 9, 0, 0, 0, zone).toLocalDate().toEpochDay(),
+            copy.oneShotEpochDay,
+        )
+        assertTrue(copy.isEnabled)
+    }
+
+    @Test
     fun nextRunIsFutureForEnabledTaskAndNullForPausedTask() {
         val now = ZonedDateTime.of(2026, 9, 17, 10, 0, 0, 0, ZoneId.of("UTC"))
         val enabled = ScheduledAppShortcut("id-a", "Maps", "maps", 9, 0, RepeatOption.DAILY)
