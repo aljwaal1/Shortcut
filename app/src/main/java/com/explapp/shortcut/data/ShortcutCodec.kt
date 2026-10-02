@@ -51,6 +51,7 @@ object ShortcutCodec {
             minute = parts[3].toIntOrNull() ?: return null,
             repeat = repeat,
             isEnabled = true,
+            weeklyDayIso = if (repeat == RepeatOption.WEEKLY) java.time.LocalDate.now().dayOfWeek.value else null,
         ).takeIf { it.isValid() }
     }
 
