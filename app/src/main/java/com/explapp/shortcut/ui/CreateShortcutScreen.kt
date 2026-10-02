@@ -16,6 +16,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -42,6 +43,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberScrollState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -59,7 +61,9 @@ import com.explapp.shortcut.domain.RepeatOption
 import com.explapp.shortcut.domain.ScheduleAnchor
 import com.explapp.shortcut.domain.ScheduledAppShortcut
 import java.util.Locale
+import java.time.DayOfWeek
 import java.time.LocalDate
+import java.time.format.TextStyle
 import java.time.ZonedDateTime
 import java.util.UUID
 import kotlinx.coroutines.Dispatchers
@@ -185,6 +189,12 @@ fun CreateShortcutScreen(
                             label = { Text(repeatLabel(option)) },
                         )
                     }
+                    if (repeat == RepeatOption.WEEKLY) {
+                        WeeklyDayPicker(
+                            selectedIsoDay = weeklyDayIso ?: LocalDate.now().dayOfWeek.value,
+                            onSelected = { weeklyDayIso = it },
+                        )
+                    }
                 }
             }
         }
@@ -256,4 +266,30 @@ private fun repeatLabel(option: RepeatOption): String = when (option) {
     RepeatOption.DAILY -> stringResource(R.string.repeat_daily)
     RepeatOption.WEEKDAYS -> stringResource(R.string.repeat_weekdays)
     RepeatOption.WEEKLY -> stringResource(R.string.repeat_weekly)
+}
+
+
+@Composable
+internal fun WeeklyDayPicker(
+    selectedIsoDay: Int,
+    onSelected: (Int) -> Unit,
+) {
+    val ar = LocalConfiguration.current.locales[0].language == "ar"
+    val locale = if (ar) Locale("ar") else Locale.ENGLISH
+    val scroll = rememberScrollState()
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .horizontalScroll(scroll),
+        horizontalArrangement = Arrangement.spacedBy(6.dp),
+    ) {
+        (1..7).forEach { isoDay ->
+            val label = DayOfWeek.of(isoDay).getDisplayName(TextStyle.SHORT, locale)
+            FilterChip(
+                selected = selectedIsoDay == isoDay,
+                onClick = { onSelected(isoDay) },
+                label = { Text(label) },
+            )
+        }
+    }
 }
