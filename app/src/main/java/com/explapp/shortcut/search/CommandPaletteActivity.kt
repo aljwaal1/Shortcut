@@ -123,7 +123,7 @@ private fun CommandPaletteScreen(onBack: () -> Unit) {
                             }
                         }
                         item.id.startsWith("routine:") -> routines.firstOrNull { it.id == item.id.substringAfter(':') }
-                            ?.let { RoutineDispatcher(context).execute(it, userInitiated = true) }
+                            ?.let { RoutineDispatcher(context).executeAsync(it, userInitiated = true) }
                         item.id.startsWith("scheduled-") -> context.startActivity(Intent(context, ScheduledTasksManagerActivity::class.java))
                         item.id.startsWith("template:") -> context.startActivity(Intent(context, MyAutomationsActivity::class.java))
                     }
