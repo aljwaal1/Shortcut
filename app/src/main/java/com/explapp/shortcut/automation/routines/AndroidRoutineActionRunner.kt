@@ -91,24 +91,30 @@ class AndroidRoutineActionRunner(
 
     private fun sendTelegramBot(action: RoutineAction): RoutineActionResult {
         val token = resolve(action.parameters["botToken"].orEmpty())
-        val chatId = resolve(action.parameters["chatId"].orEmpty())
+        val destination = resolve(action.parameters["chatId"].orEmpty())
         val text = resolve(action.secondaryValue)
         val attachment = resolve(action.parameters["attachment"].orEmpty())
-        if (token.isBlank() || chatId.isBlank()) return RoutineActionResult.failure(action, local("Bot token and chat ID are required", "يلزم إدخال رمز البوت ومعرّف المحادثة"))
-        var error: Throwable? = null
-        val thread = Thread {
-            val result = if (attachment.isNotBlank()) {
-                TelegramBotSender().sendPhoto(token, chatId, text, java.io.File(attachment))
-            } else {
-                TelegramBotSender().sendText(token, chatId, text)
-            }
-            error = result.exceptionOrNull()
+        if (token.isBlank() || destination.isBlank()) {
+            return RoutineActionResult.failure(
+                action,
+                local(
+                    "Bot token and Telegram username are required",
+                    "يلزم إدخال رمز البوت واسم مستخدم تيليجرام",
+                ),
+            )
         }
-        thread.start()
-        thread.join(20_000L)
-        return if (thread.isAlive) RoutineActionResult.failure(action, local("Telegram request timed out", "انتهت مهلة الاتصال بتيليجرام"))
-        else error?.let { RoutineActionResult.failure(action, it.message ?: local("Telegram send failed", "فشل الإرسال إلى تيليجرام")) }
-            ?: RoutineActionResult.success(action)
+
+        val result = if (attachment.isNotBlank()) {
+            TelegramBotSender().sendPhoto(token, destination, text, java.io.File(attachment))
+        } else {
+            TelegramBotSender().sendText(token, destination, text)
+        }
+        return result.exceptionOrNull()?.let {
+            RoutineActionResult.failure(
+                action,
+                it.message ?: local("Telegram send failed", "فشل الإرسال إلى تيليجرام"),
+            )
+        } ?: RoutineActionResult.success(action)
     }
 
     private fun setVariable(action: RoutineAction): RoutineActionResult {
