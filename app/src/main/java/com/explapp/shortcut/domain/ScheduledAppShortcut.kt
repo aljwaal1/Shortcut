@@ -18,6 +18,7 @@ data class ScheduledAppShortcut(
     val repeat: RepeatOption,
     val isEnabled: Boolean = true,
     val weeklyDayIso: Int? = null,
+    val oneShotEpochDay: Long? = null,
 ) {
     fun isValid(): Boolean =
         id.isNotBlank() &&
