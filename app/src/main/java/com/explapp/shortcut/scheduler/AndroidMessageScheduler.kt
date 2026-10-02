@@ -10,10 +10,10 @@ import java.time.ZonedDateTime
 class AndroidMessageScheduler(
     private val context: Context,
 ) {
-    fun schedule(message: ScheduledMessage) {
-        if (!message.isEnabled || !message.isValid()) return
+    fun schedule(message: ScheduledMessage): Boolean {
+        if (!message.isEnabled || !message.isValid()) return false
         val alarmManager = context.getSystemService(AlarmManager::class.java)
-        val triggerAt = NextRunCalculator.nextRun(ZonedDateTime.now(), message) ?: return
+        val triggerAt = NextRunCalculator.nextRun(ZonedDateTime.now(), message) ?: return false
         val pendingIntent = PendingIntent.getBroadcast(
             context,
             SchedulerIdentity.requestCode(message.id),
@@ -24,7 +24,7 @@ class AndroidMessageScheduler(
         val triggerAtMillis = triggerAt.toInstant().toEpochMilli()
         val canUseExact = Build.VERSION.SDK_INT < Build.VERSION_CODES.S || alarmManager.canScheduleExactAlarms()
 
-        runCatching {
+        return runCatching {
             if (canUseExact) {
                 alarmManager.setExactAndAllowWhileIdle(
                     AlarmManager.RTC_WAKEUP,
@@ -38,7 +38,8 @@ class AndroidMessageScheduler(
                     pendingIntent,
                 )
             }
-        }
+            true
+        }.getOrDefault(false)
     }
 
     fun cancel(message: ScheduledMessage) = cancelById(message.id)
