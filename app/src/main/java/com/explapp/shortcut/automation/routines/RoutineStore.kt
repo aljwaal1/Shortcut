@@ -4,11 +4,57 @@ import android.content.Context
 
 class RoutineStore(context: Context) {
     private val prefs = context.getSharedPreferences("automation_routines", Context.MODE_PRIVATE)
+    private val secrets = RoutineSecretStore(context.applicationContext)
 
-    fun load(): List<AutomationRoutine> = RoutineCodec.decode(prefs.getString(KEY, "[]").orEmpty())
+    fun load(): List<AutomationRoutine> {
+        val decoded = RoutineCodec.decode(prefs.getString(KEY, "[]").orEmpty())
+        var migrated = false
+        val hydrated = decoded.map { routine ->
+            routine.copy(
+                actions = routine.actions.mapIndexed { index, action ->
+                    val updated = action.parameters.toMutableMap()
+                    SECRET_KEYS.forEach { key ->
+                        val value = updated[key].orEmpty()
+                        val secretKey = secretKey(routine.id, index, key)
+                        when {
+                            value == SECRET_MARKER -> {
+                                val secret = secrets.get(secretKey)
+                                if (secret.isNotBlank()) updated[key] = secret else updated.remove(key)
+                            }
+                            value.isNotBlank() -> {
+                                if (secrets.put(secretKey, value)) {
+                                    migrated = true
+                                }
+                            }
+                        }
+                    }
+                    action.copy(parameters = updated)
+                },
+            )
+        }
+        if (migrated) save(hydrated)
+        return hydrated
+    }
 
     fun save(items: List<AutomationRoutine>) {
-        prefs.edit().putString(KEY, RoutineCodec.encode(items.distinctBy { it.id })).apply()
+        val distinct = items.distinctBy { it.id }
+        val protected = distinct.map { routine ->
+            routine.copy(
+                actions = routine.actions.mapIndexed { index, action ->
+                    val updated = action.parameters.toMutableMap()
+                    SECRET_KEYS.forEach { key ->
+                        val value = updated[key].orEmpty()
+                        if (value.isBlank()) {
+                            updated.remove(key)
+                        } else if (secrets.put(secretKey(routine.id, index, key), value)) {
+                            updated[key] = SECRET_MARKER
+                        }
+                    }
+                    action.copy(parameters = updated)
+                },
+            )
+        }
+        prefs.edit().putString(KEY, RoutineCodec.encode(protected)).apply()
     }
 
     fun upsert(item: AutomationRoutine) {
@@ -18,7 +64,17 @@ class RoutineStore(context: Context) {
         save(current)
     }
 
-    fun removeById(id: String) = save(load().filterNot { it.id == id })
+    fun removeById(id: String) {
+        secrets.removePrefix("$id:")
+        save(load().filterNot { it.id == id })
+    }
 
-    companion object { private const val KEY = "items" }
+    private fun secretKey(routineId: String, actionIndex: Int, parameter: String): String =
+        "$routineId:$actionIndex:$parameter"
+
+    companion object {
+        private const val KEY = "items"
+        private const val SECRET_MARKER = "__shortcut_secret_v1__"
+        private val SECRET_KEYS = setOf("botToken", "telegramBotToken")
+    }
 }
