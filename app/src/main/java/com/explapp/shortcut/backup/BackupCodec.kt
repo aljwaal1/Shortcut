@@ -5,6 +5,7 @@ import com.explapp.shortcut.automation.routines.RoutineCodec
 import com.explapp.shortcut.domain.MessageDeliveryMode
 import com.explapp.shortcut.domain.MessagePlatform
 import com.explapp.shortcut.domain.RepeatOption
+import com.explapp.shortcut.domain.ScheduleAnchor
 import com.explapp.shortcut.domain.ScheduledAppShortcut
 import com.explapp.shortcut.domain.ScheduledMessage
 import kotlinx.serialization.json.Json
@@ -20,6 +21,7 @@ import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.put
+import java.time.ZonedDateTime
 import java.util.UUID
 
 data class BackupPayload(
@@ -132,7 +134,12 @@ object BackupCodec {
             repeat = enumValueOf(requiredString("repeat")),
             isEnabled = optionalBoolean("isEnabled") ?: true,
             weeklyDayIso = optionalInt("weeklyDayIso"),
-            oneShotEpochDay = optionalLong("oneShotEpochDay"),
+            oneShotEpochDay = oneShotAnchorForImport(
+                repeat = enumValueOf(requiredString("repeat")),
+                stored = optionalLong("oneShotEpochDay"),
+                hour = requiredInt("hour"),
+                minute = requiredInt("minute"),
+            ),
         )
         require(shortcut.name.isNotBlank()) { "Shortcut name is required" }
         require(shortcut.isValid()) { "Invalid shortcut" }
@@ -153,11 +160,27 @@ object BackupCodec {
             deliveryMode = optionalString("deliveryMode")?.let { runCatching { MessageDeliveryMode.valueOf(it) }.getOrNull() }
                 ?: MessageDeliveryMode.PREPARED,
             weeklyDayIso = optionalInt("weeklyDayIso"),
-            oneShotEpochDay = optionalLong("oneShotEpochDay"),
+            oneShotEpochDay = oneShotAnchorForImport(
+                repeat = RepeatOption.valueOf(requiredString("repeat")),
+                stored = optionalLong("oneShotEpochDay"),
+                hour = requiredInt("hour"),
+                minute = requiredInt("minute"),
+            ),
         )
         require(scheduledMessage.name.isNotBlank()) { "Message name is required" }
         require(scheduledMessage.isValid()) { "Invalid scheduled message" }
         return scheduledMessage
+    }
+
+    private fun oneShotAnchorForImport(
+        repeat: RepeatOption,
+        stored: Long?,
+        hour: Int,
+        minute: Int,
+    ): Long? = when {
+        repeat != RepeatOption.ONCE -> null
+        stored != null -> stored
+        else -> ScheduleAnchor.nextOneShotEpochDay(ZonedDateTime.now(), hour, minute)
     }
 
     private fun JsonObject.requiredString(key: String): String =
