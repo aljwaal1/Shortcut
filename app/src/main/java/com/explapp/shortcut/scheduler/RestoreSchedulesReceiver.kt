@@ -12,18 +12,25 @@ class RestoreSchedulesReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent?) {
         if (!StartupEvent.shouldReschedule(intent?.action)) return
 
+        val pendingResult = goAsync()
         val appContext = context.applicationContext
-        val appScheduler = AndroidAlarmScheduler(appContext)
-        RestorePolicy.shortcuts(ShortcutStore(appContext).load())
-            .forEach(appScheduler::schedule)
+        Thread {
+            try {
+                val appScheduler = AndroidAlarmScheduler(appContext)
+                RestorePolicy.shortcuts(ShortcutStore(appContext).load())
+                    .forEach { item -> runCatching { appScheduler.schedule(item) } }
 
-        val messageScheduler = AndroidMessageScheduler(appContext)
-        RestorePolicy.messages(MessageStore(appContext).load())
-            .forEach(messageScheduler::schedule)
+                val messageScheduler = AndroidMessageScheduler(appContext)
+                RestorePolicy.messages(MessageStore(appContext).load())
+                    .forEach { item -> runCatching { messageScheduler.schedule(item) } }
 
-        val routineScheduler = RoutineScheduler(appContext)
-        RoutineStore(appContext).load()
-            .filter { it.isEnabled }
-            .forEach(routineScheduler::schedule)
+                val routineScheduler = RoutineScheduler(appContext)
+                RoutineStore(appContext).load()
+                    .filter { it.isEnabled && it.isValid() }
+                    .forEach { item -> runCatching { routineScheduler.schedule(item) } }
+            } finally {
+                pendingResult.finish()
+            }
+        }.start()
     }
 }
