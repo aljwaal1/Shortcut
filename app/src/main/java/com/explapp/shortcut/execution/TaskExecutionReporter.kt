@@ -10,6 +10,13 @@ import androidx.core.app.NotificationCompat
 import androidx.core.content.ContextCompat
 import org.json.JSONArray
 import org.json.JSONObject
+import java.text.DateFormat
+import java.text.SimpleDateFormat
+import java.time.Instant
+import java.time.ZoneId
+import java.time.LocalDate
+import java.util.Date
+import java.util.Locale
 
 class TaskExecutionReporter(private val context: Context) {
     private val prefs = context.getSharedPreferences("task_execution_results", Context.MODE_PRIVATE)
@@ -57,6 +64,7 @@ class TaskExecutionReporter(private val context: Context) {
         put("reason", result.reason)
         put("startedAtMs", result.startedAtMs)
         put("finishedAtMs", result.finishedAtMs)
+        put("details", JSONArray(result.details))
     }
 
     private fun encodeList(records: List<TaskExecutionResult>) = JSONArray().apply {
@@ -72,8 +80,46 @@ class TaskExecutionReporter(private val context: Context) {
             reason = if (json.isNull("reason")) null else json.getString("reason"),
             startedAtMs = json.getLong("startedAtMs"),
             finishedAtMs = json.getLong("finishedAtMs"),
+            details = buildList {
+                val array = json.optJSONArray("details") ?: return@buildList
+                for (index in 0 until array.length()) add(array.optString(index))
+            },
         )
     }.getOrNull()
+
+    fun dailyReport(nowMs: Long = System.currentTimeMillis(), ar: Boolean = false): String {
+        val zone = ZoneId.systemDefault()
+        val targetDate = Instant.ofEpochMilli(nowMs).atZone(zone).toLocalDate()
+        val records = history()
+            .filter { Instant.ofEpochMilli(it.finishedAtMs).atZone(zone).toLocalDate() == targetDate }
+            .sortedBy { it.startedAtMs }
+
+        val day = targetDate.toString()
+        val timeFormat = SimpleDateFormat("HH:mm:ss", Locale.US)
+        return buildString {
+            appendLine(if (ar) "تقرير Shortcut اليومي — $day" else "Shortcut daily report — $day")
+            appendLine(if (ar) "عدد العمليات: ${records.size}" else "Operations: ${records.size}")
+            appendLine("================================")
+            if (records.isEmpty()) {
+                append(if (ar) "لا توجد عمليات مسجلة اليوم." else "No recorded operations today.")
+            } else {
+                records.forEachIndexed { index, item ->
+                    val status = when (item.status) {
+                        TaskExecutionStatus.SUCCESS -> "SUCCESS"
+                        TaskExecutionStatus.PREPARED -> "PREPARED"
+                        TaskExecutionStatus.FAILURE -> "FAILURE"
+                    }
+                    appendLine("#${index + 1} [$status] ${item.taskName}")
+                    appendLine("Start: ${timeFormat.format(Date(item.startedAtMs))}")
+                    appendLine("End: ${timeFormat.format(Date(item.finishedAtMs))}")
+                    appendLine("DurationMs: ${item.durationMs}")
+                    item.reason?.takeIf { it.isNotBlank() }?.let { appendLine("Reason: $it") }
+                    item.details.forEach { appendLine("Step: $it") }
+                    if (index != records.lastIndex) appendLine("--------------------------------")
+                }
+            }
+        }
+    }
 
     private fun notify(result: TaskExecutionResult) {
         if (Build.VERSION.SDK_INT >= 33 &&
@@ -126,7 +172,7 @@ class TaskExecutionReporter(private val context: Context) {
         private const val CHANNEL = "task_execution_results"
         private const val KEY_LAST = "last"
         private const val KEY_HISTORY = "history"
-        private const val MAX_RECORDS = 200
+        private const val MAX_RECORDS = 1000
         private val REPORT_LOCK = Any()
     }
 }
