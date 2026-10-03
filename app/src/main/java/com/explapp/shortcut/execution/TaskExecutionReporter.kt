@@ -94,8 +94,16 @@ class TaskExecutionReporter(private val context: Context) {
 
         val day = targetDate.toString()
         val timeFormat = SimpleDateFormat("HH:mm:ss", Locale.US)
+        val versionName = runCatching {
+            context.packageManager.getPackageInfo(context.packageName, 0).versionName.orEmpty()
+        }.getOrDefault("")
+        val generatedAt = timeFormat.format(Date(nowMs))
         return buildString {
             appendLine(if (ar) "تقرير Shortcut اليومي — $day" else "Shortcut daily report — $day")
+            appendLine("AppVersion: $versionName")
+            appendLine("Android: API ${Build.VERSION.SDK_INT} • ${Build.MANUFACTURER} ${Build.MODEL}")
+            appendLine("TimeZone: $zone")
+            appendLine("GeneratedAt: $generatedAt")
             appendLine(if (ar) "عدد العمليات: ${records.size}" else "Operations: ${records.size}")
             appendLine("================================")
             if (records.isEmpty()) {
