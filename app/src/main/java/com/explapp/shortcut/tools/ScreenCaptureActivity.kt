@@ -461,7 +461,6 @@ class ScreenCaptureService : Service() {
                 image.close()
                 return@setOnImageAvailableListener
             }
-            completed = true
             val plane = image.planes[0]
             val pixelStride = plane.pixelStride
             val rowStride = plane.rowStride
