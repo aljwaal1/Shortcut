@@ -26,7 +26,8 @@ object ScreenshotStamp {
         val textHeight = metrics.bottom - metrics.top
 
         val right = bitmap.width - padding
-        val bottom = bitmap.height - padding
+        val systemBarInset = (bitmap.height * 0.07f).coerceAtLeast(padding)
+        val bottom = bitmap.height - systemBarInset
         val left = (right - textWidth - padding * 2).coerceAtLeast(padding)
         val top = (bottom - textHeight - padding * 2).coerceAtLeast(padding)
 
