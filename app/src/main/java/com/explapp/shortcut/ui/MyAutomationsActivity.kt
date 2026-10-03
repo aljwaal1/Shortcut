@@ -1396,6 +1396,25 @@ private fun RoutineBuilderScreen(
                                     else "For unattended daily runs, start the persistent capture session once. After a phone restart, screen-capture consent is required again.",
                                     ar,
                                 )
+                                if (params["persistentCapture"].toBoolean()) {
+                                    Button(
+                                        onClick = {
+                                            context.startActivity(
+                                                Intent(context, ScreenCaptureActivity::class.java)
+                                                    .putExtra(ScreenCaptureActivity.EXTRA_PERSISTENT_START_ONLY, true),
+                                            )
+                                        },
+                                        modifier = Modifier.fillMaxWidth(),
+                                    ) {
+                                        Text(
+                                            if (PersistentScreenCaptureService.isSessionActive(context)) {
+                                                if (ar) "إعادة تفعيل جلسة التصوير" else "Reactivate capture session"
+                                            } else {
+                                                if (ar) "تفعيل جلسة التصوير الآن" else "Activate capture session now"
+                                            },
+                                        )
+                                    }
+                                }
                             }
                         }
 
