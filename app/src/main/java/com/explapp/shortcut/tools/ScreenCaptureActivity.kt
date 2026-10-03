@@ -650,6 +650,7 @@ class ScreenCaptureService : Service() {
                 add("SCREENSHOT_CAPTURE = SUCCESS")
                 add("SCREENSHOT_SAVE = " + if (savedUri != null) "SUCCESS" else "FAILURE")
                 add("DateTimeStamp = $stampDateTime")
+                if (shareAnyApp) add("SHARE_ANY_APP = PREPARED")
                 savedUri?.let { add("Uri = $it") }
             },
         )
@@ -687,48 +688,17 @@ class ScreenCaptureService : Service() {
                     shareIntent,
                     local("Share screenshot", "مشاركة لقطة الشاشة"),
                 ).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-
-                val opened = runCatching {
-                    if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q) {
-                        startActivity(chooser)
-                    } else {
-                        val pending = PendingIntent.getActivity(
-                            this,
-                            8835,
-                            chooser,
-                            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
-                        )
-                        if (Build.VERSION.SDK_INT >= 34) {
-                            val options = ActivityOptions.makeBasic().apply {
-                                val mode = if (Build.VERSION.SDK_INT >= 36) {
-                                    ActivityOptions.MODE_BACKGROUND_ACTIVITY_START_ALLOW_ALWAYS
-                                } else {
-                                    @Suppress("DEPRECATION")
-                                    ActivityOptions.MODE_BACKGROUND_ACTIVITY_START_ALLOWED
-                                }
-                                setPendingIntentBackgroundActivityStartMode(mode)
-                            }
-                            pending.send(this, 0, null, null, null, null, options.toBundle())
-                        } else {
-                            pending.send()
-                        }
-                    }
-                    true
-                }.getOrDefault(false)
-
-                if (!opened) {
-                    val fallbackPending = PendingIntent.getActivity(
-                        this,
-                        8835,
-                        chooser,
-                        PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
-                    )
-                    showResultNotification(
-                        local("Screenshot ready to share", "لقطة الشاشة جاهزة للمشاركة"),
-                        local("Tap to choose an app.", "اضغط لاختيار تطبيق للمشاركة."),
-                        fallbackPending,
-                    )
-                }
+                val sharePending = PendingIntent.getActivity(
+                    this,
+                    8835,
+                    chooser,
+                    PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
+                )
+                showResultNotification(
+                    local("Screenshot saved — ready to share", "تم حفظ الصورة — جاهزة للمشاركة"),
+                    local("Tap to choose any app.", "اضغط لاختيار أي تطبيق للمشاركة."),
+                    sharePending,
+                )
                 stopForeground(STOP_FOREGROUND_REMOVE)
                 stopSelf()
             }
