@@ -36,7 +36,7 @@ class RoutineDispatcher(private val context: Context) {
 
         return try {
             val result = RoutineExecutor(
-                AndroidRoutineActionRunner(context, userInitiated),
+                AndroidRoutineActionRunner(context, userInitiated, routine.id, routine.name),
                 AndroidRoutineConditionEvaluator(context),
             ).execute(routine, startedAtMs = startedAt)
             TaskExecutionReporter(context).report(result.toTaskExecutionResult())
