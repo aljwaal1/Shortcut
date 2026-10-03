@@ -26,6 +26,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
@@ -104,29 +105,10 @@ private fun MyAutomationsScreen(onBack: () -> Unit, initialMode: String = "") {
     val store = remember { RoutineStore(context.applicationContext) }
     val scheduler = remember { RoutineScheduler(context.applicationContext) }
     val itemsState = remember { mutableStateListOf<AutomationRoutine>().apply { addAll(store.load()) } }
-    var editing by remember(initialMode) {
-        mutableStateOf<AutomationRoutine?>(
-            if (initialMode == MyAutomationsActivity.MODE_SCREENSHOT) {
-                AutomationRoutine(
-                    name = if (ar) "لقطة تطبيق بالتاريخ" else "Dated app screenshot",
-                    trigger = RoutineTrigger(RoutineTriggerType.MANUAL),
-                    actions = listOf(
-                        RoutineAction(
-                            type = RoutineActionType.OPEN_APP_SCREENSHOT,
-                            value = "",
-                            secondaryValue = "3000",
-                            parameters = mapOf(
-                                "stampDateTime" to "true",
-                                "persistentCapture" to "false",
-                            ),
-                        ),
-                    ),
-                )
-            } else null,
-        )
-    }
+    var editing by remember { mutableStateOf<AutomationRoutine?>(null) }
     var creating by remember(initialMode) { mutableStateOf(initialMode == MyAutomationsActivity.MODE_CREATE) }
     var showTemplates by remember(initialMode) { mutableStateOf(initialMode == MyAutomationsActivity.MODE_TEMPLATES) }
+    var showSimpleScreenshot by remember(initialMode) { mutableStateOf(initialMode == MyAutomationsActivity.MODE_SCREENSHOT) }
     var showDailyScreenshotTelegram by remember { mutableStateOf(false) }
     var showDailyScreenshotTelegramChat by remember { mutableStateOf(false) }
     var lastDeleted by remember { mutableStateOf<AutomationRoutine?>(null) }
@@ -147,6 +129,14 @@ private fun MyAutomationsScreen(onBack: () -> Unit, initialMode: String = "") {
     }
 
     when {
+        showSimpleScreenshot -> SimpleAppScreenshotWizard(
+            onCancel = { showSimpleScreenshot = false },
+            onSave = { routine ->
+                upsert(routine)
+                showSimpleScreenshot = false
+            },
+        )
+
         creating || editing != null -> RoutineBuilderScreen(
             initial = editing,
             onCancel = { creating = false; editing = null },
@@ -212,23 +202,7 @@ private fun MyAutomationsScreen(onBack: () -> Unit, initialMode: String = "") {
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
                         Button(
-                            onClick = {
-                                editing = AutomationRoutine(
-                                    name = if (ar) "لقطة تطبيق بالتاريخ" else "Dated app screenshot",
-                                    trigger = RoutineTrigger(RoutineTriggerType.MANUAL),
-                                    actions = listOf(
-                                        RoutineAction(
-                                            type = RoutineActionType.OPEN_APP_SCREENSHOT,
-                                            value = "",
-                                            secondaryValue = "3000",
-                                            parameters = mapOf(
-                                                "stampDateTime" to "true",
-                                                "persistentCapture" to "false",
-                                            ),
-                                        ),
-                                    ),
-                                )
-                            },
+                            onClick = { showSimpleScreenshot = true },
                             modifier = Modifier.fillMaxWidth(),
                         ) {
                             Text(if (ar) "إنشاء هذه الأتمتة" else "Create this automation")
@@ -471,8 +445,8 @@ private fun DailyScreenshotTelegramWizard(
         (!useBot || (botToken.isNotBlank() && chatId.isNotBlank()))
 
     LazyColumn(
-        Modifier.fillMaxSize(),
-        contentPadding = PaddingValues(18.dp),
+        Modifier.fillMaxSize().navigationBarsPadding(),
+        contentPadding = PaddingValues(start = 18.dp, top = 18.dp, end = 18.dp, bottom = 32.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
         item {
