@@ -15,6 +15,19 @@ private fun RoutineRunResult.stepDetails(): List<String> =
             append(item.action.type.name)
             append(" = ")
             append(status)
+            when (item.action.type) {
+                RoutineActionType.OPEN_APP -> append(" [package=${item.action.value}]")
+                RoutineActionType.OPEN_APP_SCREENSHOT -> {
+                    append(" [package=${item.action.value}")
+                    append(", delayMs=${item.action.secondaryValue.ifBlank { "3000" }}")
+                    append(", stamp=${item.action.parameters["stampDateTime"].toBoolean()}")
+                    append(", persistent=${item.action.parameters["persistentCapture"].toBoolean()}]")
+                }
+                RoutineActionType.TAKE_SCREENSHOT ->
+                    append(" [delayMs=${item.action.value.ifBlank { "3000" }}, stamp=${item.action.parameters["stampDateTime"].toBoolean()}]")
+                RoutineActionType.WAIT -> append(" [delayMs=${item.action.value}]")
+                else -> Unit
+            }
             item.reason?.takeIf { it.isNotBlank() }?.let {
                 append(" — ")
                 append(it)
