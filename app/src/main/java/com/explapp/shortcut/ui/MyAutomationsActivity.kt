@@ -169,6 +169,46 @@ private fun MyAutomationsScreen(onBack: () -> Unit) {
                 ElevatedCard(Modifier.fillMaxWidth()) {
                     Column(Modifier.fillMaxWidth().padding(14.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                         Text(
+                            if (ar) "فتح تطبيق + حفظ لقطة شاشة بالتاريخ"
+                            else "Open app + save dated screenshot",
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.Bold,
+                        )
+                        Text(
+                            if (ar) "يبدأ كاختصار يدوي. اختر التطبيق، ثم يمكنك تعديله لاحقًا ليعمل يوميًا في وقت محدد. تُحفظ اللقطة مع التاريخ والوقت على الصورة، ويُسجل النجاح أو الفشل في سجل التنفيذ."
+                            else "Starts as a manual shortcut. Choose the app, then you can edit it later to run daily at a specific time. The screenshot is saved with date/time stamped on the image, and success or failure is recorded in execution history.",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                        Button(
+                            onClick = {
+                                editing = AutomationRoutine(
+                                    name = if (ar) "لقطة تطبيق بالتاريخ" else "Dated app screenshot",
+                                    trigger = RoutineTrigger(RoutineTriggerType.MANUAL),
+                                    actions = listOf(
+                                        RoutineAction(
+                                            type = RoutineActionType.OPEN_APP_SCREENSHOT,
+                                            value = "",
+                                            secondaryValue = "3000",
+                                            parameters = mapOf(
+                                                "stampDateTime" to "true",
+                                                "persistentCapture" to "false",
+                                            ),
+                                        ),
+                                    ),
+                                )
+                            },
+                            modifier = Modifier.fillMaxWidth(),
+                        ) {
+                            Text(if (ar) "إنشاء هذه الأتمتة" else "Create this automation")
+                        }
+                    }
+                }
+            }
+            item {
+                ElevatedCard(Modifier.fillMaxWidth()) {
+                    Column(Modifier.fillMaxWidth().padding(14.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Text(
                             if (ar) "1. لقطة شاشة وإرسال تلقائي بواسطة بوت تيليجرام"
                             else "1. Screenshot and auto-send with Telegram bot",
                             style = MaterialTheme.typography.titleMedium,
