@@ -19,7 +19,7 @@ import java.util.Locale
 class TaskExecutionReporter(private val context: Context) {
     private val prefs = context.getSharedPreferences("task_execution_results", Context.MODE_PRIVATE)
 
-    fun report(result: TaskExecutionResult) {
+    fun report(result: TaskExecutionResult, notifyUser: Boolean = true) {
         synchronized(REPORT_LOCK) {
             val updated = TaskExecutionHistory.append(history(), result)
             prefs.edit()
@@ -27,7 +27,7 @@ class TaskExecutionReporter(private val context: Context) {
                 .putString(KEY_HISTORY, encodeList(updated).toString())
                 .apply()
         }
-        notify(result)
+        if (notifyUser) notify(result)
     }
 
     fun last(): TaskExecutionResult? {
