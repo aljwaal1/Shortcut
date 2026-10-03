@@ -24,13 +24,22 @@ class RoutineDispatcher(private val context: Context) {
     fun execute(routine: AutomationRoutine, userInitiated: Boolean): RoutineRunResult {
         val startedAt = System.currentTimeMillis()
         if (!runningRoutineIds.add(routine.id)) {
+            val finishedAt = System.currentTimeMillis()
+            TaskExecutionReporter(context).report(
+                com.explapp.shortcut.execution.TaskExecutionResult.prepared(
+                    taskName = routine.name,
+                    startedAtMs = startedAt,
+                    finishedAtMs = finishedAt,
+                    details = listOf("ROUTINE_SKIPPED = ALREADY_RUNNING"),
+                ),
+            )
             return RoutineRunResult(
                 routineId = routine.id,
                 routineName = routine.name,
                 status = RoutineRunStatus.PREPARED,
                 actionResults = emptyList(),
                 startedAtMs = startedAt,
-                finishedAtMs = System.currentTimeMillis(),
+                finishedAtMs = finishedAt,
             )
         }
 
