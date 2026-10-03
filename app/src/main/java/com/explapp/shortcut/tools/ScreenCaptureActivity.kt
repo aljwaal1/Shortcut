@@ -376,7 +376,7 @@ class ScreenCaptureActivity : AppCompatActivity() {
         } else {
             TaskExecutionResult.failure(taskName, reason ?: "Screenshot failed", started, details = details)
         }
-        TaskExecutionReporter(applicationContext).report(result)
+        TaskExecutionReporter(applicationContext).report(result, notifyUser = false)
     }
 
     private fun local(en: String, ar: String): String =
