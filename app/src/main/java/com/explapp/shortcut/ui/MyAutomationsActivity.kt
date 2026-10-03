@@ -1726,6 +1726,56 @@ private fun RoutineBuilderScreen(
             }
         }
 
+        if (
+            triggerType == RoutineTriggerType.TIME &&
+            actions.any {
+                it.type == RoutineActionType.OPEN_APP_SCREENSHOT &&
+                    !it.parameters["persistentCapture"].toBoolean()
+            }
+        ) {
+            item {
+                ElevatedCard(
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = CardDefaults.elevatedCardColors(
+                        containerColor = MaterialTheme.colorScheme.tertiaryContainer.copy(alpha = 0.55f),
+                    ),
+                ) {
+                    Column(
+                        Modifier.fillMaxWidth().padding(14.dp),
+                        verticalArrangement = Arrangement.spacedBy(8.dp),
+                    ) {
+                        Text(
+                            if (ar) "تنبيه للتصوير المجدول" else "Scheduled capture warning",
+                            fontWeight = FontWeight.Bold,
+                        )
+                        Text(
+                            if (ar) {
+                                "الأتمتة تعمل بوقت محدد، لكن جلسة التصوير المستمرة غير مفعلة في خطوة اللقطة. قد تحتاج موافقة يدوية وقت التنفيذ."
+                            } else {
+                                "This routine is time-triggered, but persistent capture is off for the screenshot step. It may require manual approval at run time."
+                            },
+                            style = MaterialTheme.typography.bodySmall,
+                        )
+                        Button(
+                            onClick = {
+                                actions.indices.forEach { index ->
+                                    val action = actions[index]
+                                    if (action.type == RoutineActionType.OPEN_APP_SCREENSHOT) {
+                                        actions[index] = action.copy(
+                                            parameters = action.parameters + ("persistentCapture" to "true"),
+                                        )
+                                    }
+                                }
+                            },
+                            modifier = Modifier.fillMaxWidth(),
+                        ) {
+                            Text(if (ar) "تفعيل التصوير المستمر للقطات" else "Enable persistent capture")
+                        }
+                    }
+                }
+            }
+        }
+
         item {
             val routine = AutomationRoutine(
                 id = stableId,
