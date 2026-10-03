@@ -13,6 +13,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
@@ -54,7 +55,7 @@ fun AppUsageDashboard(
     val local: (String, String) -> String = { en, arabic -> if (ar) arabic else en }
 
     LazyColumn(
-        modifier = Modifier.fillMaxSize().padding(20.dp),
+        modifier = Modifier.fillMaxSize().navigationBarsPadding().padding(20.dp),
         verticalArrangement = Arrangement.spacedBy(14.dp),
     ) {
         item {
