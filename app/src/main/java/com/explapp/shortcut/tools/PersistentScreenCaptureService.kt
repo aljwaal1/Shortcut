@@ -486,7 +486,7 @@ class PersistentScreenCaptureService : Service() {
                     details = details,
                 )
             }
-            TaskExecutionReporter(applicationContext).report(result)
+            TaskExecutionReporter(applicationContext).report(result, notifyUser = false)
             pendingRoutineId = ""
             pendingRoutineName = ""
             pendingRoutineStartedAtMs = 0L
