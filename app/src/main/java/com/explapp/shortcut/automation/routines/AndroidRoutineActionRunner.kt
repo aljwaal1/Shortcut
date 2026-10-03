@@ -30,6 +30,8 @@ import com.explapp.shortcut.usage.AppUsageActivity
 class AndroidRoutineActionRunner(
     private val context: Context,
     private val userInitiated: Boolean,
+    private val routineId: String = "",
+    private val routineName: String = "",
 ) : RoutineActionRunner {
     private val variables = mutableMapOf<String, String>()
     override fun run(action: RoutineAction): RoutineActionResult = when (action.type) {
@@ -82,6 +84,9 @@ class AndroidRoutineActionRunner(
             .putExtra(ScreenCaptureActivity.EXTRA_TELEGRAM_CHAT_ID, action.parameters["telegramChatId"].orEmpty())
             .putExtra(ScreenCaptureActivity.EXTRA_TELEGRAM_CAPTION, resolve(action.parameters["telegramCaption"].orEmpty()))
             .putExtra(ScreenCaptureActivity.EXTRA_NORMAL_TELEGRAM_SHARE, action.parameters["normalTelegramShare"].toBoolean())
+            .putExtra(ScreenCaptureActivity.EXTRA_STAMP_DATE_TIME, action.parameters["stampDateTime"].toBoolean())
+            .putExtra(ScreenCaptureActivity.EXTRA_ROUTINE_ID, routineId)
+            .putExtra(ScreenCaptureActivity.EXTRA_ROUTINE_NAME, routineName)
             .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
         return runCatching {
             context.startActivity(workflowIntent)
@@ -276,6 +281,9 @@ class AndroidRoutineActionRunner(
                     .putExtra(PersistentScreenCaptureService.EXTRA_TELEGRAM_CHAT_ID, action.parameters["telegramChatId"].orEmpty())
                     .putExtra(PersistentScreenCaptureService.EXTRA_TELEGRAM_CAPTION, resolve(action.parameters["telegramCaption"].orEmpty()))
                     .putExtra(PersistentScreenCaptureService.EXTRA_NORMAL_TELEGRAM_SHARE, action.parameters["normalTelegramShare"].toBoolean())
+                    .putExtra(PersistentScreenCaptureService.EXTRA_STAMP_DATE_TIME, action.parameters["stampDateTime"].toBoolean())
+                    .putExtra(PersistentScreenCaptureService.EXTRA_ROUTINE_ID, routineId)
+                    .putExtra(PersistentScreenCaptureService.EXTRA_ROUTINE_NAME, routineName)
                 return runCatching {
                     ContextCompat.startForegroundService(context, captureIntent)
                     RoutineActionResult.prepared(
@@ -315,6 +323,9 @@ class AndroidRoutineActionRunner(
             .putExtra(ScreenCaptureActivity.EXTRA_TELEGRAM_CHAT_ID, action.parameters["telegramChatId"].orEmpty())
             .putExtra(ScreenCaptureActivity.EXTRA_TELEGRAM_CAPTION, resolve(action.parameters["telegramCaption"].orEmpty()))
             .putExtra(ScreenCaptureActivity.EXTRA_NORMAL_TELEGRAM_SHARE, action.parameters["normalTelegramShare"].toBoolean())
+            .putExtra(ScreenCaptureActivity.EXTRA_STAMP_DATE_TIME, action.parameters["stampDateTime"].toBoolean())
+            .putExtra(ScreenCaptureActivity.EXTRA_ROUTINE_ID, routineId)
+            .putExtra(ScreenCaptureActivity.EXTRA_ROUTINE_NAME, routineName)
             .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
 
         if (userInitiated) {
