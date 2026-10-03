@@ -45,35 +45,38 @@ private class RoutineEdgeState(context: Context) {
 }
 
 class RoutineScheduler(private val context: Context) {
-    fun schedule(routine: AutomationRoutine) {
-        if (!routine.isEnabled || !routine.isValid()) return
-        when (routine.trigger.type) {
+    fun schedule(routine: AutomationRoutine): Boolean {
+        if (!routine.isEnabled || !routine.isValid()) return false
+        return when (routine.trigger.type) {
             RoutineTriggerType.TIME -> scheduleTime(routine)
             RoutineTriggerType.BATTERY_BELOW -> scheduleStatePoll(routine)
             RoutineTriggerType.CHARGER_CONNECTED,
             RoutineTriggerType.CHARGER_DISCONNECTED,
-            -> Unit // System power broadcasts trigger these routines directly; no polling needed.
-            else -> Unit
+            RoutineTriggerType.MANUAL,
+            RoutineTriggerType.NFC,
+            RoutineTriggerType.BOOT,
+            -> true // Event/manual triggers do not need an AlarmManager entry.
         }
     }
 
-    private fun scheduleTime(routine: AutomationRoutine) {
+    private fun scheduleTime(routine: AutomationRoutine): Boolean {
         val parts = routine.trigger.value.split(':')
-        val hour = parts.getOrNull(0)?.toIntOrNull() ?: return
-        val minute = parts.getOrNull(1)?.toIntOrNull() ?: return
-        if (hour !in 0..23 || minute !in 0..59) return
+        val hour = parts.getOrNull(0)?.toIntOrNull() ?: return false
+        val minute = parts.getOrNull(1)?.toIntOrNull() ?: return false
+        if (hour !in 0..23 || minute !in 0..59) return false
         val now = ZonedDateTime.now()
-        val at = nextOccurrence(routine.trigger, now, hour, minute) ?: return
-        val pending = statePending(routine.id, PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE, time = true) ?: return
+        val at = nextOccurrence(routine.trigger, now, hour, minute) ?: return false
+        val pending = statePending(routine.id, PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE, time = true) ?: return false
         val alarm = context.getSystemService(AlarmManager::class.java)
         val millis = at.toInstant().toEpochMilli()
-        runCatching {
+        return runCatching {
             if (Build.VERSION.SDK_INT < Build.VERSION_CODES.S || alarm.canScheduleExactAlarms()) {
                 alarm.setExactAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, millis, pending)
             } else {
                 alarm.setAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, millis, pending)
             }
-        }
+            true
+        }.getOrDefault(false)
     }
 
     private fun nextOccurrence(
@@ -138,15 +141,16 @@ class RoutineScheduler(private val context: Context) {
         }
     }
 
-    private fun scheduleStatePoll(routine: AutomationRoutine) {
-        val pending = statePending(routine.id, PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE, time = false) ?: return
-        runCatching {
+    private fun scheduleStatePoll(routine: AutomationRoutine): Boolean {
+        val pending = statePending(routine.id, PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE, time = false) ?: return false
+        return runCatching {
             context.getSystemService(AlarmManager::class.java).setAndAllowWhileIdle(
                 AlarmManager.ELAPSED_REALTIME_WAKEUP,
                 SystemClock.elapsedRealtime() + STATE_POLL_INTERVAL_MS,
                 pending,
             )
-        }
+            true
+        }.getOrDefault(false)
     }
 
     fun cancel(id: String) {
