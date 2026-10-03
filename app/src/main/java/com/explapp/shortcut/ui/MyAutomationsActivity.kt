@@ -970,6 +970,385 @@ private fun DailyScreenshotTelegramWizard(
 }
 
 @Composable
+private fun SimpleAppScreenshotWizard(
+    onCancel: () -> Unit,
+    onSave: (AutomationRoutine) -> Unit,
+) {
+    val context = LocalContext.current
+    val ar = LocalConfiguration.current.locales[0].language == "ar"
+    val installedApps = remember(context) { InstalledAppRepository(context).loadLaunchableApps() }
+    val alarmManager = remember(context) { context.getSystemService(AlarmManager::class.java) }
+
+    var name by remember { mutableStateOf(if (ar) "لقطة تطبيق بالتاريخ" else "Dated app screenshot") }
+    var appPackage by remember { mutableStateOf("") }
+    var scheduled by remember { mutableStateOf(false) }
+    var time by remember { mutableStateOf("") }
+    var repeat by remember { mutableStateOf(RoutineRepeat.DAILY) }
+    var repeatValue by remember { mutableStateOf("") }
+    var delayMs by remember { mutableStateOf("3000") }
+    var shareAfterSave by remember { mutableStateOf(false) }
+    var showAppPicker by remember { mutableStateOf(false) }
+    var pendingRoutine by remember { mutableStateOf<AutomationRoutine?>(null) }
+    var permissionMessage by remember { mutableStateOf<String?>(null) }
+
+    fun finishSave() {
+        pendingRoutine?.let(onSave)
+        pendingRoutine = null
+    }
+
+    val exactAlarmLauncher = rememberLauncherForActivityResult(ActivityResultContracts.StartActivityForResult()) {
+        finishSave()
+    }
+
+    fun requestExactAlarmOrSave() {
+        if (
+            scheduled &&
+            Build.VERSION.SDK_INT >= Build.VERSION_CODES.S &&
+            !alarmManager.canScheduleExactAlarms()
+        ) {
+            permissionMessage = if (ar) {
+                "فعّل السماح بالمنبهات الدقيقة حتى تعمل الأتمتة في الوقت الذي اخترته."
+            } else {
+                "Allow exact alarms so the automation can run at the selected time."
+            }
+            exactAlarmLauncher.launch(
+                Intent(
+                    Settings.ACTION_REQUEST_SCHEDULE_EXACT_ALARM,
+                    Uri.parse("package:${context.packageName}"),
+                ),
+            )
+        } else {
+            finishSave()
+        }
+    }
+
+    val notificationLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) {
+        requestExactAlarmOrSave()
+    }
+
+    fun saveRoutine(routine: AutomationRoutine) {
+        pendingRoutine = routine
+        permissionMessage = null
+        val needsNotifications = scheduled && Build.VERSION.SDK_INT >= 33 &&
+            ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED
+        if (needsNotifications) {
+            notificationLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
+        } else {
+            requestExactAlarmOrSave()
+        }
+    }
+
+    val selectedApp = installedApps.firstOrNull { it.packageName == appPackage }
+    val repeatValid = when (repeat) {
+        RoutineRepeat.ONCE -> runCatching { java.time.LocalDate.parse(repeatValue) }.isSuccess
+        RoutineRepeat.DAILY -> true
+        RoutineRepeat.WEEKLY -> repeatValue.toIntOrNull() in 1..7
+        RoutineRepeat.MONTHLY,
+        RoutineRepeat.YEARLY,
+        -> false
+    }
+    val canSave = appPackage.isNotBlank() && (!scheduled || (time.isNotBlank() && repeatValid))
+
+    LazyColumn(
+        modifier = Modifier.fillMaxSize().navigationBarsPadding(),
+        contentPadding = PaddingValues(start = 18.dp, top = 18.dp, end = 18.dp, bottom = 36.dp),
+        verticalArrangement = Arrangement.spacedBy(14.dp),
+    ) {
+        item {
+            Text(
+                if (ar) "فتح تطبيق + لقطة شاشة" else "Open app + screenshot",
+                style = MaterialTheme.typography.headlineSmall,
+                fontWeight = FontWeight.ExtraBold,
+            )
+            Text(
+                if (ar) "شاشة مبسطة: اختر التطبيق وطريقة التشغيل فقط. التاريخ والوقت يُكتبان على الصورة تلقائيًا."
+                else "Simple setup: choose the app and how it runs. Date and time are stamped on the image automatically.",
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+
+        item {
+            OutlinedTextField(
+                value = name,
+                onValueChange = { name = it },
+                label = { Text(if (ar) "اسم الأتمتة" else "Automation name") },
+                modifier = Modifier.fillMaxWidth(),
+            )
+        }
+
+        item {
+            Text(if (ar) "التطبيق" else "App", fontWeight = FontWeight.Bold)
+            Button(
+                onClick = { showAppPicker = true },
+                modifier = Modifier.fillMaxWidth(),
+            ) {
+                Text(selectedApp?.label ?: if (ar) "اختر التطبيق" else "Choose app")
+            }
+        }
+
+        item {
+            Text(if (ar) "طريقة التشغيل" else "Run mode", fontWeight = FontWeight.Bold)
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                FilterChip(
+                    selected = !scheduled,
+                    onClick = { scheduled = false },
+                    label = { Text(if (ar) "يدوي" else "Manual") },
+                )
+                FilterChip(
+                    selected = scheduled,
+                    onClick = { scheduled = true },
+                    label = { Text(if (ar) "بموعد" else "Scheduled") },
+                )
+            }
+            Text(
+                if (!scheduled) {
+                    if (ar) "تشغّل الأتمتة بنفسك وقتما تريد."
+                    else "Run it yourself whenever you want."
+                } else {
+                    if (ar) "تعمل تلقائيًا حسب الوقت والتكرار أدناه."
+                    else "Runs automatically using the time and repeat settings below."
+                },
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+
+        if (scheduled) {
+            item {
+                Text(if (ar) "الوقت" else "Time", fontWeight = FontWeight.Bold)
+                val now = Calendar.getInstance()
+                val parts = time.split(":")
+                val hour = parts.getOrNull(0)?.toIntOrNull() ?: now.get(Calendar.HOUR_OF_DAY)
+                val minute = parts.getOrNull(1)?.toIntOrNull() ?: now.get(Calendar.MINUTE)
+                Button(
+                    onClick = {
+                        TimePickerDialog(
+                            context,
+                            { _, h, m -> time = String.format(Locale.US, "%02d:%02d", h, m) },
+                            hour,
+                            minute,
+                            true,
+                        ).show()
+                    },
+                    modifier = Modifier.fillMaxWidth(),
+                ) {
+                    Text(if (time.isBlank()) {
+                        if (ar) "اختر الوقت" else "Choose time"
+                    } else {
+                        (if (ar) "الوقت: " else "Time: ") + time
+                    })
+                }
+            }
+
+            item {
+                Text(if (ar) "التكرار" else "Repeat", fontWeight = FontWeight.Bold)
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    listOf(RoutineRepeat.ONCE, RoutineRepeat.DAILY, RoutineRepeat.WEEKLY).forEach { option ->
+                        FilterChip(
+                            selected = repeat == option,
+                            onClick = {
+                                repeat = option
+                                if (option == RoutineRepeat.DAILY) repeatValue = ""
+                            },
+                            label = { Text(repeatLabel(option, ar)) },
+                        )
+                    }
+                }
+
+                when (repeat) {
+                    RoutineRepeat.ONCE -> {
+                        val now = Calendar.getInstance()
+                        val parts = repeatValue.split("-")
+                        val year = parts.getOrNull(0)?.toIntOrNull() ?: now.get(Calendar.YEAR)
+                        val month = parts.getOrNull(1)?.toIntOrNull() ?: now.get(Calendar.MONTH) + 1
+                        val day = parts.getOrNull(2)?.toIntOrNull() ?: now.get(Calendar.DAY_OF_MONTH)
+                        Button(
+                            onClick = {
+                                DatePickerDialog(
+                                    context,
+                                    { _, y, m, d ->
+                                        repeatValue = String.format(Locale.US, "%04d-%02d-%02d", y, m + 1, d)
+                                    },
+                                    year,
+                                    month - 1,
+                                    day,
+                                ).show()
+                            },
+                            modifier = Modifier.fillMaxWidth(),
+                        ) {
+                            Text(
+                                if (repeatValue.isBlank()) {
+                                    if (ar) "اختر التاريخ" else "Choose date"
+                                } else {
+                                    (if (ar) "التاريخ: " else "Date: ") + repeatValue
+                                },
+                            )
+                        }
+                    }
+                    RoutineRepeat.WEEKLY -> {
+                        val days = if (ar) {
+                            listOf("1" to "الاثنين", "2" to "الثلاثاء", "3" to "الأربعاء", "4" to "الخميس", "5" to "الجمعة", "6" to "السبت", "7" to "الأحد")
+                        } else {
+                            listOf("1" to "Mon", "2" to "Tue", "3" to "Wed", "4" to "Thu", "5" to "Fri", "6" to "Sat", "7" to "Sun")
+                        }
+                        LazyRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                            items(days) { (stored, label) ->
+                                FilterChip(
+                                    selected = repeatValue == stored,
+                                    onClick = { repeatValue = stored },
+                                    label = { Text(label) },
+                                )
+                            }
+                        }
+                    }
+                    else -> Unit
+                }
+            }
+
+            item {
+                ElevatedCard(Modifier.fillMaxWidth()) {
+                    Column(
+                        Modifier.fillMaxWidth().padding(14.dp),
+                        verticalArrangement = Arrangement.spacedBy(8.dp),
+                    ) {
+                        Text(
+                            if (ar) "التصوير المجدول" else "Scheduled capture",
+                            fontWeight = FontWeight.Bold,
+                        )
+                        Text(
+                            if (ar) "للتشغيل التلقائي، فعّل جلسة تصوير الشاشة مرة واحدة. تبقى فعالة حتى يوقفها أندرويد أو تعيد تشغيل الهاتف."
+                            else "For automatic runs, activate the capture session once. It stays active until Android stops it or the phone restarts.",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                        Button(
+                            onClick = {
+                                context.startActivity(
+                                    Intent(context, ScreenCaptureActivity::class.java)
+                                        .putExtra(ScreenCaptureActivity.EXTRA_PERSISTENT_START_ONLY, true),
+                                )
+                            },
+                            modifier = Modifier.fillMaxWidth(),
+                        ) {
+                            Text(
+                                if (PersistentScreenCaptureService.isSessionActive(context)) {
+                                    if (ar) "جلسة التصوير نشطة" else "Capture session active"
+                                } else {
+                                    if (ar) "تفعيل جلسة التصوير" else "Activate capture session"
+                                },
+                            )
+                        }
+                    }
+                }
+            }
+        }
+
+        item {
+            Text(if (ar) "الانتظار قبل التصوير" else "Wait before capture", fontWeight = FontWeight.Bold)
+            DelayChips(ar, delayMs) { delayMs = it }
+        }
+
+        item {
+            Text(if (ar) "بعد التقاط الصورة" else "After capture", fontWeight = FontWeight.Bold)
+            Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                FilterChip(
+                    selected = !shareAfterSave,
+                    onClick = { shareAfterSave = false },
+                    label = { Text(if (ar) "حفظ الصورة فقط" else "Save screenshot only") },
+                )
+                FilterChip(
+                    selected = shareAfterSave,
+                    onClick = { shareAfterSave = true },
+                    label = { Text(if (ar) "حفظ ثم مشاركة مع أي تطبيق" else "Save then share with any app") },
+                )
+            }
+            Text(
+                if (ar) "اسم الملف يحتوي التاريخ والوقت، كما يظهر التاريخ والوقت داخل الصورة نفسها."
+                else "The file name includes the date/time, and the date/time is also stamped on the image itself.",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+
+        permissionMessage?.let { message ->
+            item {
+                Text(message, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall)
+            }
+        }
+
+        item {
+            val trigger = if (scheduled) {
+                RoutineTrigger(
+                    type = RoutineTriggerType.TIME,
+                    value = time,
+                    repeat = repeat,
+                    repeatValue = repeatValue,
+                )
+            } else {
+                RoutineTrigger(RoutineTriggerType.MANUAL)
+            }
+            val routine = AutomationRoutine(
+                name = name.ifBlank { if (ar) "لقطة تطبيق بالتاريخ" else "Dated app screenshot" },
+                trigger = trigger,
+                actions = listOf(
+                    RoutineAction(
+                        type = RoutineActionType.OPEN_APP_SCREENSHOT,
+                        value = appPackage,
+                        secondaryValue = delayMs,
+                        parameters = mapOf(
+                            "stampDateTime" to "true",
+                            "persistentCapture" to scheduled.toString(),
+                            "shareAnyApp" to shareAfterSave.toString(),
+                        ),
+                    ),
+                ),
+            )
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                TextButton(onClick = onCancel, modifier = Modifier.weight(1f)) {
+                    Text(if (ar) "إلغاء" else "Cancel")
+                }
+                Button(
+                    onClick = { saveRoutine(routine) },
+                    enabled = canSave,
+                    modifier = Modifier.weight(1f),
+                ) {
+                    Text(if (ar) "حفظ" else "Save")
+                }
+            }
+            Spacer(Modifier.height(8.dp))
+        }
+    }
+
+    if (showAppPicker) {
+        AlertDialog(
+            onDismissRequest = { showAppPicker = false },
+            title = { Text(if (ar) "اختر التطبيق" else "Choose app") },
+            text = {
+                LazyColumn {
+                    items(installedApps, key = { it.packageName }) { app ->
+                        TextButton(
+                            onClick = {
+                                appPackage = app.packageName
+                                showAppPicker = false
+                            },
+                            modifier = Modifier.fillMaxWidth(),
+                        ) {
+                            Text(app.label)
+                        }
+                    }
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = { showAppPicker = false }) {
+                    Text(if (ar) "إلغاء" else "Cancel")
+                }
+            },
+        )
+    }
+}
+
+@Composable
 private fun RoutineBuilderScreen(
     initial: AutomationRoutine?,
     onCancel: () -> Unit,
