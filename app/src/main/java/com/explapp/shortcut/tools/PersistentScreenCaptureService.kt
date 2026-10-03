@@ -177,7 +177,7 @@ class PersistentScreenCaptureService : Service() {
                     notifyResult(
                         saved = saved.isSuccess,
                         sent = false,
-                        reason = if (saved.isFailure) saved.exceptionOrNull()?.message else local("Telegram bot data is missing", "بيانات بوت تيليجرام غير مكتملة"),
+                        reason = saved.exceptionOrNull()?.message,
                     )
                 }
             }.onFailure {
