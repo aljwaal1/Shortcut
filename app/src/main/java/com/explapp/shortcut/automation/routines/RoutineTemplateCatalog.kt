@@ -33,9 +33,19 @@ object RoutineTemplateCatalog {
             actions = listOf(RoutineAction(RoutineActionType.PREPARE_TELEGRAM, "", "")),
         ),
         AutomationRoutine(
-            name = "Open app + screenshot",
+            name = "Open app + dated screenshot",
             trigger = RoutineTrigger(RoutineTriggerType.MANUAL),
-            actions = listOf(RoutineAction(RoutineActionType.OPEN_APP_SCREENSHOT, "", "2000")),
+            actions = listOf(
+                RoutineAction(
+                    RoutineActionType.OPEN_APP_SCREENSHOT,
+                    "",
+                    "3000",
+                    parameters = mapOf(
+                        "stampDateTime" to "true",
+                        "persistentCapture" to "false",
+                    ),
+                ),
+            ),
         ),
         AutomationRoutine(
             name = "App usage",
