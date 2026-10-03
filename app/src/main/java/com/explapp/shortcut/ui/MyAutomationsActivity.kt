@@ -125,11 +125,21 @@ private fun MyAutomationsScreen(onBack: () -> Unit, initialMode: String = "") {
     }
 
     fun upsert(item: AutomationRoutine) {
-        val next = itemsState.toMutableList()
-        val index = next.indexOfFirst { it.id == item.id }
-        if (index >= 0) next[index] = item else next += item
         scheduler.cancel(item.id)
-        if (item.isEnabled) scheduler.schedule(item)
+        val persisted = if (item.isEnabled && !scheduler.schedule(item)) {
+            Toast.makeText(
+                context,
+                if (ar) "تعذر جدولة الأتمتة. تم حفظها كمتوقفة حتى لا تظهر كأنها تعمل."
+                else "Could not schedule the automation. It was saved paused so it does not appear active.",
+                Toast.LENGTH_LONG,
+            ).show()
+            item.copy(isEnabled = false)
+        } else {
+            item
+        }
+        val next = itemsState.toMutableList()
+        val index = next.indexOfFirst { it.id == persisted.id }
+        if (index >= 0) next[index] = persisted else next += persisted
         persist(next)
     }
 
