@@ -23,6 +23,8 @@ import androidx.core.app.NotificationCompat
 import android.content.ClipData
 import android.net.Uri
 import com.explapp.shortcut.automation.routines.TelegramBotSender
+import com.explapp.shortcut.execution.TaskExecutionReporter
+import com.explapp.shortcut.execution.TaskExecutionResult
 import java.io.File
 import java.io.FileOutputStream
 
@@ -39,6 +41,10 @@ class PersistentScreenCaptureService : Service() {
     private var pendingChatId = ""
     private var pendingCaption = ""
     private var pendingNormalTelegramShare = false
+    private var pendingStampDateTime = false
+    private var pendingRoutineId = ""
+    private var pendingRoutineName = ""
+    private var pendingRoutineStartedAtMs = 0L
 
     override fun onBind(intent: Intent?): IBinder? = null
 
@@ -129,6 +135,7 @@ class PersistentScreenCaptureService : Service() {
                 padded.recycle()
                 image.close()
 
+                if (pendingStampDateTime) ScreenshotStamp.apply(cropped)
                 val file = File(cacheDir, "persistent_capture_" + System.currentTimeMillis() + ".png")
                 FileOutputStream(file).use { cropped.compress(Bitmap.CompressFormat.PNG, 100, it) }
                 cropped.recycle()
@@ -137,7 +144,7 @@ class PersistentScreenCaptureService : Service() {
                 captureInFlight = false
                 val saved = runCatching {
                     val output = ToolOutputStore(this).create(
-                        "Screenshot_" + System.currentTimeMillis() + ".png",
+                        ScreenshotStamp.fileName(),
                         "image/png",
                         true,
                     )
@@ -218,6 +225,10 @@ class PersistentScreenCaptureService : Service() {
         pendingChatId = intent.getStringExtra(EXTRA_TELEGRAM_CHAT_ID).orEmpty()
         pendingCaption = intent.getStringExtra(EXTRA_TELEGRAM_CAPTION).orEmpty()
         pendingNormalTelegramShare = intent.getBooleanExtra(EXTRA_NORMAL_TELEGRAM_SHARE, false)
+        pendingStampDateTime = intent.getBooleanExtra(EXTRA_STAMP_DATE_TIME, false)
+        pendingRoutineId = intent.getStringExtra(EXTRA_ROUTINE_ID).orEmpty()
+        pendingRoutineName = intent.getStringExtra(EXTRA_ROUTINE_NAME).orEmpty()
+        pendingRoutineStartedAtMs = System.currentTimeMillis()
         val delayMs = intent.getLongExtra(EXTRA_CAPTURE_DELAY_MS, 3_000L).coerceIn(500L, 15_000L)
         val packageNameToOpen = intent.getStringExtra(EXTRA_LAUNCH_PACKAGE).orEmpty()
         val skipAppLaunch = intent.getBooleanExtra(EXTRA_SKIP_APP_LAUNCH, false)
@@ -419,6 +430,30 @@ class PersistentScreenCaptureService : Service() {
 
     private fun notifyResult(saved: Boolean, sent: Boolean, reason: String? = null) {
         val cleanReason = reason?.trim().orEmpty()
+        if (pendingRoutineName.isNotBlank()) {
+            val details = buildList {
+                add("PERSISTENT_CAPTURE = " + if (saved) "SUCCESS" else "FAILURE")
+                add("SCREENSHOT_SAVE = " + if (saved) "SUCCESS" else "FAILURE")
+                add("TELEGRAM_SEND = " + if (sent) "SUCCESS" else "NOT_COMPLETED")
+                add("DateTimeStamp = $pendingStampDateTime")
+            }
+            val taskName = "$pendingRoutineName / SCREENSHOT"
+            val started = pendingRoutineStartedAtMs.takeIf { it > 0L } ?: System.currentTimeMillis()
+            val result = if (saved) {
+                TaskExecutionResult.success(taskName, started, details = details)
+            } else {
+                TaskExecutionResult.failure(
+                    taskName,
+                    cleanReason.ifBlank { "Persistent screenshot failed" },
+                    started,
+                    details = details,
+                )
+            }
+            TaskExecutionReporter(applicationContext).report(result)
+            pendingRoutineId = ""
+            pendingRoutineName = ""
+            pendingRoutineStartedAtMs = 0L
+        }
         val title = when {
             saved && sent -> local("Screenshot sent to Telegram", "تم إرسال لقطة الشاشة إلى تيليجرام")
             saved && cleanReason.isNotBlank() -> local("Telegram send failed", "فشل الإرسال إلى تيليجرام")
@@ -485,6 +520,9 @@ class PersistentScreenCaptureService : Service() {
         const val EXTRA_TELEGRAM_CHAT_ID = "telegramChatId"
         const val EXTRA_TELEGRAM_CAPTION = "telegramCaption"
         const val EXTRA_NORMAL_TELEGRAM_SHARE = "normalTelegramShare"
+        const val EXTRA_STAMP_DATE_TIME = "stampDateTime"
+        const val EXTRA_ROUTINE_ID = "routineId"
+        const val EXTRA_ROUTINE_NAME = "routineName"
 
         private const val CHANNEL = "persistent_screen_capture"
         private const val NOTIFICATION_ID = 9200
