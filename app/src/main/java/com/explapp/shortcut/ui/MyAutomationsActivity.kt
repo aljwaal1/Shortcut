@@ -4,6 +4,8 @@ import android.Manifest
 import android.app.AlarmManager
 import android.app.DatePickerDialog
 import android.app.TimePickerDialog
+import android.content.ClipData
+import android.content.ClipboardManager
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.net.Uri
@@ -73,6 +75,7 @@ import com.explapp.shortcut.automation.routines.RoutineTrigger
 import com.explapp.shortcut.automation.routines.RoutineTriggerType
 import com.explapp.shortcut.automation.routines.TelegramBotSender
 import com.explapp.shortcut.data.InstalledAppRepository
+import com.explapp.shortcut.execution.TaskExecutionReporter
 import com.explapp.shortcut.tools.NfcSetupActivity
 import com.explapp.shortcut.tools.ScreenCaptureActivity
 import com.explapp.shortcut.tools.PersistentScreenCaptureService
@@ -253,6 +256,39 @@ private fun MyAutomationsScreen(onBack: () -> Unit) {
                     }
                 }
             }
+            item {
+                ElevatedCard(Modifier.fillMaxWidth()) {
+                    Column(Modifier.fillMaxWidth().padding(14.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Text(
+                            if (ar) "تقرير Debug اليومي لكل الأتمتات" else "Daily debug log for all automations",
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.Bold,
+                        )
+                        Text(
+                            if (ar) "يشمل كل تشغيل اليوم: يدوي أو مجدول، كل الخطوات، النجاح والفشل، سبب الفشل، المدة، نسخة التطبيق ومعلومات الجهاز. انسخه كاملًا وأرسله لي عند وجود مشكلة."
+                            else "Includes every run today: manual or scheduled, every step, success/failure, failure reason, duration, app version, and device info. Copy the full log and send it when something goes wrong.",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                        Button(
+                            onClick = {
+                                val report = TaskExecutionReporter(context.applicationContext).dailyReport(ar = ar)
+                                val clipboard = context.getSystemService(ClipboardManager::class.java)
+                                clipboard.setPrimaryClip(ClipData.newPlainText("Shortcut daily debug log", report))
+                                Toast.makeText(
+                                    context,
+                                    if (ar) "تم نسخ تقرير Debug لليوم" else "Today's debug log copied",
+                                    Toast.LENGTH_SHORT,
+                                ).show()
+                            },
+                            modifier = Modifier.fillMaxWidth(),
+                        ) {
+                            Text(if (ar) "نسخ تقرير اليوم كاملًا" else "Copy full daily log")
+                        }
+                    }
+                }
+            }
+
             item {
                 TextButton(
                     onClick = { context.startActivity(Intent(context, ScheduledTasksManagerActivity::class.java)) },
