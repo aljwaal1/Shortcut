@@ -8,6 +8,7 @@ import android.content.pm.PackageManager
 import android.os.Build
 import androidx.core.app.NotificationCompat
 import androidx.core.content.ContextCompat
+import com.explapp.shortcut.quality.CrashLogStore
 import org.json.JSONArray
 import org.json.JSONObject
 import java.text.SimpleDateFormat
@@ -108,6 +109,9 @@ class TaskExecutionReporter(private val context: Context) {
         val successCount = records.count { it.status == TaskExecutionStatus.SUCCESS }
         val preparedCount = records.count { it.status == TaskExecutionStatus.PREPARED }
         val failureCount = records.count { it.status == TaskExecutionStatus.FAILURE }
+        val crash = CrashLogStore(context).last()?.takeIf {
+            Instant.ofEpochMilli(it.timestampMs).atZone(zone).toLocalDate() == targetDate
+        }
 
         return buildString {
             appendLine("===== SHORTCUT DAILY DEBUG LOG =====")
@@ -205,6 +209,16 @@ class TaskExecutionReporter(private val context: Context) {
                                 (item.reason?.takeIf { it.isNotBlank() } ?: "Unknown reason"),
                         )
                     }
+            }
+
+            crash?.let {
+                appendLine()
+                appendLine("===== APP CRASH DETECTED TODAY =====")
+                appendLine("CrashTime: ${timeFormat.format(Date(it.timestampMs))}")
+                appendLine("Thread: ${it.threadName}")
+                appendLine("Summary: ${it.summary}")
+                appendLine("StackTrace:")
+                appendLine(it.stackTrace.take(8000))
             }
         }
     }
