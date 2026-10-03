@@ -1047,14 +1047,23 @@ private fun SimpleAppScreenshotWizard(
         }
     }
 
-    val notificationLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) {
-        requestExactAlarmOrSave()
+    val notificationLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
+        if (!granted && shareAfterSave) {
+            pendingRoutine = null
+            permissionMessage = if (ar) {
+                "يلزم السماح بالإشعارات لخيار المشاركة، لأن التطبيق يعرض إشعارًا موثوقًا بعد حفظ الصورة لفتح قائمة المشاركة."
+            } else {
+                "Notification permission is required for sharing because Shortcut uses a reliable notification after saving the screenshot to open the share sheet."
+            }
+        } else {
+            requestExactAlarmOrSave()
+        }
     }
 
     fun saveRoutine(routine: AutomationRoutine) {
         pendingRoutine = routine
         permissionMessage = null
-        val needsNotifications = scheduled && Build.VERSION.SDK_INT >= 33 &&
+        val needsNotifications = (scheduled || shareAfterSave) && Build.VERSION.SDK_INT >= 33 &&
             ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED
         if (needsNotifications) {
             notificationLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
