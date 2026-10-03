@@ -74,6 +74,14 @@ class ScreenCaptureActivity : AppCompatActivity() {
     private val consent = registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
         val data = result.data
         if (result.resultCode != Activity.RESULT_OK || data == null) {
+            reportRoutineScreenshot(
+                success = false,
+                reason = "Screen capture permission was not granted",
+                details = listOf(
+                    "SCREEN_CAPTURE_PERMISSION = DENIED",
+                    "DateTimeStamp = $stampDateTime",
+                ),
+            )
             finish()
             return@registerForActivityResult
         }
