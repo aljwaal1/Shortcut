@@ -873,17 +873,6 @@ private fun DailyScreenshotTelegramWizard(
             )
         }
 
-        if (scheduled && !captureSessionReady) {
-            item {
-                Text(
-                    if (ar) "زر الحفظ سيُفعّل بعد تشغيل جلسة تصوير الشاشة."
-                    else "Save becomes available after the screen-capture session is activated.",
-                    color = MaterialTheme.colorScheme.error,
-                    style = MaterialTheme.typography.bodySmall,
-                )
-            }
-        }
-
         permissionMessage?.let { message ->
             item {
                 Text(message, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall)
@@ -1317,6 +1306,17 @@ private fun SimpleAppScreenshotWizard(
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
+        }
+
+        if (scheduled && !captureSessionReady) {
+            item {
+                Text(
+                    if (ar) "زر الحفظ سيُفعّل بعد تشغيل جلسة تصوير الشاشة."
+                    else "Save becomes available after the screen-capture session is activated.",
+                    color = MaterialTheme.colorScheme.error,
+                    style = MaterialTheme.typography.bodySmall,
+                )
+            }
         }
 
         permissionMessage?.let { message ->
