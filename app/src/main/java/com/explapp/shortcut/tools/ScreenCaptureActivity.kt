@@ -37,6 +37,8 @@ import androidx.core.app.NotificationCompat
 import androidx.core.content.ContextCompat
 import com.google.mlkit.vision.common.InputImage
 import com.explapp.shortcut.automation.routines.TelegramBotSender
+import com.explapp.shortcut.execution.TaskExecutionReporter
+import com.explapp.shortcut.execution.TaskExecutionResult
 import com.google.mlkit.vision.text.TextRecognition
 import com.google.mlkit.vision.text.latin.TextRecognizerOptions
 import java.io.File
@@ -51,6 +53,10 @@ class ScreenCaptureActivity : AppCompatActivity() {
     private var telegramCaption: String = ""
     private var normalTelegramShare: Boolean = false
     private var persistentStartOnly: Boolean = false
+    private var stampDateTime: Boolean = false
+    private var routineId: String = ""
+    private var routineName: String = ""
+    private var routineStartedAtMs: Long = 0L
 
     private val receiver = object : BroadcastReceiver() {
         override fun onReceive(context: Context, intent: Intent) {
@@ -95,6 +101,10 @@ class ScreenCaptureActivity : AppCompatActivity() {
                 .putExtra(ScreenCaptureService.EXTRA_TELEGRAM_CHAT_ID, telegramChatId)
                 .putExtra(ScreenCaptureService.EXTRA_TELEGRAM_CAPTION, telegramCaption)
                 .putExtra(ScreenCaptureService.EXTRA_NORMAL_TELEGRAM_SHARE, normalTelegramShare)
+                .putExtra(ScreenCaptureService.EXTRA_STAMP_DATE_TIME, stampDateTime)
+                .putExtra(ScreenCaptureService.EXTRA_ROUTINE_ID, routineId)
+                .putExtra(ScreenCaptureService.EXTRA_ROUTINE_NAME, routineName)
+                .putExtra(ScreenCaptureService.EXTRA_ROUTINE_STARTED_AT_MS, routineStartedAtMs)
             ContextCompat.startForegroundService(this, service)
 
             if (!packageNameToOpen.isNullOrBlank()) {
@@ -125,6 +135,10 @@ class ScreenCaptureActivity : AppCompatActivity() {
         telegramCaption = intent.getStringExtra(EXTRA_TELEGRAM_CAPTION).orEmpty()
         normalTelegramShare = intent.getBooleanExtra(EXTRA_NORMAL_TELEGRAM_SHARE, false)
         persistentStartOnly = intent.getBooleanExtra(EXTRA_PERSISTENT_START_ONLY, false)
+        stampDateTime = intent.getBooleanExtra(EXTRA_STAMP_DATE_TIME, false)
+        routineId = intent.getStringExtra(EXTRA_ROUTINE_ID).orEmpty()
+        routineName = intent.getStringExtra(EXTRA_ROUTINE_NAME).orEmpty()
+        routineStartedAtMs = System.currentTimeMillis()
         ContextCompat.registerReceiver(
             this,
             receiver,
@@ -212,7 +226,7 @@ class ScreenCaptureActivity : AppCompatActivity() {
     private fun saveScreenshot(file: File) {
         runCatching {
             val uri = ToolOutputStore(this).create(
-                "Screenshot_${System.currentTimeMillis()}.png",
+                ScreenshotStamp.fileName(),
                 "image/png",
                 true,
             )
@@ -222,6 +236,15 @@ class ScreenCaptureActivity : AppCompatActivity() {
             }
             uri
         }.onSuccess { uri ->
+            reportRoutineScreenshot(
+                success = true,
+                reason = null,
+                details = listOf(
+                    "SCREENSHOT_SAVE = SUCCESS",
+                    "Uri = $uri",
+                    "DateTimeStamp = $stampDateTime",
+                ),
+            )
             if (telegramBotToken.isNotBlank() && telegramChatId.isNotBlank()) {
                 Thread {
                     val result = TelegramBotSender().sendPhoto(telegramBotToken, telegramChatId, telegramCaption, file)
@@ -261,6 +284,11 @@ class ScreenCaptureActivity : AppCompatActivity() {
             }
         }.onFailure {
             file.delete()
+            reportRoutineScreenshot(
+                success = false,
+                reason = it.message ?: "Screenshot save failed",
+                details = listOf("SCREENSHOT_SAVE = FAILURE", "DateTimeStamp = $stampDateTime"),
+            )
             Toast.makeText(this, it.message ?: local("Screenshot error", "حدث خطأ أثناء التقاط الشاشة"), Toast.LENGTH_LONG).show()
             finish()
         }
@@ -327,6 +355,22 @@ class ScreenCaptureActivity : AppCompatActivity() {
         finish()
     }
 
+    private fun reportRoutineScreenshot(
+        success: Boolean,
+        reason: String?,
+        details: List<String>,
+    ) {
+        if (routineName.isBlank()) return
+        val started = routineStartedAtMs.takeIf { it > 0L } ?: System.currentTimeMillis()
+        val taskName = "$routineName / SCREENSHOT"
+        val result = if (success) {
+            TaskExecutionResult.success(taskName, started, details = details)
+        } else {
+            TaskExecutionResult.failure(taskName, reason ?: "Screenshot failed", started, details = details)
+        }
+        TaskExecutionReporter(applicationContext).report(result)
+    }
+
     private fun local(en: String, ar: String): String =
         if (resources.configuration.locales[0].language == "ar") ar else en
 
@@ -339,6 +383,9 @@ class ScreenCaptureActivity : AppCompatActivity() {
         const val EXTRA_TELEGRAM_CAPTION = "telegram_caption"
         const val EXTRA_NORMAL_TELEGRAM_SHARE = "normal_telegram_share"
         const val EXTRA_PERSISTENT_START_ONLY = "persistent_start_only"
+        const val EXTRA_STAMP_DATE_TIME = "stamp_date_time"
+        const val EXTRA_ROUTINE_ID = "routine_id"
+        const val EXTRA_ROUTINE_NAME = "routine_name"
         private const val DEFAULT_CAPTURE_DELAY_MS = 3_000L
         private const val OCR_CHANNEL = "screen_ocr"
     }
@@ -353,6 +400,10 @@ class ScreenCaptureService : Service() {
     private var telegramChatId = ""
     private var telegramCaption = ""
     private var normalTelegramShare = false
+    private var stampDateTime = false
+    private var routineId = ""
+    private var routineName = ""
+    private var routineStartedAtMs = 0L
     @Volatile private var captureBusy = false
 
     override fun onBind(intent: Intent?): IBinder? = null
@@ -413,6 +464,10 @@ class ScreenCaptureService : Service() {
         telegramChatId = intent?.getStringExtra(EXTRA_TELEGRAM_CHAT_ID).orEmpty()
         telegramCaption = intent?.getStringExtra(EXTRA_TELEGRAM_CAPTION).orEmpty()
         normalTelegramShare = intent?.getBooleanExtra(EXTRA_NORMAL_TELEGRAM_SHARE, false) == true
+        stampDateTime = intent?.getBooleanExtra(EXTRA_STAMP_DATE_TIME, false) == true
+        routineId = intent?.getStringExtra(EXTRA_ROUTINE_ID).orEmpty()
+        routineName = intent?.getStringExtra(EXTRA_ROUTINE_NAME).orEmpty()
+        routineStartedAtMs = intent?.getLongExtra(EXTRA_ROUTINE_STARTED_AT_MS, System.currentTimeMillis()) ?: System.currentTimeMillis()
         captureHandler.postDelayed({ capture(resultCode, data) }, delayMs)
         return START_NOT_STICKY
     }
@@ -480,6 +535,7 @@ class ScreenCaptureService : Service() {
             }
 
             completed = true
+            if (stampDateTime) ScreenshotStamp.apply(cropped)
             val file = File(cacheDir, "capture_${System.currentTimeMillis()}.png")
             FileOutputStream(file).use { cropped.compress(Bitmap.CompressFormat.PNG, 100, it) }
             cropped.recycle()
@@ -545,6 +601,11 @@ class ScreenCaptureService : Service() {
 
     private fun handleAutomationResult(path: String?) {
         if (path.isNullOrBlank()) {
+            reportAutomationScreenshot(
+                success = false,
+                reason = "Screen capture returned no image",
+                details = listOf("SCREENSHOT_CAPTURE = FAILURE", "DateTimeStamp = $stampDateTime"),
+            )
             showResultNotification(
                 local("Screenshot failed", "فشل التقاط لقطة الشاشة"),
                 local("Shortcut could not capture the target app screen.", "تعذر على التطبيق التقاط شاشة التطبيق المطلوب."),
@@ -557,7 +618,7 @@ class ScreenCaptureService : Service() {
         val file = File(path)
         val savedUri = runCatching {
             val uri = ToolOutputStore(this).create(
-                "Screenshot_" + System.currentTimeMillis() + ".png",
+                ScreenshotStamp.fileName(),
                 "image/png",
                 true,
             )
@@ -567,6 +628,17 @@ class ScreenCaptureService : Service() {
             }
             uri
         }.getOrNull()
+
+        reportAutomationScreenshot(
+            success = savedUri != null,
+            reason = if (savedUri == null) "Could not save screenshot" else null,
+            details = buildList {
+                add("SCREENSHOT_CAPTURE = SUCCESS")
+                add("SCREENSHOT_SAVE = " + if (savedUri != null) "SUCCESS" else "FAILURE")
+                add("DateTimeStamp = $stampDateTime")
+                savedUri?.let { add("Uri = $it") }
+            },
+        )
 
         when {
             telegramBotToken.isNotBlank() && telegramChatId.isNotBlank() -> {
@@ -665,6 +737,22 @@ class ScreenCaptureService : Service() {
         }
     }
 
+    private fun reportAutomationScreenshot(
+        success: Boolean,
+        reason: String?,
+        details: List<String>,
+    ) {
+        if (routineName.isBlank()) return
+        val started = routineStartedAtMs.takeIf { it > 0L } ?: System.currentTimeMillis()
+        val taskName = "$routineName / SCREENSHOT"
+        val result = if (success) {
+            TaskExecutionResult.success(taskName, started, details = details)
+        } else {
+            TaskExecutionResult.failure(taskName, reason ?: "Screenshot failed", started, details = details)
+        }
+        TaskExecutionReporter(applicationContext).report(result)
+    }
+
     private fun showResultNotification(title: String, text: String, pending: PendingIntent? = null) {
         val manager = getSystemService(NotificationManager::class.java)
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
@@ -701,6 +789,10 @@ class ScreenCaptureService : Service() {
         const val EXTRA_TELEGRAM_CHAT_ID = "telegramChatId"
         const val EXTRA_TELEGRAM_CAPTION = "telegramCaption"
         const val EXTRA_NORMAL_TELEGRAM_SHARE = "normalTelegramShare"
+        const val EXTRA_STAMP_DATE_TIME = "stampDateTime"
+        const val EXTRA_ROUTINE_ID = "routineId"
+        const val EXTRA_ROUTINE_NAME = "routineName"
+        const val EXTRA_ROUTINE_STARTED_AT_MS = "routineStartedAtMs"
         private const val CHANNEL = "screen_capture"
         private const val RESULT_CHANNEL = "screen_capture_results"
         private const val NOTIFICATION_ID = 8831
