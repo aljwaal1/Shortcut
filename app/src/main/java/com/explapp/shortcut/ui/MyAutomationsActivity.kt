@@ -85,20 +85,48 @@ import com.explapp.shortcut.tools.ToolId
 class MyAutomationsActivity : AppCompatActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        setContent { ShortcutTheme { MyAutomationsScreen(onBack = ::finish) } }
+        val startMode = intent.getStringExtra(EXTRA_START_MODE).orEmpty()
+        setContent { ShortcutTheme { MyAutomationsScreen(onBack = ::finish, initialMode = startMode) } }
+    }
+
+    companion object {
+        const val EXTRA_START_MODE = "start_mode"
+        const val MODE_CREATE = "create"
+        const val MODE_TEMPLATES = "templates"
+        const val MODE_SCREENSHOT = "screenshot"
     }
 }
 
 @Composable
-private fun MyAutomationsScreen(onBack: () -> Unit) {
+private fun MyAutomationsScreen(onBack: () -> Unit, initialMode: String = "") {
     val context = LocalContext.current
     val ar = LocalConfiguration.current.locales[0].language == "ar"
     val store = remember { RoutineStore(context.applicationContext) }
     val scheduler = remember { RoutineScheduler(context.applicationContext) }
     val itemsState = remember { mutableStateListOf<AutomationRoutine>().apply { addAll(store.load()) } }
-    var editing by remember { mutableStateOf<AutomationRoutine?>(null) }
-    var creating by remember { mutableStateOf(false) }
-    var showTemplates by remember { mutableStateOf(false) }
+    var editing by remember(initialMode) {
+        mutableStateOf<AutomationRoutine?>(
+            if (initialMode == MyAutomationsActivity.MODE_SCREENSHOT) {
+                AutomationRoutine(
+                    name = if (ar) "لقطة تطبيق بالتاريخ" else "Dated app screenshot",
+                    trigger = RoutineTrigger(RoutineTriggerType.MANUAL),
+                    actions = listOf(
+                        RoutineAction(
+                            type = RoutineActionType.OPEN_APP_SCREENSHOT,
+                            value = "",
+                            secondaryValue = "3000",
+                            parameters = mapOf(
+                                "stampDateTime" to "true",
+                                "persistentCapture" to "false",
+                            ),
+                        ),
+                    ),
+                )
+            } else null,
+        )
+    }
+    var creating by remember(initialMode) { mutableStateOf(initialMode == MyAutomationsActivity.MODE_CREATE) }
+    var showTemplates by remember(initialMode) { mutableStateOf(initialMode == MyAutomationsActivity.MODE_TEMPLATES) }
     var showDailyScreenshotTelegram by remember { mutableStateOf(false) }
     var showDailyScreenshotTelegramChat by remember { mutableStateOf(false) }
     var lastDeleted by remember { mutableStateOf<AutomationRoutine?>(null) }
