@@ -8,6 +8,7 @@ data class TaskExecutionResult(
     val reason: String?,
     val startedAtMs: Long,
     val finishedAtMs: Long,
+    val details: List<String> = emptyList(),
 ) {
     val durationMs: Long get() = (finishedAtMs - startedAtMs).coerceAtLeast(0L)
 
@@ -26,13 +27,26 @@ data class TaskExecutionResult(
         }
 
     companion object {
-        fun success(taskName: String, startedAtMs: Long, finishedAtMs: Long = System.currentTimeMillis()) =
-            TaskExecutionResult(taskName, TaskExecutionStatus.SUCCESS, null, startedAtMs, finishedAtMs)
+        fun success(
+            taskName: String,
+            startedAtMs: Long,
+            finishedAtMs: Long = System.currentTimeMillis(),
+            details: List<String> = emptyList(),
+        ) = TaskExecutionResult(taskName, TaskExecutionStatus.SUCCESS, null, startedAtMs, finishedAtMs, details)
 
-        fun prepared(taskName: String, startedAtMs: Long, finishedAtMs: Long = System.currentTimeMillis()) =
-            TaskExecutionResult(taskName, TaskExecutionStatus.PREPARED, null, startedAtMs, finishedAtMs)
+        fun prepared(
+            taskName: String,
+            startedAtMs: Long,
+            finishedAtMs: Long = System.currentTimeMillis(),
+            details: List<String> = emptyList(),
+        ) = TaskExecutionResult(taskName, TaskExecutionStatus.PREPARED, null, startedAtMs, finishedAtMs, details)
 
-        fun failure(taskName: String, reason: String, startedAtMs: Long, finishedAtMs: Long = System.currentTimeMillis()) =
-            TaskExecutionResult(taskName, TaskExecutionStatus.FAILURE, reason, startedAtMs, finishedAtMs)
+        fun failure(
+            taskName: String,
+            reason: String,
+            startedAtMs: Long,
+            finishedAtMs: Long = System.currentTimeMillis(),
+            details: List<String> = emptyList(),
+        ) = TaskExecutionResult(taskName, TaskExecutionStatus.FAILURE, reason, startedAtMs, finishedAtMs, details)
     }
 }
