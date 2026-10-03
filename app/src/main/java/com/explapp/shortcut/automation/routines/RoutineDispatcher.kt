@@ -48,7 +48,13 @@ class RoutineDispatcher(private val context: Context) {
                 AndroidRoutineActionRunner(context, userInitiated, routine.id, routine.name),
                 AndroidRoutineConditionEvaluator(context),
             ).execute(routine, startedAtMs = startedAt)
-            TaskExecutionReporter(context).report(result.toTaskExecutionResult())
+            val historyResult = result.toTaskExecutionResult().copy(
+                details = listOf(
+                    "RUN_SOURCE = " + if (userInitiated) "MANUAL" else "SCHEDULED",
+                    "ROUTINE_ID = ${routine.id}",
+                ) + result.toTaskExecutionResult().details,
+            )
+            TaskExecutionReporter(context).report(historyResult)
             result
         } finally {
             runningRoutineIds.remove(routine.id)
