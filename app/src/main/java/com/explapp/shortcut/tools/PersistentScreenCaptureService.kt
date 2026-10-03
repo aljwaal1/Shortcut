@@ -467,8 +467,12 @@ class PersistentScreenCaptureService : Service() {
             val details = buildList {
                 add("PERSISTENT_CAPTURE = " + if (saved) "SUCCESS" else "FAILURE")
                 add("SCREENSHOT_SAVE = " + if (saved) "SUCCESS" else "FAILURE")
-                add("TELEGRAM_SEND = " + if (sent) "SUCCESS" else "NOT_COMPLETED")
+                if (pendingToken.isNotBlank() || pendingChatId.isNotBlank()) {
+                    add("TELEGRAM_SEND = " + if (sent) "SUCCESS" else "FAILURE")
+                }
+                if (pendingNormalTelegramShare) add("TELEGRAM_SHARE = PREPARED")
                 add("DateTimeStamp = $pendingStampDateTime")
+                if (pendingRoutineId.isNotBlank()) add("RoutineId = $pendingRoutineId")
             }
             val taskName = "$pendingRoutineName / SCREENSHOT"
             val started = pendingRoutineStartedAtMs.takeIf { it > 0L } ?: System.currentTimeMillis()
@@ -500,8 +504,8 @@ class PersistentScreenCaptureService : Service() {
             )
             cleanReason.isNotBlank() -> cleanReason
             saved -> local(
-                "The screenshot was saved, but Telegram sending did not complete.",
-                "تم حفظ لقطة الشاشة، لكن لم يكتمل الإرسال إلى تيليجرام.",
+                "The screenshot was saved successfully.",
+                "تم حفظ لقطة الشاشة بنجاح.",
             )
             else -> local(
                 "Shortcut could not create the scheduled screenshot.",
