@@ -42,6 +42,7 @@ class PersistentScreenCaptureService : Service() {
     private var pendingChatId = ""
     private var pendingCaption = ""
     private var pendingNormalTelegramShare = false
+    private var pendingShareAnyApp = false
     private var pendingStampDateTime = false
     private var pendingRoutineId = ""
     private var pendingRoutineName = ""
@@ -168,6 +169,7 @@ class PersistentScreenCaptureService : Service() {
                 val chatId = pendingChatId
                 val caption = pendingCaption
                 val normalShare = pendingNormalTelegramShare
+                val shareAnyApp = pendingShareAnyApp
                 if (token.isNotBlank() && chatId.isNotBlank()) {
                     Thread {
                         val sent = TelegramBotSender().sendPhoto(token, chatId, caption, file)
@@ -178,6 +180,10 @@ class PersistentScreenCaptureService : Service() {
                             reason = sent.exceptionOrNull()?.message,
                         )
                     }.start()
+                } else if (shareAnyApp && saved.isSuccess) {
+                    file.delete()
+                    notifyResult(saved = true, sent = false, reason = null)
+                    notifyGenericShare(saved.getOrThrow())
                 } else if (normalShare && saved.isSuccess) {
                     file.delete()
                     notifyResult(saved = true, sent = false, reason = null)
@@ -235,6 +241,7 @@ class PersistentScreenCaptureService : Service() {
         pendingChatId = intent.getStringExtra(EXTRA_TELEGRAM_CHAT_ID).orEmpty()
         pendingCaption = intent.getStringExtra(EXTRA_TELEGRAM_CAPTION).orEmpty()
         pendingNormalTelegramShare = intent.getBooleanExtra(EXTRA_NORMAL_TELEGRAM_SHARE, false)
+        pendingShareAnyApp = intent.getBooleanExtra(EXTRA_SHARE_ANY_APP, false)
         pendingStampDateTime = intent.getBooleanExtra(EXTRA_STAMP_DATE_TIME, false)
         pendingRoutineId = intent.getStringExtra(EXTRA_ROUTINE_ID).orEmpty()
         pendingRoutineName = intent.getStringExtra(EXTRA_ROUTINE_NAME).orEmpty()
@@ -394,6 +401,66 @@ class PersistentScreenCaptureService : Service() {
             .setOngoing(true)
             .addAction(0, local("Stop", "إيقاف"), stopPending)
             .build()
+    }
+
+    private fun notifyGenericShare(uri: Uri) {
+        val sendIntent = Intent(Intent.ACTION_SEND).apply {
+            type = "image/png"
+            putExtra(Intent.EXTRA_STREAM, uri)
+            clipData = ClipData.newRawUri("Shortcut screenshot", uri)
+            addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+        }
+        val chooser = Intent.createChooser(
+            sendIntent,
+            local("Share screenshot", "مشاركة لقطة الشاشة"),
+        ).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+
+        val opened = runCatching {
+            if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q) {
+                startActivity(chooser)
+            } else {
+                val pending = PendingIntent.getActivity(
+                    this,
+                    9204,
+                    chooser,
+                    PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
+                )
+                if (Build.VERSION.SDK_INT >= 34) {
+                    val options = ActivityOptions.makeBasic().apply {
+                        val mode = if (Build.VERSION.SDK_INT >= 36) {
+                            ActivityOptions.MODE_BACKGROUND_ACTIVITY_START_ALLOW_ALWAYS
+                        } else {
+                            @Suppress("DEPRECATION")
+                            ActivityOptions.MODE_BACKGROUND_ACTIVITY_START_ALLOWED
+                        }
+                        setPendingIntentBackgroundActivityStartMode(mode)
+                    }
+                    pending.send(this, 0, null, null, null, null, options.toBundle())
+                } else {
+                    pending.send()
+                }
+            }
+            true
+        }.getOrDefault(false)
+
+        if (!opened) {
+            val pending = PendingIntent.getActivity(
+                this,
+                9204,
+                chooser,
+                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
+            )
+            getSystemService(NotificationManager::class.java).notify(
+                RESULT_NOTIFICATION_ID + 1,
+                NotificationCompat.Builder(this, RESULT_CHANNEL)
+                    .setSmallIcon(android.R.drawable.ic_menu_share)
+                    .setContentTitle(local("Screenshot ready to share", "لقطة الشاشة جاهزة للمشاركة"))
+                    .setContentText(local("Tap to choose an app.", "اضغط لاختيار تطبيق للمشاركة."))
+                    .setContentIntent(pending)
+                    .setAutoCancel(true)
+                    .build(),
+            )
+        }
     }
 
     private fun notifyNormalTelegramShare(uri: Uri, caption: String) {
@@ -557,6 +624,7 @@ class PersistentScreenCaptureService : Service() {
         const val EXTRA_TELEGRAM_CHAT_ID = "telegramChatId"
         const val EXTRA_TELEGRAM_CAPTION = "telegramCaption"
         const val EXTRA_NORMAL_TELEGRAM_SHARE = "normalTelegramShare"
+        const val EXTRA_SHARE_ANY_APP = "shareAnyApp"
         const val EXTRA_STAMP_DATE_TIME = "stampDateTime"
         const val EXTRA_ROUTINE_ID = "routineId"
         const val EXTRA_ROUTINE_NAME = "routineName"
