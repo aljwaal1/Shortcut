@@ -12,8 +12,8 @@ android {
         applicationId = "com.explapp.shortcut"
         minSdk = 26
         targetSdk = 36
-        versionCode = 39
-        versionName = "0.9.7"
+        versionCode = 40
+        versionName = "0.9.8"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables { useSupportLibrary = true }
