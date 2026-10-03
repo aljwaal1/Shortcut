@@ -433,6 +433,7 @@ class ScreenCaptureService : Service() {
         var display: android.hardware.display.VirtualDisplay? = null
         var completed = false
         val readyAtMs = SystemClock.uptimeMillis() + 350L
+        val forceAcceptAtMs = SystemClock.uptimeMillis() + 3_000L
         var framesSeen = 0
 
         fun cleanup() {
@@ -471,6 +472,15 @@ class ScreenCaptureService : Service() {
             val cropped = Bitmap.createBitmap(padded, 0, 0, width, height)
             padded.recycle()
             image.close()
+
+            val sample = sampleCenterGrid(cropped)
+            val likelyBlank = ScreenFrameReadiness.isLikelyBlank(sample)
+            if (likelyBlank && SystemClock.uptimeMillis() < forceAcceptAtMs) {
+                cropped.recycle()
+                return@setOnImageAvailableListener
+            }
+
+            completed = true
             val file = File(cacheDir, "capture_${System.currentTimeMillis()}.png")
             FileOutputStream(file).use { cropped.compress(Bitmap.CompressFormat.PNG, 100, it) }
             cropped.recycle()
@@ -495,7 +505,29 @@ class ScreenCaptureService : Service() {
                 cleanup()
                 complete(null)
             }
-        }, 4_000)
+        }, 6_000)
+    }
+
+    private fun sampleCenterGrid(bitmap: Bitmap): IntArray {
+        val columns = 11
+        val rows = 15
+        val left = (bitmap.width * 0.12f).toInt()
+        val right = (bitmap.width * 0.88f).toInt().coerceAtLeast(left + 1)
+        val top = (bitmap.height * 0.12f).toInt()
+        val bottom = (bitmap.height * 0.88f).toInt().coerceAtLeast(top + 1)
+        val pixels = IntArray(columns * rows)
+        var index = 0
+        for (row in 0 until rows) {
+            val y = if (rows == 1) top else top + ((bottom - top - 1) * row / (rows - 1))
+            for (column in 0 until columns) {
+                val x = if (columns == 1) left else left + ((right - left - 1) * column / (columns - 1))
+                pixels[index++] = bitmap.getPixel(
+                    x.coerceIn(0, bitmap.width - 1),
+                    y.coerceIn(0, bitmap.height - 1),
+                )
+            }
+        }
+        return pixels
     }
 
     private fun complete(path: String?) {
