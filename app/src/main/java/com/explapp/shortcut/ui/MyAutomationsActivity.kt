@@ -1371,10 +1371,47 @@ private fun RoutineBuilderScreen(
                             }
                             if (actionType == RoutineActionType.OPEN_APP_SCREENSHOT) {
                                 DelayChips(ar, secondary.ifBlank { "3000" }) { secondary = it }
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    Text(
+                                        if (ar) "كتابة التاريخ والوقت على الصورة" else "Stamp date and time on image",
+                                        modifier = Modifier.weight(1f),
+                                    )
+                                    Switch(
+                                        checked = params["stampDateTime"].toBoolean(),
+                                        onCheckedChange = { params = params + ("stampDateTime" to it.toString()) },
+                                    )
+                                }
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    Text(
+                                        if (ar) "استخدام جلسة التصوير المستمرة للجدولة" else "Use persistent capture session for schedules",
+                                        modifier = Modifier.weight(1f),
+                                    )
+                                    Switch(
+                                        checked = params["persistentCapture"].toBoolean(),
+                                        onCheckedChange = { params = params + ("persistentCapture" to it.toString()) },
+                                    )
+                                }
+                                ClearHint(
+                                    if (ar) "للتنفيذ اليومي التلقائي فعّل جلسة التصوير المستمرة مرة واحدة. بعد إعادة تشغيل الهاتف تحتاج موافقة تصوير الشاشة من جديد."
+                                    else "For unattended daily runs, start the persistent capture session once. After a phone restart, screen-capture consent is required again.",
+                                    ar,
+                                )
                             }
                         }
 
-                        RoutineActionType.TAKE_SCREENSHOT -> DelayChips(ar, value.ifBlank { "3000" }) { value = it }
+                        RoutineActionType.TAKE_SCREENSHOT -> {
+                            DelayChips(ar, value.ifBlank { "3000" }) { value = it }
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Text(
+                                    if (ar) "كتابة التاريخ والوقت على الصورة" else "Stamp date and time on image",
+                                    modifier = Modifier.weight(1f),
+                                )
+                                Switch(
+                                    checked = params["stampDateTime"].toBoolean(),
+                                    onCheckedChange = { params = params + ("stampDateTime" to it.toString()) },
+                                )
+                            }
+                        }
 
                         RoutineActionType.WAIT -> {
                             Text(if (ar) "مدة الانتظار" else "Wait duration", fontWeight = FontWeight.Bold)
@@ -1731,6 +1768,9 @@ private fun RoutineBuilderScreen(
                                 onClick = {
                                     actionType = meta.type
                                     resetActionEditor()
+                                    if (meta.type in setOf(RoutineActionType.OPEN_APP_SCREENSHOT, RoutineActionType.TAKE_SCREENSHOT)) {
+                                        params = mapOf("stampDateTime" to "true")
+                                    }
                                     showActionPicker = false
                                     actionPickerSearch = ""
                                 },
