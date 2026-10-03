@@ -19,6 +19,7 @@ import android.os.Build
 import android.os.Handler
 import android.os.IBinder
 import android.os.HandlerThread
+import android.os.SystemClock
 import androidx.core.app.NotificationCompat
 import android.content.ClipData
 import android.net.Uri
@@ -45,6 +46,7 @@ class PersistentScreenCaptureService : Service() {
     private var pendingRoutineId = ""
     private var pendingRoutineName = ""
     private var pendingRoutineStartedAtMs = 0L
+    private var blankFrameRetryUntilMs = 0L
 
     override fun onBind(intent: Intent?): IBinder? = null
 
@@ -122,7 +124,6 @@ class PersistentScreenCaptureService : Service() {
             // buffered frame immediately before asking for a fresh screenshot.
             if (!captureRequested) return@setOnImageAvailableListener
             val image = source.acquireLatestImage() ?: return@setOnImageAvailableListener
-            captureRequested = false
             runCatching {
                 val plane = image.planes[0]
                 val pixelStride = plane.pixelStride
@@ -135,6 +136,14 @@ class PersistentScreenCaptureService : Service() {
                 padded.recycle()
                 image.close()
 
+                val sample = sampleCenterGrid(cropped)
+                val likelyBlank = ScreenFrameReadiness.isLikelyBlank(sample)
+                if (likelyBlank && SystemClock.uptimeMillis() < blankFrameRetryUntilMs) {
+                    cropped.recycle()
+                    return@setOnImageAvailableListener
+                }
+
+                captureRequested = false
                 if (pendingStampDateTime) ScreenshotStamp.apply(cropped)
                 val file = File(cacheDir, "persistent_capture_" + System.currentTimeMillis() + ".png")
                 FileOutputStream(file).use { cropped.compress(Bitmap.CompressFormat.PNG, 100, it) }
@@ -171,6 +180,7 @@ class PersistentScreenCaptureService : Service() {
                     }.start()
                 } else if (normalShare && saved.isSuccess) {
                     file.delete()
+                    notifyResult(saved = true, sent = false, reason = null)
                     notifyNormalTelegramShare(saved.getOrThrow(), caption)
                 } else {
                     file.delete()
@@ -285,6 +295,7 @@ class PersistentScreenCaptureService : Service() {
                 // Drain any frame buffered while idle so the next callback represents
                 // the screen after the requested delay, not an old frame.
                 runCatching { reader?.acquireLatestImage()?.close() }
+                blankFrameRetryUntilMs = SystemClock.uptimeMillis() + BLANK_FRAME_RETRY_MS
                 captureRequested = true
                 handler.postDelayed({
                     if (generation == captureGeneration && captureInFlight && captureRequested) {
@@ -304,6 +315,28 @@ class PersistentScreenCaptureService : Service() {
                 captureInFlight = false
             }
         }, delayMs)
+    }
+
+    private fun sampleCenterGrid(bitmap: Bitmap): IntArray {
+        val columns = 11
+        val rows = 15
+        val left = (bitmap.width * 0.12f).toInt()
+        val right = (bitmap.width * 0.88f).toInt().coerceAtLeast(left + 1)
+        val top = (bitmap.height * 0.12f).toInt()
+        val bottom = (bitmap.height * 0.88f).toInt().coerceAtLeast(top + 1)
+        val pixels = IntArray(columns * rows)
+        var index = 0
+        for (row in 0 until rows) {
+            val y = if (rows == 1) top else top + ((bottom - top - 1) * row / (rows - 1))
+            for (column in 0 until columns) {
+                val x = if (columns == 1) left else left + ((right - left - 1) * column / (columns - 1))
+                pixels[index++] = bitmap.getPixel(
+                    x.coerceIn(0, bitmap.width - 1),
+                    y.coerceIn(0, bitmap.height - 1),
+                )
+            }
+        }
+        return pixels
     }
 
     private fun stopSession() {
@@ -529,6 +562,7 @@ class PersistentScreenCaptureService : Service() {
         private const val RESULT_NOTIFICATION_ID = 9202
         private const val RESULT_CHANNEL = "persistent_screen_capture_results"
         private const val CAPTURE_FRAME_TIMEOUT_MS = 6_000L
+        private const val BLANK_FRAME_RETRY_MS = 3_000L
         private const val PREFS = "persistent_screen_capture_state"
         private const val KEY_ACTIVE = "active"
 
