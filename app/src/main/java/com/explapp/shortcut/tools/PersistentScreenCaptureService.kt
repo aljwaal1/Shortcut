@@ -414,53 +414,22 @@ class PersistentScreenCaptureService : Service() {
             sendIntent,
             local("Share screenshot", "مشاركة لقطة الشاشة"),
         ).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-
-        val opened = runCatching {
-            if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q) {
-                startActivity(chooser)
-            } else {
-                val pending = PendingIntent.getActivity(
-                    this,
-                    9204,
-                    chooser,
-                    PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
-                )
-                if (Build.VERSION.SDK_INT >= 34) {
-                    val options = ActivityOptions.makeBasic().apply {
-                        val mode = if (Build.VERSION.SDK_INT >= 36) {
-                            ActivityOptions.MODE_BACKGROUND_ACTIVITY_START_ALLOW_ALWAYS
-                        } else {
-                            @Suppress("DEPRECATION")
-                            ActivityOptions.MODE_BACKGROUND_ACTIVITY_START_ALLOWED
-                        }
-                        setPendingIntentBackgroundActivityStartMode(mode)
-                    }
-                    pending.send(this, 0, null, null, null, null, options.toBundle())
-                } else {
-                    pending.send()
-                }
-            }
-            true
-        }.getOrDefault(false)
-
-        if (!opened) {
-            val pending = PendingIntent.getActivity(
-                this,
-                9204,
-                chooser,
-                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
-            )
-            getSystemService(NotificationManager::class.java).notify(
-                RESULT_NOTIFICATION_ID + 1,
-                NotificationCompat.Builder(this, RESULT_CHANNEL)
-                    .setSmallIcon(android.R.drawable.ic_menu_share)
-                    .setContentTitle(local("Screenshot ready to share", "لقطة الشاشة جاهزة للمشاركة"))
-                    .setContentText(local("Tap to choose an app.", "اضغط لاختيار تطبيق للمشاركة."))
-                    .setContentIntent(pending)
-                    .setAutoCancel(true)
-                    .build(),
-            )
-        }
+        val pending = PendingIntent.getActivity(
+            this,
+            9204,
+            chooser,
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
+        )
+        getSystemService(NotificationManager::class.java).notify(
+            RESULT_NOTIFICATION_ID + 1,
+            NotificationCompat.Builder(this, RESULT_CHANNEL)
+                .setSmallIcon(android.R.drawable.ic_menu_share)
+                .setContentTitle(local("Screenshot saved — ready to share", "تم حفظ الصورة — جاهزة للمشاركة"))
+                .setContentText(local("Tap to choose any app.", "اضغط لاختيار أي تطبيق للمشاركة."))
+                .setContentIntent(pending)
+                .setAutoCancel(true)
+                .build(),
+        )
     }
 
     private fun notifyNormalTelegramShare(uri: Uri, caption: String) {
@@ -538,6 +507,7 @@ class PersistentScreenCaptureService : Service() {
                     add("TELEGRAM_SEND = " + if (sent) "SUCCESS" else "FAILURE")
                 }
                 if (pendingNormalTelegramShare) add("TELEGRAM_SHARE = PREPARED")
+                if (pendingShareAnyApp) add("SHARE_ANY_APP = PREPARED")
                 add("DateTimeStamp = $pendingStampDateTime")
                 if (pendingRoutineId.isNotBlank()) add("RoutineId = $pendingRoutineId")
             }
