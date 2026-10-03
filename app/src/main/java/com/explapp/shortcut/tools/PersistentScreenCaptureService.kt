@@ -48,6 +48,7 @@ class PersistentScreenCaptureService : Service() {
     private var pendingRoutineName = ""
     private var pendingRoutineStartedAtMs = 0L
     private var blankFrameRetryUntilMs = 0L
+    private var lastFramesSeen = 0
 
     override fun onBind(intent: Intent?): IBinder? = null
 
@@ -125,6 +126,7 @@ class PersistentScreenCaptureService : Service() {
             // buffered frame immediately before asking for a fresh screenshot.
             if (!captureRequested) return@setOnImageAvailableListener
             val image = source.acquireLatestImage() ?: return@setOnImageAvailableListener
+            lastFramesSeen++
             runCatching {
                 val plane = image.planes[0]
                 val pixelStride = plane.pixelStride
@@ -235,6 +237,7 @@ class PersistentScreenCaptureService : Service() {
             return
         }
         captureInFlight = true
+        lastFramesSeen = 0
         val generation = ++captureGeneration
 
         pendingToken = intent.getStringExtra(EXTRA_TELEGRAM_BOT_TOKEN).orEmpty()
@@ -503,6 +506,9 @@ class PersistentScreenCaptureService : Service() {
             val details = buildList {
                 add("PERSISTENT_CAPTURE = " + if (saved) "SUCCESS" else "FAILURE")
                 add("SCREENSHOT_SAVE = " + if (saved) "SUCCESS" else "FAILURE")
+                add("FramesSeen = $lastFramesSeen")
+                add("CaptureMode = PERSISTENT")
+                add("ShareAnyApp = $pendingShareAnyApp")
                 if (pendingToken.isNotBlank() || pendingChatId.isNotBlank()) {
                     add("TELEGRAM_SEND = " + if (sent) "SUCCESS" else "FAILURE")
                 }
