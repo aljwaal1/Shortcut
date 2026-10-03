@@ -94,35 +94,103 @@ class TaskExecutionReporter(private val context: Context) {
 
         val day = targetDate.toString()
         val timeFormat = SimpleDateFormat("HH:mm:ss", Locale.US)
-        val versionName = runCatching {
-            context.packageManager.getPackageInfo(context.packageName, 0).versionName.orEmpty()
-        }.getOrDefault("")
+        val packageInfo = runCatching {
+            context.packageManager.getPackageInfo(context.packageName, 0)
+        }.getOrNull()
+        val versionName = packageInfo?.versionName.orEmpty()
+        val versionCode = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+            packageInfo?.longVersionCode ?: 0L
+        } else {
+            @Suppress("DEPRECATION")
+            packageInfo?.versionCode?.toLong() ?: 0L
+        }
         val generatedAt = timeFormat.format(Date(nowMs))
+        val successCount = records.count { it.status == TaskExecutionStatus.SUCCESS }
+        val preparedCount = records.count { it.status == TaskExecutionStatus.PREPARED }
+        val failureCount = records.count { it.status == TaskExecutionStatus.FAILURE }
+
         return buildString {
-            appendLine(if (ar) "تقرير Shortcut اليومي — $day" else "Shortcut daily report — $day")
-            appendLine("AppVersion: $versionName")
-            appendLine("Android: API ${Build.VERSION.SDK_INT} • ${Build.MANUFACTURER} ${Build.MODEL}")
-            appendLine("TimeZone: $zone")
+            appendLine("===== SHORTCUT DAILY DEBUG LOG =====")
+            appendLine("Date: $day")
             appendLine("GeneratedAt: $generatedAt")
-            appendLine(if (ar) "عدد العمليات: ${records.size}" else "Operations: ${records.size}")
-            appendLine("================================")
+            appendLine("AppVersion: $versionName ($versionCode)")
+            appendLine("Android: API ${Build.VERSION.SDK_INT}")
+            appendLine("Device: ${Build.MANUFACTURER} ${Build.MODEL}")
+            appendLine("TimeZone: $zone")
+            appendLine("------------------------------------")
+            appendLine("Total: ${records.size}")
+            appendLine("SUCCESS: $successCount")
+            appendLine("PREPARED: $preparedCount")
+            appendLine("FAILURE: $failureCount")
+            appendLine("====================================")
+
             if (records.isEmpty()) {
                 append(if (ar) "لا توجد عمليات مسجلة اليوم." else "No recorded operations today.")
-            } else {
-                records.forEachIndexed { index, item ->
-                    val status = when (item.status) {
-                        TaskExecutionStatus.SUCCESS -> "SUCCESS"
-                        TaskExecutionStatus.PREPARED -> "PREPARED"
-                        TaskExecutionStatus.FAILURE -> "FAILURE"
-                    }
-                    appendLine("#${index + 1} [$status] ${item.taskName}")
-                    appendLine("Start: ${timeFormat.format(Date(item.startedAtMs))}")
-                    appendLine("End: ${timeFormat.format(Date(item.finishedAtMs))}")
-                    appendLine("DurationMs: ${item.durationMs}")
-                    item.reason?.takeIf { it.isNotBlank() }?.let { appendLine("Reason: $it") }
-                    item.details.forEach { appendLine("Step: $it") }
-                    if (index != records.lastIndex) appendLine("--------------------------------")
+                return@buildString
+            }
+
+            records.forEachIndexed { index, item ->
+                val status = when (item.status) {
+                    TaskExecutionStatus.SUCCESS -> "SUCCESS"
+                    TaskExecutionStatus.PREPARED -> "PREPARED"
+                    TaskExecutionStatus.FAILURE -> "FAILURE"
                 }
+                val source = item.details
+                    .firstOrNull { it.startsWith("RUN_SOURCE = ") }
+                    ?.substringAfter("RUN_SOURCE = ")
+                    .orEmpty()
+                val routineId = item.details
+                    .firstOrNull { it.startsWith("ROUTINE_ID = ") }
+                    ?.substringAfter("ROUTINE_ID = ")
+                    .orEmpty()
+                val failedSteps = item.details.filter {
+                    it.contains("= FAILURE") || it.contains("FAILED", ignoreCase = true)
+                }
+
+                appendLine("#${index + 1} [$status] ${item.taskName}")
+                appendLine("Start: ${timeFormat.format(Date(item.startedAtMs))}")
+                appendLine("End: ${timeFormat.format(Date(item.finishedAtMs))}")
+                appendLine("DurationMs: ${item.durationMs}")
+                if (source.isNotBlank()) appendLine("RunSource: $source")
+                if (routineId.isNotBlank()) appendLine("RoutineId: $routineId")
+
+                if (item.status == TaskExecutionStatus.FAILURE) {
+                    appendLine(
+                        "FailureReason: " +
+                            (item.reason?.takeIf { it.isNotBlank() }
+                                ?: if (ar) "لم يسجل سبب تفصيلي" else "No detailed reason was recorded"),
+                    )
+                    if (failedSteps.isNotEmpty()) {
+                        appendLine("FailedSteps:")
+                        failedSteps.forEach { appendLine("  - $it") }
+                    }
+                } else if (item.status == TaskExecutionStatus.PREPARED) {
+                    appendLine(
+                        "State: " +
+                            if (ar) "بدأت العملية وتنتظر إجراءً يدويًا أو نتيجة غير متزامنة."
+                            else "Execution started and is waiting for user action or an asynchronous result.",
+                    )
+                }
+
+                appendLine("Steps:")
+                item.details
+                    .filterNot { it.startsWith("RUN_SOURCE = ") || it.startsWith("ROUTINE_ID = ") }
+                    .forEach { appendLine("  - $it") }
+
+                if (index != records.lastIndex) appendLine("------------------------------------")
+            }
+
+            if (failureCount > 0) {
+                appendLine()
+                appendLine("===== FAILURES SUMMARY =====")
+                records
+                    .filter { it.status == TaskExecutionStatus.FAILURE }
+                    .forEachIndexed { index, item ->
+                        appendLine(
+                            "${index + 1}. ${item.taskName}: " +
+                                (item.reason?.takeIf { it.isNotBlank() } ?: "Unknown reason"),
+                        )
+                    }
             }
         }
     }
