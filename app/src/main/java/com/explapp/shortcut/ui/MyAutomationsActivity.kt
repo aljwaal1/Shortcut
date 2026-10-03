@@ -43,7 +43,9 @@ import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -52,11 +54,14 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
 import kotlin.math.abs
 import java.util.Calendar
 import java.util.Locale
@@ -987,8 +992,17 @@ private fun SimpleAppScreenshotWizard(
 ) {
     val context = LocalContext.current
     val ar = LocalConfiguration.current.locales[0].language == "ar"
+    val lifecycleOwner = LocalLifecycleOwner.current
     val installedApps = remember(context) { InstalledAppRepository(context).loadLaunchableApps() }
     val alarmManager = remember(context) { context.getSystemService(AlarmManager::class.java) }
+    var captureSessionRefresh by remember { mutableIntStateOf(0) }
+    DisposableEffect(lifecycleOwner) {
+        val observer = LifecycleEventObserver { _, event ->
+            if (event == Lifecycle.Event.ON_RESUME) captureSessionRefresh++
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
+    }
 
     var name by remember { mutableStateOf(if (ar) "لقطة تطبيق بالتاريخ" else "Dated app screenshot") }
     var appPackage by remember { mutableStateOf("") }
@@ -1058,7 +1072,9 @@ private fun SimpleAppScreenshotWizard(
         RoutineRepeat.YEARLY,
         -> false
     }
-    val captureSessionReady = PersistentScreenCaptureService.isSessionActive(context)
+    val captureSessionReady = remember(captureSessionRefresh) {
+        PersistentScreenCaptureService.isSessionActive(context)
+    }
     val canSave = appPackage.isNotBlank() &&
         (!scheduled || (time.isNotBlank() && repeatValid && captureSessionReady))
 
