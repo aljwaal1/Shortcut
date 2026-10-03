@@ -417,6 +417,8 @@ class ScreenCaptureService : Service() {
     private var routineId = ""
     private var routineName = ""
     private var routineStartedAtMs = 0L
+    private var lastFramesSeen = 0
+    private var lastCaptureFailureReason = ""
     @Volatile private var captureBusy = false
 
     override fun onBind(intent: Intent?): IBinder? = null
@@ -482,14 +484,16 @@ class ScreenCaptureService : Service() {
         routineId = intent?.getStringExtra(EXTRA_ROUTINE_ID).orEmpty()
         routineName = intent?.getStringExtra(EXTRA_ROUTINE_NAME).orEmpty()
         routineStartedAtMs = intent?.getLongExtra(EXTRA_ROUTINE_STARTED_AT_MS, System.currentTimeMillis()) ?: System.currentTimeMillis()
-        captureHandler.postDelayed({ capture(resultCode, data) }, delayMs)
+        capture(resultCode, data, delayMs)
         return START_NOT_STICKY
     }
 
-    private fun capture(resultCode: Int, data: Intent) {
+    private fun capture(resultCode: Int, data: Intent, delayMs: Long) {
         val manager = getSystemService(MediaProjectionManager::class.java)
         val p = manager.getMediaProjection(resultCode, data)
         if (p == null) {
+            lastFramesSeen = 0
+            lastCaptureFailureReason = "MediaProjection was unavailable"
             complete(null)
             return
         }
@@ -501,9 +505,13 @@ class ScreenCaptureService : Service() {
         val reader = ImageReader.newInstance(width, height, PixelFormat.RGBA_8888, 3)
         var display: android.hardware.display.VirtualDisplay? = null
         var completed = false
-        val readyAtMs = SystemClock.uptimeMillis() + 350L
-        val forceAcceptAtMs = SystemClock.uptimeMillis() + 3_000L
+        val captureAfterMs = SystemClock.uptimeMillis() + delayMs
+        val readyAtMs = captureAfterMs + 350L
+        val forceAcceptAtMs = captureAfterMs + 5_000L
+        val failAtMs = captureAfterMs + 12_000L
         var framesSeen = 0
+        lastFramesSeen = 0
+        lastCaptureFailureReason = ""
 
         fun cleanup() {
             runCatching { display?.release() }
@@ -526,7 +534,8 @@ class ScreenCaptureService : Service() {
             if (completed) return@setOnImageAvailableListener
             val image = imageReader.acquireLatestImage() ?: return@setOnImageAvailableListener
             framesSeen++
-            if (framesSeen == 1 || SystemClock.uptimeMillis() < readyAtMs) {
+            lastFramesSeen = framesSeen
+            if (SystemClock.uptimeMillis() < captureAfterMs || framesSeen == 1 || SystemClock.uptimeMillis() < readyAtMs) {
                 image.close()
                 return@setOnImageAvailableListener
             }
@@ -571,10 +580,16 @@ class ScreenCaptureService : Service() {
         handler.postDelayed({
             if (!completed) {
                 completed = true
+                lastFramesSeen = framesSeen
+                lastCaptureFailureReason = if (framesSeen == 0) {
+                    "No screen frames were received before timeout"
+                } else {
+                    "No usable screen frame was available before timeout"
+                }
                 cleanup()
                 complete(null)
             }
-        }, 6_000)
+        }, (failAtMs - SystemClock.uptimeMillis()).coerceAtLeast(1_000L))
     }
 
     private fun sampleCenterGrid(bitmap: Bitmap): IntArray {
@@ -617,8 +632,14 @@ class ScreenCaptureService : Service() {
         if (path.isNullOrBlank()) {
             reportAutomationScreenshot(
                 success = false,
-                reason = "Screen capture returned no image",
-                details = listOf("SCREENSHOT_CAPTURE = FAILURE", "DateTimeStamp = $stampDateTime"),
+                reason = lastCaptureFailureReason.ifBlank { "Screen capture returned no image" },
+                details = listOf(
+                    "SCREENSHOT_CAPTURE = FAILURE",
+                    "FramesSeen = $lastFramesSeen",
+                    "DateTimeStamp = $stampDateTime",
+                    "ShareAnyApp = $shareAnyApp",
+                    "CaptureMode = ONE_SHOT",
+                ),
             )
             showResultNotification(
                 local("Screenshot failed", "فشل التقاط لقطة الشاشة"),
@@ -649,6 +670,9 @@ class ScreenCaptureService : Service() {
             details = buildList {
                 add("SCREENSHOT_CAPTURE = SUCCESS")
                 add("SCREENSHOT_SAVE = " + if (savedUri != null) "SUCCESS" else "FAILURE")
+                add("FramesSeen = $lastFramesSeen")
+                add("CaptureMode = ONE_SHOT")
+                add("ShareAnyApp = $shareAnyApp")
                 add("DateTimeStamp = $stampDateTime")
                 if (shareAnyApp) add("SHARE_ANY_APP = PREPARED")
                 savedUri?.let { add("Uri = $it") }
