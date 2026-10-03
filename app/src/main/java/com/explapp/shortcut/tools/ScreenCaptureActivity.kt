@@ -52,6 +52,7 @@ class ScreenCaptureActivity : AppCompatActivity() {
     private var telegramChatId: String = ""
     private var telegramCaption: String = ""
     private var normalTelegramShare: Boolean = false
+    private var shareAnyApp: Boolean = false
     private var persistentStartOnly: Boolean = false
     private var stampDateTime: Boolean = false
     private var routineId: String = ""
@@ -109,6 +110,7 @@ class ScreenCaptureActivity : AppCompatActivity() {
                 .putExtra(ScreenCaptureService.EXTRA_TELEGRAM_CHAT_ID, telegramChatId)
                 .putExtra(ScreenCaptureService.EXTRA_TELEGRAM_CAPTION, telegramCaption)
                 .putExtra(ScreenCaptureService.EXTRA_NORMAL_TELEGRAM_SHARE, normalTelegramShare)
+                .putExtra(ScreenCaptureService.EXTRA_SHARE_ANY_APP, shareAnyApp)
                 .putExtra(ScreenCaptureService.EXTRA_STAMP_DATE_TIME, stampDateTime)
                 .putExtra(ScreenCaptureService.EXTRA_ROUTINE_ID, routineId)
                 .putExtra(ScreenCaptureService.EXTRA_ROUTINE_NAME, routineName)
@@ -142,6 +144,7 @@ class ScreenCaptureActivity : AppCompatActivity() {
         telegramChatId = intent.getStringExtra(EXTRA_TELEGRAM_CHAT_ID).orEmpty()
         telegramCaption = intent.getStringExtra(EXTRA_TELEGRAM_CAPTION).orEmpty()
         normalTelegramShare = intent.getBooleanExtra(EXTRA_NORMAL_TELEGRAM_SHARE, false)
+        shareAnyApp = intent.getBooleanExtra(EXTRA_SHARE_ANY_APP, false)
         persistentStartOnly = intent.getBooleanExtra(EXTRA_PERSISTENT_START_ONLY, false)
         stampDateTime = intent.getBooleanExtra(EXTRA_STAMP_DATE_TIME, false)
         routineId = intent.getStringExtra(EXTRA_ROUTINE_ID).orEmpty()
@@ -390,6 +393,7 @@ class ScreenCaptureActivity : AppCompatActivity() {
         const val EXTRA_TELEGRAM_CHAT_ID = "telegram_chat_id"
         const val EXTRA_TELEGRAM_CAPTION = "telegram_caption"
         const val EXTRA_NORMAL_TELEGRAM_SHARE = "normal_telegram_share"
+        const val EXTRA_SHARE_ANY_APP = "share_any_app"
         const val EXTRA_PERSISTENT_START_ONLY = "persistent_start_only"
         const val EXTRA_STAMP_DATE_TIME = "stamp_date_time"
         const val EXTRA_ROUTINE_ID = "routine_id"
@@ -408,6 +412,7 @@ class ScreenCaptureService : Service() {
     private var telegramChatId = ""
     private var telegramCaption = ""
     private var normalTelegramShare = false
+    private var shareAnyApp = false
     private var stampDateTime = false
     private var routineId = ""
     private var routineName = ""
@@ -472,6 +477,7 @@ class ScreenCaptureService : Service() {
         telegramChatId = intent?.getStringExtra(EXTRA_TELEGRAM_CHAT_ID).orEmpty()
         telegramCaption = intent?.getStringExtra(EXTRA_TELEGRAM_CAPTION).orEmpty()
         normalTelegramShare = intent?.getBooleanExtra(EXTRA_NORMAL_TELEGRAM_SHARE, false) == true
+        shareAnyApp = intent?.getBooleanExtra(EXTRA_SHARE_ANY_APP, false) == true
         stampDateTime = intent?.getBooleanExtra(EXTRA_STAMP_DATE_TIME, false) == true
         routineId = intent?.getStringExtra(EXTRA_ROUTINE_ID).orEmpty()
         routineName = intent?.getStringExtra(EXTRA_ROUTINE_NAME).orEmpty()
@@ -669,6 +675,64 @@ class ScreenCaptureService : Service() {
                 }.start()
             }
 
+            shareAnyApp && savedUri != null -> {
+                file.delete()
+                val shareIntent = Intent(Intent.ACTION_SEND).apply {
+                    type = "image/png"
+                    putExtra(Intent.EXTRA_STREAM, savedUri)
+                    clipData = ClipData.newRawUri("Shortcut screenshot", savedUri)
+                    addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                }
+                val chooser = Intent.createChooser(
+                    shareIntent,
+                    local("Share screenshot", "مشاركة لقطة الشاشة"),
+                ).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+
+                val opened = runCatching {
+                    if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q) {
+                        startActivity(chooser)
+                    } else {
+                        val pending = PendingIntent.getActivity(
+                            this,
+                            8835,
+                            chooser,
+                            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
+                        )
+                        if (Build.VERSION.SDK_INT >= 34) {
+                            val options = ActivityOptions.makeBasic().apply {
+                                val mode = if (Build.VERSION.SDK_INT >= 36) {
+                                    ActivityOptions.MODE_BACKGROUND_ACTIVITY_START_ALLOW_ALWAYS
+                                } else {
+                                    @Suppress("DEPRECATION")
+                                    ActivityOptions.MODE_BACKGROUND_ACTIVITY_START_ALLOWED
+                                }
+                                setPendingIntentBackgroundActivityStartMode(mode)
+                            }
+                            pending.send(this, 0, null, null, null, null, options.toBundle())
+                        } else {
+                            pending.send()
+                        }
+                    }
+                    true
+                }.getOrDefault(false)
+
+                if (!opened) {
+                    val fallbackPending = PendingIntent.getActivity(
+                        this,
+                        8835,
+                        chooser,
+                        PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
+                    )
+                    showResultNotification(
+                        local("Screenshot ready to share", "لقطة الشاشة جاهزة للمشاركة"),
+                        local("Tap to choose an app.", "اضغط لاختيار تطبيق للمشاركة."),
+                        fallbackPending,
+                    )
+                }
+                stopForeground(STOP_FOREGROUND_REMOVE)
+                stopSelf()
+            }
+
             normalTelegramShare && savedUri != null -> {
                 file.delete()
                 val shareIntent = Intent(Intent.ACTION_SEND).apply {
@@ -797,6 +861,7 @@ class ScreenCaptureService : Service() {
         const val EXTRA_TELEGRAM_CHAT_ID = "telegramChatId"
         const val EXTRA_TELEGRAM_CAPTION = "telegramCaption"
         const val EXTRA_NORMAL_TELEGRAM_SHARE = "normalTelegramShare"
+        const val EXTRA_SHARE_ANY_APP = "shareAnyApp"
         const val EXTRA_STAMP_DATE_TIME = "stampDateTime"
         const val EXTRA_ROUTINE_ID = "routineId"
         const val EXTRA_ROUTINE_NAME = "routineName"
