@@ -65,8 +65,8 @@ class RoutineHistoryMappingTest {
         val history = result.toTaskExecutionResult()
 
         assertEquals(2, history.details.size)
-        assertEquals("1. OPEN_APP = SUCCESS", history.details[0])
-        assertEquals("2. OPEN_APP_SCREENSHOT = FAILURE — Capture timed out", history.details[1])
+        assertEquals("1. OPEN_APP = SUCCESS [package=pkg]", history.details[0])
+        assertEquals("2. OPEN_APP_SCREENSHOT = FAILURE [package=pkg, delayMs=3000, stamp=true, persistent=false] — Capture timed out", history.details[1])
     }
 }
 
