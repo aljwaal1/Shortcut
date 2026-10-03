@@ -36,6 +36,13 @@ import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.Language
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Build
+import androidx.compose.material.icons.filled.BugReport
+import androidx.compose.material.icons.filled.CameraAlt
+import androidx.compose.material.icons.filled.Chat
+import androidx.compose.material.icons.filled.CollectionsBookmark
+import androidx.compose.material.icons.filled.DesignServices
+import androidx.compose.material.icons.filled.ListAlt
+import androidx.compose.material.icons.filled.Schedule
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
@@ -350,6 +357,8 @@ private fun MainShell(
                 messages = messages,
                 onCreateShortcut = onCreateShortcut,
                 onOpenTools = onOpenTools,
+                onOpenTemplates = { selected = MainTab.TEMPLATES },
+                onOpenHistory = { selected = MainTab.HISTORY },
                 onEditShortcut = onEditShortcut,
                 onEditMessage = onEditMessage,
                 onDeleteShortcut = onDeleteShortcut,
@@ -439,12 +448,53 @@ private fun CreateChoice(
 }
 
 @Composable
+private fun HomeNavCard(
+    title: String,
+    subtitle: String,
+    icon: ImageVector,
+    accent: Color,
+    modifier: Modifier = Modifier,
+    onClick: () -> Unit,
+) {
+    ElevatedCard(
+        onClick = onClick,
+        modifier = modifier,
+        colors = CardDefaults.elevatedCardColors(containerColor = accent.copy(alpha = 0.09f)),
+    ) {
+        Column(
+            modifier = Modifier.fillMaxWidth().padding(14.dp),
+            verticalArrangement = Arrangement.spacedBy(7.dp),
+        ) {
+            Surface(
+                shape = CircleShape,
+                color = accent.copy(alpha = 0.14f),
+            ) {
+                Icon(
+                    imageVector = icon,
+                    contentDescription = null,
+                    tint = accent,
+                    modifier = Modifier.padding(9.dp).size(24.dp),
+                )
+            }
+            Text(title, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.ExtraBold)
+            Text(
+                subtitle,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+    }
+}
+
+@Composable
 private fun HomeScreen(
     padding: PaddingValues,
     shortcuts: List<ScheduledAppShortcut>,
     messages: List<ScheduledMessage>,
     onCreateShortcut: () -> Unit,
     onOpenTools: () -> Unit,
+    onOpenTemplates: () -> Unit,
+    onOpenHistory: () -> Unit,
     onEditShortcut: (ScheduledAppShortcut) -> Unit,
     onEditMessage: (ScheduledMessage) -> Unit,
     onDeleteShortcut: (ScheduledAppShortcut) -> Unit,
@@ -479,6 +529,107 @@ private fun HomeScreen(
                 activeCount = shortcuts.size + messages.size + advancedRoutines.count { it.isEnabled },
                 onOpenTools = onOpenTools,
             )
+        }
+        item {
+            SectionLabel(
+                title = if (ar) "مركز الأتمتة" else "Automation center",
+                subtitle = if (ar) "كل أنواع الأتمتة والقوالب والتقارير من مكان واحد"
+                else "All automation types, templates, and reports in one place",
+            )
+        }
+        item {
+            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                    HomeNavCard(
+                        title = if (ar) "تصميم أتمتة" else "Design automation",
+                        subtitle = if (ar) "مشغل + شروط + خطوات" else "Trigger + conditions + steps",
+                        icon = Icons.Default.DesignServices,
+                        accent = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.weight(1f),
+                    ) {
+                        context.startActivity(
+                            Intent(context, MyAutomationsActivity::class.java)
+                                .putExtra(MyAutomationsActivity.EXTRA_START_MODE, MyAutomationsActivity.MODE_CREATE),
+                        )
+                    }
+                    HomeNavCard(
+                        title = if (ar) "أتمتاتي" else "My automations",
+                        subtitle = if (ar) "عرض، تعديل وتشغيل" else "View, edit and run",
+                        icon = Icons.Default.ListAlt,
+                        accent = MaterialTheme.colorScheme.secondary,
+                        modifier = Modifier.weight(1f),
+                    ) {
+                        context.startActivity(Intent(context, MyAutomationsActivity::class.java))
+                    }
+                }
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                    HomeNavCard(
+                        title = if (ar) "قوالب الأتمتة" else "Automation templates",
+                        subtitle = if (ar) "قوالب جاهزة قابلة للتعديل" else "Ready-to-edit routines",
+                        icon = Icons.Default.CollectionsBookmark,
+                        accent = MaterialTheme.colorScheme.tertiary,
+                        modifier = Modifier.weight(1f),
+                    ) {
+                        context.startActivity(
+                            Intent(context, MyAutomationsActivity::class.java)
+                                .putExtra(MyAutomationsActivity.EXTRA_START_MODE, MyAutomationsActivity.MODE_TEMPLATES),
+                        )
+                    }
+                    HomeNavCard(
+                        title = if (ar) "قوالب سريعة" else "Quick templates",
+                        subtitle = if (ar) "تطبيقات ورسائل" else "Apps and messages",
+                        icon = Icons.Default.AutoAwesome,
+                        accent = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.weight(1f),
+                    ) { onOpenTemplates() }
+                }
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                    HomeNavCard(
+                        title = if (ar) "لقطة شاشة" else "Screenshot automation",
+                        subtitle = if (ar) "فتح تطبيق + تاريخ + حفظ" else "Open app + date + save",
+                        icon = Icons.Default.CameraAlt,
+                        accent = MaterialTheme.colorScheme.secondary,
+                        modifier = Modifier.weight(1f),
+                    ) {
+                        context.startActivity(
+                            Intent(context, MyAutomationsActivity::class.java)
+                                .putExtra(MyAutomationsActivity.EXTRA_START_MODE, MyAutomationsActivity.MODE_SCREENSHOT),
+                        )
+                    }
+                    HomeNavCard(
+                        title = if (ar) "المهام المجدولة" else "Scheduled tasks",
+                        subtitle = if (ar) "إدارة المواعيد والتكرار" else "Manage times and repeats",
+                        icon = Icons.Default.Schedule,
+                        accent = MaterialTheme.colorScheme.tertiary,
+                        modifier = Modifier.weight(1f),
+                    ) {
+                        context.startActivity(Intent(context, ScheduledTasksManagerActivity::class.java))
+                    }
+                }
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                    HomeNavCard(
+                        title = if (ar) "الرسائل" else "Messages",
+                        subtitle = if (ar) "واتساب وتيليجرام" else "WhatsApp and Telegram",
+                        icon = Icons.Default.Chat,
+                        accent = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.weight(1f),
+                    ) { onOpenTemplates() }
+                    HomeNavCard(
+                        title = if (ar) "سجل Debug" else "Debug log",
+                        subtitle = if (ar) "نجاح، فشل وأسبابه" else "Success, failure and reasons",
+                        icon = Icons.Default.BugReport,
+                        accent = MaterialTheme.colorScheme.error,
+                        modifier = Modifier.weight(1f),
+                    ) { onOpenHistory() }
+                }
+                HomeNavCard(
+                    title = if (ar) "الأدوات" else "Tools",
+                    subtitle = if (ar) "كل أدوات Shortcut" else "All Shortcut tools",
+                    icon = Icons.Default.Build,
+                    accent = MaterialTheme.colorScheme.tertiary,
+                    modifier = Modifier.fillMaxWidth(),
+                ) { onOpenTools() }
+            }
         }
         item {
             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
