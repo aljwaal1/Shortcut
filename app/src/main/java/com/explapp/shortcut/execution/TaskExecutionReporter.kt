@@ -10,11 +10,9 @@ import androidx.core.app.NotificationCompat
 import androidx.core.content.ContextCompat
 import org.json.JSONArray
 import org.json.JSONObject
-import java.text.DateFormat
 import java.text.SimpleDateFormat
 import java.time.Instant
 import java.time.ZoneId
-import java.time.LocalDate
 import java.util.Date
 import java.util.Locale
 
