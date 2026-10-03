@@ -858,6 +858,17 @@ private fun DailyScreenshotTelegramWizard(
             )
         }
 
+        if (scheduled && !captureSessionReady) {
+            item {
+                Text(
+                    if (ar) "زر الحفظ سيُفعّل بعد تشغيل جلسة تصوير الشاشة."
+                    else "Save becomes available after the screen-capture session is activated.",
+                    color = MaterialTheme.colorScheme.error,
+                    style = MaterialTheme.typography.bodySmall,
+                )
+            }
+        }
+
         permissionMessage?.let { message ->
             item {
                 Text(message, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall)
@@ -1047,7 +1058,9 @@ private fun SimpleAppScreenshotWizard(
         RoutineRepeat.YEARLY,
         -> false
     }
-    val canSave = appPackage.isNotBlank() && (!scheduled || (time.isNotBlank() && repeatValid))
+    val captureSessionReady = PersistentScreenCaptureService.isSessionActive(context)
+    val canSave = appPackage.isNotBlank() &&
+        (!scheduled || (time.isNotBlank() && repeatValid && captureSessionReady))
 
     LazyColumn(
         modifier = Modifier.fillMaxSize().navigationBarsPadding(),
@@ -1217,8 +1230,8 @@ private fun SimpleAppScreenshotWizard(
                             fontWeight = FontWeight.Bold,
                         )
                         Text(
-                            if (ar) "للتشغيل التلقائي، فعّل جلسة تصوير الشاشة مرة واحدة. تبقى فعالة حتى يوقفها أندرويد أو تعيد تشغيل الهاتف."
-                            else "For automatic runs, activate the capture session once. It stays active until Android stops it or the phone restarts.",
+                            if (ar) "للتشغيل التلقائي يجب تفعيل جلسة تصوير الشاشة أولًا. لن يسمح التطبيق بحفظ المهمة المجدولة قبل تفعيلها، حتى لا تُحفظ أتمتة لا تستطيع التصوير."
+                            else "Automatic runs require an active screen-capture session. Shortcut will not save the scheduled task until it is activated, preventing a schedule that cannot capture.",
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
@@ -1232,10 +1245,10 @@ private fun SimpleAppScreenshotWizard(
                             modifier = Modifier.fillMaxWidth(),
                         ) {
                             Text(
-                                if (PersistentScreenCaptureService.isSessionActive(context)) {
-                                    if (ar) "جلسة التصوير نشطة" else "Capture session active"
+                                if (captureSessionReady) {
+                                    if (ar) "✓ جلسة التصوير نشطة" else "✓ Capture session active"
                                 } else {
-                                    if (ar) "تفعيل جلسة التصوير" else "Activate capture session"
+                                    if (ar) "تفعيل جلسة التصوير أولًا" else "Activate capture session first"
                                 },
                             )
                         }
