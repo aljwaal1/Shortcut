@@ -574,6 +574,7 @@ class PersistentScreenCaptureService : Service() {
     }
 
     private fun setActive(active: Boolean) {
+        processSessionActive = active
         getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit().putBoolean(KEY_ACTIVE, active).apply()
     }
 
@@ -607,8 +608,10 @@ class PersistentScreenCaptureService : Service() {
         private const val BLANK_FRAME_RETRY_MS = 3_000L
         private const val PREFS = "persistent_screen_capture_state"
         private const val KEY_ACTIVE = "active"
+        @Volatile private var processSessionActive = false
 
         fun isSessionActive(context: Context): Boolean =
-            context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).getBoolean(KEY_ACTIVE, false)
+            processSessionActive &&
+                context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).getBoolean(KEY_ACTIVE, false)
     }
 }
