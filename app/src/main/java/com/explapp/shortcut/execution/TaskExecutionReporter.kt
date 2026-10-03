@@ -124,6 +124,20 @@ class TaskExecutionReporter(private val context: Context) {
             appendLine("FAILURE: $failureCount")
             appendLine("====================================")
 
+            if (records.isNotEmpty()) {
+                appendLine("===== AUTOMATION SUMMARY =====")
+                records
+                    .groupBy { it.taskName.substringBefore(" / SCREENSHOT") }
+                    .toSortedMap()
+                    .forEach { (name, automationRecords) ->
+                        val ok = automationRecords.count { it.status == TaskExecutionStatus.SUCCESS }
+                        val wait = automationRecords.count { it.status == TaskExecutionStatus.PREPARED }
+                        val fail = automationRecords.count { it.status == TaskExecutionStatus.FAILURE }
+                        appendLine("$name: runs=${automationRecords.size}, success=$ok, prepared=$wait, failure=$fail")
+                    }
+                appendLine("====================================")
+            }
+
             if (records.isEmpty()) {
                 append(if (ar) "لا توجد عمليات مسجلة اليوم." else "No recorded operations today.")
                 return@buildString
