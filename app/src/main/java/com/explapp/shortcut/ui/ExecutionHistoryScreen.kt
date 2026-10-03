@@ -1,5 +1,8 @@
 package com.explapp.shortcut.ui
 
+import android.content.ClipData
+import android.content.ClipboardManager
+import android.widget.Toast
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
@@ -61,7 +64,19 @@ fun ExecutionHistoryScreen(padding: PaddingValues) {
                     )
                 }
                 if (all.isNotEmpty()) {
-                    TextButton(onClick = { confirmClear = true }) { Text(if (ar) "مسح" else "Clear") }
+                    Column(horizontalAlignment = androidx.compose.ui.Alignment.End) {
+                        TextButton(onClick = {
+                            val report = reporter.dailyReport(ar = ar)
+                            val clipboard = context.getSystemService(ClipboardManager::class.java)
+                            clipboard.setPrimaryClip(ClipData.newPlainText("Shortcut daily report", report))
+                            Toast.makeText(
+                                context,
+                                if (ar) "تم نسخ تقرير اليوم" else "Today's report copied",
+                                Toast.LENGTH_SHORT,
+                            ).show()
+                        }) { Text(if (ar) "نسخ تقرير اليوم" else "Copy today") }
+                        TextButton(onClick = { confirmClear = true }) { Text(if (ar) "مسح" else "Clear") }
+                    }
                 }
             }
         }
@@ -118,6 +133,13 @@ fun ExecutionHistoryScreen(padding: PaddingValues) {
                     }
                     result.reason?.takeIf { it.isNotBlank() }?.let {
                         Text(it, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
+                    result.details.forEach { detail ->
+                        Text(
+                            "• $detail",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
                     }
                     Text(
                         DateFormat.getDateTimeInstance(DateFormat.SHORT, DateFormat.SHORT).format(Date(result.finishedAtMs)),
