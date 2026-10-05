@@ -129,20 +129,44 @@ private fun BackupTransferScreen(onBack: () -> Unit) {
             cancellation.messageIds.forEach { id -> runCatching { messageScheduler.cancelById(id) } }
             cancellation.routineIds.forEach { id -> runCatching { routineScheduler.cancel(id) } }
 
-            shortcutStore.save(payload.shortcuts)
-            messageStore.save(payload.messages)
-            routineStore.save(payload.routines)
+            val restoredShortcuts = payload.shortcuts.map { item ->
+                if (!item.isEnabled) item
+                else if (appScheduler.schedule(item)) item
+                else item.copy(isEnabled = false)
+            }
+            val restoredMessages = payload.messages.map { item ->
+                if (!item.isEnabled) item
+                else if (messageScheduler.schedule(item)) item
+                else item.copy(isEnabled = false)
+            }
+            val restoredRoutines = payload.routines.map { item ->
+                if (!item.isEnabled || !item.isValid()) item.copy(isEnabled = false)
+                else if (routineScheduler.schedule(item)) item
+                else item.copy(isEnabled = false)
+            }
+
+            shortcutStore.save(restoredShortcuts)
+            messageStore.save(restoredMessages)
+            routineStore.save(restoredRoutines)
             toolPrefs.replaceFavorites(payload.favoriteToolIds.mapNotNull { runCatching { ToolId.valueOf(it) }.getOrNull() })
             toolPrefs.replaceRecents(payload.recentToolIds.mapNotNull { runCatching { ToolId.valueOf(it) }.getOrNull() })
-
-            payload.shortcuts.filter { it.isEnabled }.forEach { item -> runCatching { appScheduler.schedule(item) } }
-            payload.messages.filter { it.isEnabled }.forEach { item -> runCatching { messageScheduler.schedule(item) } }
-            payload.routines.filter { it.isEnabled && it.isValid() }.forEach { item -> runCatching { routineScheduler.schedule(item) } }
                 }
             }
             result.onSuccess {
                 pendingImport = null
-                status = if (ar) "تمت الاستعادة بنجاح" else "Backup restored"
+                val activeRequested = payload.shortcuts.count { it.isEnabled } +
+                    payload.messages.count { it.isEnabled } +
+                    payload.routines.count { it.isEnabled && it.isValid() }
+                val activeRestored = ShortcutStore(context).load().count { it.isEnabled } +
+                    MessageStore(context).load().count { it.isEnabled } +
+                    RoutineStore(context).load().count { it.isEnabled }
+                val paused = (activeRequested - activeRestored).coerceAtLeast(0)
+                status = if (paused > 0) {
+                    if (ar) "تمت الاستعادة، وتم إيقاف $paused مهمة تعذر جدولتها."
+                    else "Backup restored; $paused task(s) were paused because scheduling failed."
+                } else {
+                    if (ar) "تمت الاستعادة بنجاح" else "Backup restored"
+                }
             }.onFailure {
                 status = if (ar) "فشلت الاستعادة: " + (it.message ?: "خطأ غير معروف") else "Restore failed: " + (it.message ?: "Unknown error")
             }
