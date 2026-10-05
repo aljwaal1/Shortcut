@@ -102,6 +102,13 @@ class NfcSetupActivity : AppCompatActivity(), NfcAdapter.ReaderCallback {
         }
     }
 
+    override fun onResume() {
+        super.onResume()
+        if (selectedTool != null || selectedRoutineId != null) {
+            enableWriting()
+        }
+    }
+
     override fun onPause() {
         adapter?.disableReaderMode(this)
         super.onPause()
