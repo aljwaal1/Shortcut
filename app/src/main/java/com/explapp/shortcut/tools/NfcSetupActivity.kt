@@ -129,8 +129,8 @@ class NfcDispatchActivity : AppCompatActivity() {
             }
             "routine" -> {
                 val id = data.lastPathSegment.orEmpty()
-                val routine = RoutineStore(this).load().firstOrNull { it.id == id && it.isEnabled }
-                if (routine != null) RoutineDispatcher(this).execute(routine, userInitiated = true)
+                val routine = RoutineStore(this).load().firstOrNull { it.id == id && it.isEnabled && it.isValid() }
+                if (routine != null) RoutineDispatcher(this).executeAsync(routine, userInitiated = true)
             }
         }
         finish()
