@@ -11,7 +11,6 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
 import com.google.zxing.BarcodeFormat
 import com.google.zxing.MultiFormatWriter
-import java.io.ByteArrayOutputStream
 import java.util.zip.ZipEntry
 import java.util.zip.ZipOutputStream
 
@@ -67,21 +66,49 @@ class QuickFileActivity : AppCompatActivity() {
 
     private fun createZip(uris: List<Uri>) {
         runCatching {
-            val bytes = ByteArrayOutputStream()
-            ZipOutputStream(bytes).use { zip ->
-                uris.forEachIndexed { index, uri ->
-                    val name = queryName(uri).ifBlank { "file_$index" }
-                    zip.putNextEntry(ZipEntry(name))
-                    contentResolver.openInputStream(uri).use { input -> requireNotNull(input).copyTo(zip) }
-                    zip.closeEntry()
+            require(uris.size <= MAX_ZIP_FILES) { "Too many files selected" }
+            val output = ToolOutputStore(this).create("Shortcut_${System.currentTimeMillis()}.zip", "application/zip", false)
+            val usedNames = mutableSetOf<String>()
+            var totalBytes = 0L
+            contentResolver.openOutputStream(output).use { raw ->
+                ZipOutputStream(requireNotNull(raw).buffered()).use { zip ->
+                    uris.forEachIndexed { index, uri ->
+                        val original = queryName(uri).ifBlank { "file_${index + 1}" }
+                        val safe = ToolOutputNamePolicy.sanitize(original)
+                        val name = uniqueZipName(safe, usedNames)
+                        zip.putNextEntry(ZipEntry(name))
+                        contentResolver.openInputStream(uri).use { input ->
+                            val source = requireNotNull(input)
+                            val buffer = ByteArray(DEFAULT_BUFFER_SIZE)
+                            while (true) {
+                                val read = source.read(buffer)
+                                if (read <= 0) break
+                                totalBytes += read
+                                require(totalBytes <= MAX_ZIP_INPUT_BYTES) { "Selected files are too large" }
+                                zip.write(buffer, 0, read)
+                            }
+                        }
+                        zip.closeEntry()
+                    }
                 }
             }
-            val output = ToolOutputStore(this).create("Shortcut_${System.currentTimeMillis()}.zip", "application/zip", false)
-            contentResolver.openOutputStream(output).use { out -> requireNotNull(out).write(bytes.toByteArray()) }
             output
         }.onSuccess { output ->
             ToolResultActions.show(this, listOf(output), ToolOutputResultPolicy.forTool(ToolId.ZIP_FILES).mime)
         }.onFailure(::showError)
+    }
+
+    private fun uniqueZipName(raw: String, used: MutableSet<String>): String {
+        if (used.add(raw)) return raw
+        val dot = raw.lastIndexOf('.')
+        val base = if (dot > 0) raw.substring(0, dot) else raw
+        val ext = if (dot > 0) raw.substring(dot) else ""
+        var index = 2
+        while (true) {
+            val candidate = "${base}_${index}${ext}"
+            if (used.add(candidate)) return candidate
+            index++
+        }
     }
 
     private fun queryName(uri: Uri): String {
@@ -102,5 +129,9 @@ class QuickFileActivity : AppCompatActivity() {
 
     private fun local(en: String, ar: String): String = if (resources.configuration.locales[0].language == "ar") ar else en
 
-    companion object { const val EXTRA_TOOL = "tool" }
+    companion object {
+        const val EXTRA_TOOL = "tool"
+        private const val MAX_ZIP_FILES = 250
+        private const val MAX_ZIP_INPUT_BYTES = 512L * 1024L * 1024L
+    }
 }
