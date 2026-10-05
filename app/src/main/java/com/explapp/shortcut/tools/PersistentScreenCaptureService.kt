@@ -610,8 +610,8 @@ class PersistentScreenCaptureService : Service() {
         private const val NOTIFICATION_ID = 9200
         private const val RESULT_NOTIFICATION_ID = 9202
         private const val RESULT_CHANNEL = "persistent_screen_capture_results"
-        private const val CAPTURE_FRAME_TIMEOUT_MS = 6_000L
-        private const val BLANK_FRAME_RETRY_MS = 3_000L
+        private const val CAPTURE_FRAME_TIMEOUT_MS = 12_000L
+        private const val BLANK_FRAME_RETRY_MS = 5_000L
         private const val PREFS = "persistent_screen_capture_state"
         private const val KEY_ACTIVE = "active"
         @Volatile private var processSessionActive = false
