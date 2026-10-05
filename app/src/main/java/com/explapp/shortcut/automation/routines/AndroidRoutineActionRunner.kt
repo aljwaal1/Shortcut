@@ -89,10 +89,25 @@ class AndroidRoutineActionRunner(
             .putExtra(ScreenCaptureActivity.EXTRA_ROUTINE_ID, routineId)
             .putExtra(ScreenCaptureActivity.EXTRA_ROUTINE_NAME, routineName)
             .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-        return runCatching {
-            context.startActivity(workflowIntent)
+
+        if (userInitiated) {
+            return runCatching {
+                context.startActivity(workflowIntent)
+                RoutineActionResult.prepared(action, local("Screen-capture consent required", "يلزم تأكيد إذن تصوير الشاشة"))
+            }.getOrElse { RoutineActionResult.failure(action, it.message ?: it.javaClass.simpleName) }
+        }
+
+        return if (
+            showNotification(
+                title = local("Screenshot approval required", "يلزم تأكيد تصوير الشاشة"),
+                text = local("Tap to approve screen capture and continue.", "اضغط للموافقة على تصوير الشاشة والمتابعة."),
+                intent = workflowIntent,
+            )
+        ) {
             RoutineActionResult.prepared(action, local("Screen-capture consent required", "يلزم تأكيد إذن تصوير الشاشة"))
-        }.getOrElse { RoutineActionResult.failure(action, it.message ?: it.javaClass.simpleName) }
+        } else {
+            RoutineActionResult.failure(action, local("Notification permission is required", "يلزم السماح بالإشعارات"))
+        }
     }
 
     private fun sendTelegramBot(action: RoutineAction): RoutineActionResult {
@@ -196,6 +211,7 @@ class AndroidRoutineActionRunner(
         val intent = Intent(Intent.ACTION_SEND).apply {
             type = action.parameters["mime"].orEmpty().ifBlank { "*/*" }
             putExtra(Intent.EXTRA_STREAM, uri)
+            clipData = ClipData.newRawUri("Shortcut shared file", uri)
             addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_ACTIVITY_NEW_TASK)
         }
         return if (userInitiated) {
@@ -355,13 +371,15 @@ class AndroidRoutineActionRunner(
     }
 
     private fun preparedMessage(action: RoutineAction, platform: MessagePlatform): RoutineActionResult {
-        if (action.value.isBlank() || action.secondaryValue.isBlank()) return RoutineActionResult.failure(action, local("Recipient and message are required", "يلزم إدخال المستلم ونص الرسالة"))
-        val uri = Uri.parse(MessageDeepLinkFactory.build(platform, action.value, action.secondaryValue))
+        val recipient = resolve(action.value)
+        val message = resolve(action.secondaryValue)
+        if (recipient.isBlank() || message.isBlank()) return RoutineActionResult.failure(action, local("Recipient and message are required", "يلزم إدخال المستلم ونص الرسالة"))
+        val uri = Uri.parse(MessageDeepLinkFactory.build(platform, recipient, message))
         val intent = Intent(Intent.ACTION_VIEW, uri).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
         return if (userInitiated) openExternal(action, intent) else {
             if (showNotification(
                     title = if (platform == MessagePlatform.WHATSAPP) local("WhatsApp message ready", "رسالة واتساب جاهزة") else local("Telegram message ready", "رسالة تيليجرام جاهزة"),
-                    text = action.secondaryValue,
+                    text = message,
                     intent = intent,
                 )
             ) RoutineActionResult.prepared(action, local("User action required", "يلزم إجراء من المستخدم"))
@@ -402,21 +420,30 @@ class AndroidRoutineActionRunner(
             .setContentTitle(title)
             .setContentText(text.take(120))
             .setAutoCancel(true)
+        val notificationId = nextNotificationId()
         if (intent != null) {
             builder.setContentIntent(
                 PendingIntent.getActivity(
                     context,
-                    (intent.dataString ?: intent.component?.className.orEmpty()).hashCode(),
+                    notificationId,
                     intent,
                     PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
                 ),
             )
         }
         return runCatching {
-            manager.notify((System.currentTimeMillis() % Int.MAX_VALUE).toInt(), builder.build())
+            manager.notify(notificationId, builder.build())
             true
         }.getOrDefault(false)
     }
 
-    companion object { private const val CHANNEL = "automation_routines" }
+    companion object {
+        private const val CHANNEL = "automation_routines"
+        private val notificationSequence = java.util.concurrent.atomic.AtomicInteger(10_000)
+        private fun nextNotificationId(): Int {
+            val next = notificationSequence.incrementAndGet()
+            if (next >= Int.MAX_VALUE - 1) notificationSequence.set(10_000)
+            return next
+        }
+    }
 }
