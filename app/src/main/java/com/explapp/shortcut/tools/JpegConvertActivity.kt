@@ -2,6 +2,7 @@ package com.explapp.shortcut.tools
 
 import android.app.AlertDialog
 import android.content.Intent
+import android.content.ClipData
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.graphics.Matrix
@@ -142,12 +143,26 @@ class JpegConvertActivity : AppCompatActivity() {
     private fun share(outputs: List<Uri>) {
         val contentUris = ArrayList(outputs.filter { it.scheme == "content" })
         if (contentUris.isEmpty()) return finish()
-        val intent = Intent(Intent.ACTION_SEND_MULTIPLE).apply {
-            type = "image/jpeg"
-            putParcelableArrayListExtra(Intent.EXTRA_STREAM, contentUris)
-            addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+        val intent = if (contentUris.size == 1) {
+            Intent(Intent.ACTION_SEND).apply {
+                type = "image/jpeg"
+                putExtra(Intent.EXTRA_STREAM, contentUris.first())
+                clipData = ClipData.newRawUri("Shortcut JPEG", contentUris.first())
+            }
+        } else {
+            Intent(Intent.ACTION_SEND_MULTIPLE).apply {
+                type = "image/jpeg"
+                putParcelableArrayListExtra(Intent.EXTRA_STREAM, contentUris)
+                clipData = ClipData.newRawUri("Shortcut JPEG", contentUris.first()).also { clip ->
+                    contentUris.drop(1).forEach { clip.addItem(ClipData.Item(it)) }
+                }
+            }
+        }.apply { addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION) }
+        runCatching {
+            startActivity(Intent.createChooser(intent, local("Share JPEG files", "مشاركة ملفات JPEG")))
+        }.onFailure {
+            Toast.makeText(this, local("No app can share these files", "لا يوجد تطبيق يمكنه مشاركة هذه الملفات"), Toast.LENGTH_LONG).show()
         }
-        startActivity(Intent.createChooser(intent, local("Share JPEG files", "مشاركة ملفات JPEG")))
         finish()
     }
 
