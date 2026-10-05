@@ -2,6 +2,7 @@ package com.explapp.shortcut.tools
 
 import android.app.AlertDialog
 import android.content.Intent
+import android.content.ClipData
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.graphics.Canvas
@@ -245,11 +246,25 @@ class ImageBatchActivity : AppCompatActivity() {
         val contentUris = ArrayList(outputs.filter { it.scheme == "content" })
         if (contentUris.isEmpty()) return finish()
         val intent = if (contentUris.size == 1) {
-            Intent(Intent.ACTION_SEND).apply { type = mime; putExtra(Intent.EXTRA_STREAM, contentUris.first()) }
+            Intent(Intent.ACTION_SEND).apply {
+                type = mime
+                putExtra(Intent.EXTRA_STREAM, contentUris.first())
+                clipData = ClipData.newRawUri("Shortcut output", contentUris.first())
+            }
         } else {
-            Intent(Intent.ACTION_SEND_MULTIPLE).apply { type = mime; putParcelableArrayListExtra(Intent.EXTRA_STREAM, contentUris) }
+            Intent(Intent.ACTION_SEND_MULTIPLE).apply {
+                type = mime
+                putParcelableArrayListExtra(Intent.EXTRA_STREAM, contentUris)
+                clipData = ClipData.newRawUri("Shortcut output", contentUris.first()).also { clip ->
+                    contentUris.drop(1).forEach { clip.addItem(ClipData.Item(it)) }
+                }
+            }
         }.apply { addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION) }
-        startActivity(Intent.createChooser(intent, local("Share result", "مشاركة النتيجة")))
+        runCatching {
+            startActivity(Intent.createChooser(intent, local("Share result", "مشاركة النتيجة")))
+        }.onFailure {
+            toast(local("No app can share these files", "لا يوجد تطبيق يمكنه مشاركة هذه الملفات"))
+        }
         finish()
     }
 
