@@ -24,21 +24,36 @@ class RestoreSchedulesReceiver : BroadcastReceiver() {
                 val reconciledShortcuts = RestorePolicy.pauseExpiredOneShots(now, storedShortcuts)
                 if (reconciledShortcuts != storedShortcuts) shortcutStore.save(reconciledShortcuts)
                 val appScheduler = AndroidAlarmScheduler(appContext)
-                RestorePolicy.shortcuts(reconciledShortcuts)
-                    .forEach { item -> runCatching { appScheduler.schedule(item) } }
+                val shortcutIdsToSchedule = RestorePolicy.shortcuts(reconciledShortcuts).map { it.id }.toSet()
+                val restoredShortcuts = reconciledShortcuts.map { item ->
+                    if (item.id !in shortcutIdsToSchedule) item
+                    else if (appScheduler.schedule(item)) item
+                    else item.copy(isEnabled = false)
+                }
+                if (restoredShortcuts != reconciledShortcuts) shortcutStore.save(restoredShortcuts)
 
                 val messageStore = MessageStore(appContext)
                 val storedMessages = messageStore.load()
                 val reconciledMessages = RestorePolicy.pauseExpiredMessageOneShots(now, storedMessages)
                 if (reconciledMessages != storedMessages) messageStore.save(reconciledMessages)
                 val messageScheduler = AndroidMessageScheduler(appContext)
-                RestorePolicy.messages(reconciledMessages)
-                    .forEach { item -> runCatching { messageScheduler.schedule(item) } }
+                val messageIdsToSchedule = RestorePolicy.messages(reconciledMessages).map { it.id }.toSet()
+                val restoredMessages = reconciledMessages.map { item ->
+                    if (item.id !in messageIdsToSchedule) item
+                    else if (messageScheduler.schedule(item)) item
+                    else item.copy(isEnabled = false)
+                }
+                if (restoredMessages != reconciledMessages) messageStore.save(restoredMessages)
 
+                val routineStore = RoutineStore(appContext)
                 val routineScheduler = RoutineScheduler(appContext)
-                RoutineStore(appContext).load()
-                    .filter { it.isEnabled && it.isValid() }
-                    .forEach { item -> runCatching { routineScheduler.schedule(item) } }
+                val routines = routineStore.load()
+                val restoredRoutines = routines.map { item ->
+                    if (!item.isEnabled || !item.isValid()) item
+                    else if (routineScheduler.schedule(item)) item
+                    else item.copy(isEnabled = false)
+                }
+                if (restoredRoutines != routines) routineStore.save(restoredRoutines)
             } finally {
                 pendingResult.finish()
             }
