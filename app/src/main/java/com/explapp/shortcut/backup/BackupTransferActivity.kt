@@ -94,8 +94,17 @@ private fun BackupTransferScreen(onBack: () -> Unit) {
         scope.launch {
             val result = withContext(Dispatchers.IO) {
                 runCatching {
-                    val raw = context.contentResolver.openInputStream(uri)?.bufferedReader()?.use { it.readText() }
-                        ?: error("Cannot open backup")
+                    val raw = context.contentResolver.openInputStream(uri)?.bufferedReader()?.use { reader ->
+                        val out = StringBuilder()
+                        val buffer = CharArray(8_192)
+                        while (true) {
+                            val count = reader.read(buffer)
+                            if (count < 0) break
+                            out.append(buffer, 0, count)
+                            require(out.length <= BackupCodec.MAX_IMPORT_CHARS) { "Backup is too large" }
+                        }
+                        out.toString()
+                    } ?: error("Cannot open backup")
                     BackupCodec.decode(raw).getOrThrow()
                 }
             }
