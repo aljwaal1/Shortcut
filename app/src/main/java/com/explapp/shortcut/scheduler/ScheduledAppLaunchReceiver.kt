@@ -1,6 +1,7 @@
 package com.explapp.shortcut.scheduler
 
 import android.Manifest
+import android.app.ActivityOptions
 import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.PendingIntent
@@ -31,7 +32,30 @@ class ScheduledAppLaunchReceiver : BroadcastReceiver() {
         var failureReason: String? = null
         val launched = if (launchIntent != null) {
             runCatching {
-                context.startActivity(launchIntent)
+                if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q) {
+                    context.startActivity(launchIntent)
+                } else {
+                    val pending = PendingIntent.getActivity(
+                        context,
+                        SchedulerIdentity.requestCode(shortcut.id),
+                        launchIntent,
+                        PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
+                    )
+                    if (Build.VERSION.SDK_INT >= 34) {
+                        val options = ActivityOptions.makeBasic().apply {
+                            val mode = if (Build.VERSION.SDK_INT >= 36) {
+                                ActivityOptions.MODE_BACKGROUND_ACTIVITY_START_ALLOW_ALWAYS
+                            } else {
+                                @Suppress("DEPRECATION")
+                                ActivityOptions.MODE_BACKGROUND_ACTIVITY_START_ALLOWED
+                            }
+                            setPendingIntentBackgroundActivityStartMode(mode)
+                        }
+                        pending.send(context, 0, null, null, null, null, options.toBundle())
+                    } else {
+                        pending.send()
+                    }
+                }
                 true
             }.onFailure { failureReason = it.message ?: it.javaClass.simpleName }
                 .getOrDefault(false)
