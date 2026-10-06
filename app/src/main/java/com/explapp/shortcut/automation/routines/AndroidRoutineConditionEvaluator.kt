@@ -9,8 +9,14 @@ import java.util.Locale
 
 class AndroidRoutineConditionEvaluator(private val context: Context) : RoutineConditionEvaluator {
     override fun matches(condition: RoutineCondition): Boolean = when (condition.type) {
-        RoutineConditionType.BATTERY_ABOVE -> batteryPercent() > (condition.value.toIntOrNull() ?: return false)
-        RoutineConditionType.BATTERY_BELOW -> batteryPercent() < (condition.value.toIntOrNull() ?: return false)
+        RoutineConditionType.BATTERY_ABOVE -> {
+            val battery = batteryPercent()
+            battery in 0..100 && battery > (condition.value.toIntOrNull() ?: return false)
+        }
+        RoutineConditionType.BATTERY_BELOW -> {
+            val battery = batteryPercent()
+            battery in 0..100 && battery < (condition.value.toIntOrNull() ?: return false)
+        }
         RoutineConditionType.DAY_OF_WEEK -> {
             val requested = condition.value.toIntOrNull() ?: return false
             isoDayOfWeek() == requested
@@ -26,7 +32,7 @@ class AndroidRoutineConditionEvaluator(private val context: Context) : RoutineCo
     }
 
     private fun builtInVariable(name: String): String? = when (name.trim()) {
-        "batteryPercent" -> batteryPercent().toString()
+        "batteryPercent" -> batteryPercent().takeIf { it in 0..100 }?.toString()
         "currentDate" -> SimpleDateFormat("yyyy-MM-dd", Locale.US).format(Date())
         "currentTime" -> SimpleDateFormat("HH:mm", Locale.US).format(Date())
         "dayOfWeek" -> isoDayOfWeek().toString()
