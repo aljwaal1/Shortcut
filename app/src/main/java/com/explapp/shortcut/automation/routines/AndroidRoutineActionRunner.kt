@@ -169,22 +169,27 @@ class AndroidRoutineActionRunner(
                     .ifBlank { "Shortcut_attachment" }
 
                 val output = File(context.cacheDir, "telegram_" + System.currentTimeMillis() + "_" + name)
-                var total = 0L
-                context.contentResolver.openInputStream(parsed).use { input ->
-                    val source = requireNotNull(input) { "Could not open attachment" }
-                    output.outputStream().buffered().use { out ->
-                        val buffer = ByteArray(DEFAULT_BUFFER_SIZE)
-                        while (true) {
-                            val read = source.read(buffer)
-                            if (read <= 0) break
-                            total += read
-                            require(total <= MAX_TELEGRAM_ATTACHMENT_BYTES) { "Attachment is too large" }
-                            out.write(buffer, 0, read)
+                try {
+                    var total = 0L
+                    context.contentResolver.openInputStream(parsed).use { input ->
+                        val source = requireNotNull(input) { "Could not open attachment" }
+                        output.outputStream().buffered().use { out ->
+                            val buffer = ByteArray(DEFAULT_BUFFER_SIZE)
+                            while (true) {
+                                val read = source.read(buffer)
+                                if (read <= 0) break
+                                total += read
+                                require(total <= MAX_TELEGRAM_ATTACHMENT_BYTES) { "Attachment is too large" }
+                                out.write(buffer, 0, read)
+                            }
                         }
                     }
+                    require(total > 0L) { "Attachment is empty" }
+                    output to true
+                } catch (error: Throwable) {
+                    output.delete()
+                    throw error
                 }
-                require(total > 0L) { "Attachment is empty" }
-                output to true
             }
             "file" -> {
                 val path = parsed.path ?: error("Invalid file URI")
