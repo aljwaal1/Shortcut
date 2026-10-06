@@ -251,11 +251,9 @@ class RoutineSystemEventReceiver : BroadcastReceiver() {
         Thread worker@{
             try {
                 when (intent.action) {
-                    Intent.ACTION_BOOT_COMPLETED -> {
+                    Intent.ACTION_BOOT_COMPLETED ->
                         RoutineWork.enqueueMatching(context, RoutineEvent(RoutineTriggerType.BOOT))
-                        reschedule(context)
-                    }
-                    Intent.ACTION_MY_PACKAGE_REPLACED -> reschedule(context)
+                    Intent.ACTION_MY_PACKAGE_REPLACED -> Unit
                     Intent.ACTION_POWER_CONNECTED ->
                         RoutineWork.enqueueMatching(context, RoutineEvent(RoutineTriggerType.CHARGER_CONNECTED))
                     Intent.ACTION_POWER_DISCONNECTED ->
@@ -267,10 +265,4 @@ class RoutineSystemEventReceiver : BroadcastReceiver() {
         }.start()
     }
 
-    private fun reschedule(context: Context) {
-        val scheduler = RoutineScheduler(context)
-        RoutineStore(context).load().filter { it.isEnabled && it.isValid() }.forEach { routine ->
-            runCatching { scheduler.schedule(routine) }
-        }
-    }
 }
