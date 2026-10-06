@@ -1,7 +1,7 @@
 package com.explapp.shortcut.automation.routines
 
 import android.content.Context
-import android.os.BatteryManager
+import com.explapp.shortcut.automation.currentBatteryLevel
 import java.text.SimpleDateFormat
 import java.util.Calendar
 import java.util.Date
@@ -13,8 +13,7 @@ class AndroidRoutineConditionEvaluator(private val context: Context) : RoutineCo
         RoutineConditionType.BATTERY_BELOW -> batteryPercent() < (condition.value.toIntOrNull() ?: return false)
         RoutineConditionType.DAY_OF_WEEK -> {
             val requested = condition.value.toIntOrNull() ?: return false
-            val day = Calendar.getInstance().get(Calendar.DAY_OF_WEEK)
-            day == requested
+            isoDayOfWeek() == requested
         }
         RoutineConditionType.VARIABLE_EQUALS -> {
             val actual = builtInVariable(condition.value) ?: return false
@@ -30,12 +29,14 @@ class AndroidRoutineConditionEvaluator(private val context: Context) : RoutineCo
         "batteryPercent" -> batteryPercent().toString()
         "currentDate" -> SimpleDateFormat("yyyy-MM-dd", Locale.US).format(Date())
         "currentTime" -> SimpleDateFormat("HH:mm", Locale.US).format(Date())
-        "dayOfWeek" -> Calendar.getInstance().get(Calendar.DAY_OF_WEEK).toString()
+        "dayOfWeek" -> isoDayOfWeek().toString()
         else -> null
     }
 
-    private fun batteryPercent(): Int {
-        val manager = context.getSystemService(BatteryManager::class.java)
-        return manager.getIntProperty(BatteryManager.BATTERY_PROPERTY_CAPACITY).coerceIn(0, 100)
+    private fun batteryPercent(): Int = currentBatteryLevel(context)
+
+    private fun isoDayOfWeek(): Int {
+        val androidDay = Calendar.getInstance().get(Calendar.DAY_OF_WEEK)
+        return if (androidDay == Calendar.SUNDAY) 7 else androidDay - 1
     }
 }
