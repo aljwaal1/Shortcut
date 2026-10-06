@@ -40,7 +40,7 @@ object RoutineCatalog {
         RoutineActionType.OPEN_APP -> listOf(RoutineActionType.WAIT, RoutineActionType.TAKE_SCREENSHOT, RoutineActionType.SHOW_NOTIFICATION)
         RoutineActionType.OPEN_APP_SCREENSHOT,
         RoutineActionType.TAKE_SCREENSHOT,
-        -> listOf(RoutineActionType.SEND_TELEGRAM_BOT, RoutineActionType.COPY_TO_CLIPBOARD, RoutineActionType.CUSTOM_SCRIPT)
+        -> listOf(RoutineActionType.SEND_TELEGRAM_BOT)
         RoutineActionType.READ_CLIPBOARD -> listOf(
             RoutineActionType.WEB_SEARCH,
             RoutineActionType.COPY_TO_CLIPBOARD,
