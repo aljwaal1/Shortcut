@@ -1,5 +1,7 @@
 package com.explapp.shortcut.search
 
+import java.util.Locale
+
 enum class CommandKind { TOOL, ROUTINE, TEMPLATE, SCHEDULED }
 
 data class CommandItem(
@@ -40,7 +42,7 @@ object CommandSearch {
         }
             .sortedWith(
                 compareByDescending<Pair<CommandItem, Int>> { it.second }
-                    .thenBy { it.first.label.lowercase() },
+                    .thenBy { it.first.label.lowercase(Locale.ROOT) },
             )
             .map { it.first }
     }
