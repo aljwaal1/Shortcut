@@ -1,5 +1,7 @@
 package com.explapp.shortcut.automation.routines
 
+import com.explapp.shortcut.tools.ToolId
+
 object RoutineTemplateCatalog {
     fun templates(): List<AutomationRoutine> = listOf(
         AutomationRoutine(
@@ -50,7 +52,7 @@ object RoutineTemplateCatalog {
         AutomationRoutine(
             name = "App usage",
             trigger = RoutineTrigger(RoutineTriggerType.MANUAL),
-            actions = listOf(RoutineAction(RoutineActionType.OPEN_TOOL, "app_usage")),
+            actions = listOf(RoutineAction(RoutineActionType.OPEN_TOOL, ToolId.APP_OPEN_ROUTINE.name)),
         ),
     )
 }
