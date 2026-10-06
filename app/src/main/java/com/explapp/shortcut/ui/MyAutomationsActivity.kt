@@ -2501,7 +2501,7 @@ private fun ReorderHandle(
 private fun conditionHint(type: RoutineConditionType, ar: Boolean): String = when (type) {
     RoutineConditionType.BATTERY_ABOVE -> if (ar) "اكتب النسبة فقط، مثل 30. لن تنفذ الخطوات إلا إذا كانت البطارية أعلى منها." else "Enter a percentage such as 30. Steps run only when battery is above it."
     RoutineConditionType.BATTERY_BELOW -> if (ar) "اكتب النسبة فقط، مثل 20. لن تنفذ الخطوات إلا إذا كانت البطارية أقل منها." else "Enter a percentage such as 20. Steps run only when battery is below it."
-    RoutineConditionType.DAY_OF_WEEK -> if (ar) "استخدم رقم اليوم: 1 الأحد، 2 الاثنين، 3 الثلاثاء، 4 الأربعاء، 5 الخميس، 6 الجمعة، 7 السبت." else "Use the day number: 1 Sunday, 2 Monday, 3 Tuesday, 4 Wednesday, 5 Thursday, 6 Friday, 7 Saturday."
+    RoutineConditionType.DAY_OF_WEEK -> if (ar) "استخدم رقم اليوم: 1 الاثنين، 2 الثلاثاء، 3 الأربعاء، 4 الخميس، 5 الجمعة، 6 السبت، 7 الأحد." else "Use the ISO weekday: 1 Monday, 2 Tuesday, 3 Wednesday, 4 Thursday, 5 Friday, 6 Saturday, 7 Sunday."
     RoutineConditionType.VARIABLE_EQUALS -> if (ar) "اختر قيمة من الخيارات ثم اكتب القيمة التي يجب أن تساويها بالضبط." else "Choose a built-in value, then enter the exact value it must equal."
     RoutineConditionType.VARIABLE_CONTAINS -> if (ar) "اختر قيمة من الخيارات ثم اكتب النص الذي يجب أن يكون موجودًا داخلها." else "Choose a built-in value, then enter text that must appear inside it."
 }
@@ -2591,7 +2591,7 @@ private fun conditionValueHint(type: RoutineConditionType, ar: Boolean): String 
     RoutineConditionType.BATTERY_ABOVE,
     RoutineConditionType.BATTERY_BELOW,
     -> "30"
-    RoutineConditionType.DAY_OF_WEEK -> if (ar) "1=الأحد ... 7=السبت" else "1=Sunday ... 7=Saturday"
+    RoutineConditionType.DAY_OF_WEEK -> if (ar) "1=الاثنين ... 7=الأحد" else "1=Monday ... 7=Sunday"
     else -> if (ar) "اختر قيمة من الخيارات" else "Choose a value from the options"
 }
 
