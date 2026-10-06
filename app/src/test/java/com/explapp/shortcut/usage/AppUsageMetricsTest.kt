@@ -33,4 +33,28 @@ class AppUsageMetricsTest {
         assertEquals(4_200_000L, dashboard.ranked.first().durationMs)
         assertEquals(70.0, dashboard.topFive.first().percentage, 0.001)
     }
+
+    @Test
+    fun usesActualDayKeysWhenCalendarDaysAreNotExactly24Hours() {
+        val starts = listOf(
+            0L,
+            86_400_000L,
+            172_800_000L,
+            255_600_000L,
+            342_000_000L,
+            428_400_000L,
+            514_800_000L,
+        )
+        val samples = starts.associateWith { start ->
+            listOf(AppUsageSample("app", start / 1_000L + 1L))
+        }
+
+        val dashboard = AppUsageMetrics.build(
+            samplesByDay = samples,
+            todayStartMs = starts.last(),
+            yesterdayStartMs = starts[starts.lastIndex - 1],
+        )
+
+        assertEquals(starts, dashboard.days.map { it.dayStartMs })
+    }
 }
