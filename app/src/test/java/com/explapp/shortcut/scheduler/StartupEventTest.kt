@@ -8,9 +8,11 @@ import org.junit.Test
 
 class StartupEventTest {
     @Test
-    fun bootPackageReplacementAndExactAlarmGrantRestoreSchedules() {
+    fun systemClockChangesRestoreSchedules() {
         assertTrue(StartupEvent.shouldReschedule(Intent.ACTION_BOOT_COMPLETED))
         assertTrue(StartupEvent.shouldReschedule(Intent.ACTION_MY_PACKAGE_REPLACED))
+        assertTrue(StartupEvent.shouldReschedule(Intent.ACTION_TIME_CHANGED))
+        assertTrue(StartupEvent.shouldReschedule(Intent.ACTION_TIMEZONE_CHANGED))
         assertTrue(StartupEvent.shouldReschedule(AlarmManager.ACTION_SCHEDULE_EXACT_ALARM_PERMISSION_STATE_CHANGED))
     }
 
