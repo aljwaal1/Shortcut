@@ -519,15 +519,23 @@ class PersistentScreenCaptureService : Service() {
             }
             val taskName = "$pendingRoutineName / SCREENSHOT"
             val started = pendingRoutineStartedAtMs.takeIf { it > 0L } ?: System.currentTimeMillis()
-            val result = if (saved) {
-                TaskExecutionResult.success(taskName, started, details = details)
-            } else {
-                TaskExecutionResult.failure(
+            val botDeliveryRequested = pendingToken.isNotBlank() || pendingChatId.isNotBlank()
+            val userSharePending = pendingNormalTelegramShare || pendingShareAnyApp
+            val result = when {
+                !saved -> TaskExecutionResult.failure(
                     taskName,
                     cleanReason.ifBlank { "Persistent screenshot failed" },
                     started,
                     details = details,
                 )
+                botDeliveryRequested && !sent -> TaskExecutionResult.failure(
+                    taskName,
+                    cleanReason.ifBlank { "Telegram delivery failed" },
+                    started,
+                    details = details,
+                )
+                userSharePending -> TaskExecutionResult.prepared(taskName, started, details = details)
+                else -> TaskExecutionResult.success(taskName, started, details = details)
             }
             TaskExecutionReporter(applicationContext).report(result, notifyUser = false)
             pendingRoutineId = ""
