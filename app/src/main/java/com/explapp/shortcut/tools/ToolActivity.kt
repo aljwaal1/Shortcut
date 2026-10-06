@@ -554,6 +554,7 @@ class ToolActivity : AppCompatActivity() {
         val location = manager.getProviders(true)
             .mapNotNull { provider -> runCatching { manager.getLastKnownLocation(provider) }.getOrNull() }
             .maxByOrNull { it.time }
+            ?.takeIf { System.currentTimeMillis() - it.time in 0..PARKED_LOCATION_MAX_AGE_MS }
         if (location == null) {
             toast(local("No recent location available. Turn on location and try again.", "لا يوجد موقع حديث. شغّل الموقع وحاول مرة أخرى."))
         } else {
@@ -853,6 +854,7 @@ class ToolActivity : AppCompatActivity() {
     companion object {
         private const val MAX_UNZIP_ENTRIES = 2_000
         private const val MAX_UNZIP_BYTES = 1_073_741_824L
+        private const val PARKED_LOCATION_MAX_AGE_MS = 15 * 60 * 1000L
         const val EXTRA_TOOL = "tool"
         private const val REQUEST_LOCATION = 3001
         private const val REQUEST_MEDIA = 3002
