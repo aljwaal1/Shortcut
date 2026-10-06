@@ -130,6 +130,61 @@ class TelegramBotSender {
         }
     }
 
+    fun sendDocument(token: String, chatId: String, caption: String, file: File): Result<Unit> = runCatching {
+        val cleanToken = token.trim()
+        val cleanDestination = chatId.trim()
+        require(cleanToken.isNotBlank()) { "Bot token is required" }
+        require(cleanDestination.isNotBlank()) { "Telegram username is required" }
+        require(file.exists()) { "Attachment file does not exist" }
+        require(file.length() > 0L) { "Attachment file is empty" }
+        require(file.length() <= MAX_DOCUMENT_BYTES) { "Attachment is larger than Shortcut's Telegram safety limit" }
+        require(caption.length <= 1024) { "Telegram document caption is longer than 1024 characters" }
+
+        val resolvedChat = resolveDestination(cleanToken, cleanDestination).getOrThrow()
+        val safeName = file.name
+            .replace(Regex("[\\r\\n\\\"]"), "_")
+            .take(120)
+            .ifBlank { "Shortcut_document" }
+        val boundary = "ShortcutBoundary" + System.currentTimeMillis()
+        val connection = open(
+            "https://api.telegram.org/bot$cleanToken/sendDocument",
+            "POST",
+            10_000,
+            45_000,
+        ).apply {
+            doOutput = true
+            setRequestProperty("Content-Type", "multipart/form-data; boundary=$boundary")
+            setRequestProperty("Accept", "application/json")
+            setRequestProperty("Connection", "close")
+            setChunkedStreamingMode(64 * 1024)
+        }
+
+        try {
+            DataOutputStream(connection.outputStream).use { out ->
+                fun field(name: String, value: String) {
+                    out.writeBytes("--$boundary\r\n")
+                    out.writeBytes("Content-Disposition: form-data; name=\"$name\"\r\n")
+                    out.writeBytes("Content-Type: text/plain; charset=UTF-8\r\n\r\n")
+                    out.write(value.toByteArray(StandardCharsets.UTF_8))
+                    out.writeBytes("\r\n")
+                }
+
+                field("chat_id", resolvedChat)
+                if (caption.isNotBlank()) field("caption", caption)
+
+                out.writeBytes("--$boundary\r\n")
+                out.writeBytes("Content-Disposition: form-data; name=\"document\"; filename=\"$safeName\"\r\n")
+                out.writeBytes("Content-Type: application/octet-stream\r\n\r\n")
+                file.inputStream().use { input -> input.copyTo(out, 64 * 1024) }
+                out.writeBytes("\r\n--$boundary--\r\n")
+                out.flush()
+            }
+            ensureSuccess(connection)
+        } finally {
+            connection.disconnect()
+        }
+    }
+
     fun sendPhoto(token: String, chatId: String, caption: String, file: File): Result<Unit> = runCatching {
         val cleanToken = token.trim()
         val cleanDestination = chatId.trim()
@@ -243,4 +298,8 @@ class TelegramBotSender {
     }
 
     private fun enc(value: String): String = URLEncoder.encode(value, StandardCharsets.UTF_8.name())
+
+    companion object {
+        private const val MAX_DOCUMENT_BYTES = 48L * 1024L * 1024L
+    }
 }
