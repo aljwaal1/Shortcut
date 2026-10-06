@@ -5,7 +5,7 @@ import org.junit.Test
 
 class RoutineExecutorTest {
     @Test
-    fun executesActionsInOrderAndKeepsGoingAfterPreparedResult() {
+    fun preparedResultStopsLaterActionsUntilPendingWorkFinishes() {
         val seen = mutableListOf<RoutineActionType>()
         val runner = object : RoutineActionRunner {
             override fun run(action: RoutineAction): RoutineActionResult {
@@ -30,9 +30,9 @@ class RoutineExecutorTest {
 
         val result = RoutineExecutor(runner).execute(routine, startedAtMs = 100L, finishedAtMs = 200L)
 
-        assertEquals(listOf(RoutineActionType.OPEN_APP, RoutineActionType.PREPARE_WHATSAPP, RoutineActionType.SHOW_NOTIFICATION), seen)
+        assertEquals(listOf(RoutineActionType.OPEN_APP, RoutineActionType.PREPARE_WHATSAPP), seen)
         assertEquals(RoutineRunStatus.PREPARED, result.status)
-        assertEquals(3, result.actionResults.size)
+        assertEquals(2, result.actionResults.size)
     }
 
     @Test
