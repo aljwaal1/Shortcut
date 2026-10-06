@@ -70,6 +70,7 @@ class ParkedCarActivity : AppCompatActivity() {
         val location = manager.getProviders(true)
             .mapNotNull { provider -> runCatching { manager.getLastKnownLocation(provider) }.getOrNull() }
             .maxByOrNull { it.time }
+            ?.takeIf { System.currentTimeMillis() - it.time in 0..MAX_LOCATION_AGE_MS }
         if (location == null) {
             Toast.makeText(
                 this,
@@ -102,5 +103,6 @@ class ParkedCarActivity : AppCompatActivity() {
         private const val PREFS = "parked_car"
         private const val KEY_LAT = "lat"
         private const val KEY_LON = "lon"
+        private const val MAX_LOCATION_AGE_MS = 15 * 60 * 1000L
     }
 }
