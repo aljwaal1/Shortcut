@@ -85,4 +85,30 @@ class RoutineExecutorTest {
         assertEquals(listOf(RoutineActionType.OPEN_URL), seen)
         assertEquals(RoutineRunStatus.FAILED, result.status)
     }
+
+    @Test
+    fun unmetConditionSkipsActionsWithoutLeavingRoutinePending() {
+        val seen = mutableListOf<RoutineActionType>()
+        val runner = object : RoutineActionRunner {
+            override fun run(action: RoutineAction): RoutineActionResult {
+                seen += action.type
+                return RoutineActionResult.success(action)
+            }
+        }
+        val routine = AutomationRoutine(
+            name = "Conditional",
+            trigger = RoutineTrigger(RoutineTriggerType.MANUAL),
+            conditions = listOf(RoutineCondition(RoutineConditionType.BATTERY_ABOVE, "90")),
+            actions = listOf(RoutineAction(RoutineActionType.SHOW_NOTIFICATION, "should not run")),
+        )
+
+        val result = RoutineExecutor(
+            runner = runner,
+            conditionEvaluator = RoutineConditionEvaluator { false },
+        ).execute(routine)
+
+        assertEquals(emptyList<RoutineActionType>(), seen)
+        assertEquals(RoutineRunStatus.SUCCESS, result.status)
+        assertEquals(0, result.actionResults.size)
+    }
 }
