@@ -14,6 +14,7 @@ import androidx.core.content.FileProvider
 import com.explapp.shortcut.tools.ToolOutputStore
 import java.io.File
 import android.os.Build
+import android.provider.OpenableColumns
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -126,7 +127,19 @@ class AndroidRoutineActionRunner(
         }
 
         val result = if (attachment.isNotBlank()) {
-            TelegramBotSender().sendPhoto(token, destination, text, java.io.File(attachment))
+            val prepared = prepareAttachmentFile(attachment)
+            if (prepared.isFailure) {
+                return RoutineActionResult.failure(
+                    action,
+                    prepared.exceptionOrNull()?.message ?: local("Could not access attachment", "تعذر الوصول إلى المرفق"),
+                )
+            }
+            val (file, temporary) = prepared.getOrThrow()
+            try {
+                TelegramBotSender().sendDocument(token, destination, text, file)
+            } finally {
+                if (temporary) file.delete()
+            }
         } else {
             TelegramBotSender().sendText(token, destination, text)
         }
@@ -136,6 +149,58 @@ class AndroidRoutineActionRunner(
                 it.message ?: local("Telegram send failed", "فشل الإرسال إلى تيليجرام"),
             )
         } ?: RoutineActionResult.success(action)
+    }
+
+    private fun prepareAttachmentFile(raw: String): Result<Pair<File, Boolean>> = runCatching {
+        val parsed = Uri.parse(raw)
+        when (parsed.scheme?.lowercase(Locale.ROOT)) {
+            "content" -> {
+                val name = context.contentResolver.query(
+                    parsed,
+                    arrayOf(OpenableColumns.DISPLAY_NAME),
+                    null,
+                    null,
+                    null,
+                )?.use { cursor ->
+                    if (cursor.moveToFirst()) cursor.getString(0).orEmpty() else ""
+                }.orEmpty()
+                    .replace(Regex("""[\\/\u0000-\u001F\u007F]"""), "_")
+                    .take(120)
+                    .ifBlank { "Shortcut_attachment" }
+
+                val output = File(context.cacheDir, "telegram_" + System.currentTimeMillis() + "_" + name)
+                var total = 0L
+                context.contentResolver.openInputStream(parsed).use { input ->
+                    val source = requireNotNull(input) { "Could not open attachment" }
+                    output.outputStream().buffered().use { out ->
+                        val buffer = ByteArray(DEFAULT_BUFFER_SIZE)
+                        while (true) {
+                            val read = source.read(buffer)
+                            if (read <= 0) break
+                            total += read
+                            require(total <= MAX_TELEGRAM_ATTACHMENT_BYTES) { "Attachment is too large" }
+                            out.write(buffer, 0, read)
+                        }
+                    }
+                }
+                require(total > 0L) { "Attachment is empty" }
+                output to true
+            }
+            "file" -> {
+                val path = parsed.path ?: error("Invalid file URI")
+                val file = File(path)
+                require(file.isFile) { "Attachment file does not exist" }
+                require(file.length() <= MAX_TELEGRAM_ATTACHMENT_BYTES) { "Attachment is too large" }
+                file to false
+            }
+            null, "" -> {
+                val file = File(raw)
+                require(file.isFile) { "Attachment file does not exist" }
+                require(file.length() <= MAX_TELEGRAM_ATTACHMENT_BYTES) { "Attachment is too large" }
+                file to false
+            }
+            else -> error("Unsupported attachment URI")
+        }
     }
 
     private fun setVariable(action: RoutineAction): RoutineActionResult {
@@ -203,8 +268,15 @@ class AndroidRoutineActionRunner(
         if (raw.isBlank()) return RoutineActionResult.failure(action, local("No file is available to share", "لا يوجد ملف متاح للمشاركة"))
         val uri = runCatching {
             val parsed = Uri.parse(raw)
-            if (parsed.scheme == "content") parsed
-            else FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", File(raw))
+            when (parsed.scheme?.lowercase(Locale.ROOT)) {
+                "content" -> parsed
+                "file" -> {
+                    val path = parsed.path ?: error("Invalid file URI")
+                    FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", File(path))
+                }
+                null, "" -> FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", File(raw))
+                else -> error("Unsupported file URI")
+            }
         }.getOrElse {
             return RoutineActionResult.failure(action, local("Could not access the file", "تعذر الوصول إلى الملف"))
         }
@@ -439,6 +511,7 @@ class AndroidRoutineActionRunner(
 
     companion object {
         private const val CHANNEL = "automation_routines"
+        private const val MAX_TELEGRAM_ATTACHMENT_BYTES = 48L * 1024L * 1024L
         private val notificationSequence = java.util.concurrent.atomic.AtomicInteger(10_000)
         private fun nextNotificationId(): Int {
             val next = notificationSequence.incrementAndGet()
