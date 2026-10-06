@@ -62,8 +62,15 @@ class ScheduledMessageReceiver : BroadcastReceiver() {
 
         if (message.repeat == RepeatOption.ONCE) {
             store.removeById(message.id)
-        } else {
-            AndroidMessageScheduler(context).schedule(message)
+        } else if (!AndroidMessageScheduler(context).schedule(message)) {
+            store.upsert(message.copy(isEnabled = false))
+            TaskExecutionReporter(context).report(
+                TaskExecutionResult.failure(
+                    message.name,
+                    "The next scheduled message could not be registered, so it was paused",
+                    System.currentTimeMillis(),
+                ),
+            )
         }
     }
 
