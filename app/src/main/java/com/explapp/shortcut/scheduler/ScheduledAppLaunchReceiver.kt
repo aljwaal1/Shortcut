@@ -55,8 +55,15 @@ class ScheduledAppLaunchReceiver : BroadcastReceiver() {
 
         if (shortcut.repeat == RepeatOption.ONCE) {
             store.removeById(shortcut.id)
-        } else {
-            AndroidAlarmScheduler(context).schedule(shortcut)
+        } else if (!AndroidAlarmScheduler(context).schedule(shortcut)) {
+            store.upsert(shortcut.copy(isEnabled = false))
+            TaskExecutionReporter(context).report(
+                TaskExecutionResult.failure(
+                    shortcut.name,
+                    "The next scheduled run could not be registered, so the task was paused",
+                    System.currentTimeMillis(),
+                ),
+            )
         }
     }
 
