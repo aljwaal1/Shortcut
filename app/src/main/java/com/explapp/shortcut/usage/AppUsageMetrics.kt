@@ -27,10 +27,17 @@ object AppUsageMetrics {
         val rankedToday = AppUsageAggregator.aggregate(samplesByDay[todayStartMs].orEmpty())
         val todayMs = rankedToday.sumOf { it.durationMs }
         val yesterdayMs = AppUsageAggregator.aggregate(samplesByDay[yesterdayStartMs].orEmpty()).sumOf { it.durationMs }
-        val firstDay = todayStartMs - 6L * dayDurationMs
-        val days = (0L..6L).map { offset ->
-            val start = firstDay + offset * dayDurationMs
-            DailyUsage(start, AppUsageAggregator.aggregate(samplesByDay[start].orEmpty()).sumOf { it.durationMs })
+        val knownDays = samplesByDay.keys.sorted()
+        val days = if (knownDays.size >= 7) {
+            knownDays.takeLast(7).map { start ->
+                DailyUsage(start, AppUsageAggregator.aggregate(samplesByDay[start].orEmpty()).sumOf { it.durationMs })
+            }
+        } else {
+            val firstDay = todayStartMs - 6L * dayDurationMs
+            (0L..6L).map { offset ->
+                val start = firstDay + offset * dayDurationMs
+                DailyUsage(start, AppUsageAggregator.aggregate(samplesByDay[start].orEmpty()).sumOf { it.durationMs })
+            }
         }
         val topFive = rankedToday.take(5).map { item ->
             AppUsageShare(
