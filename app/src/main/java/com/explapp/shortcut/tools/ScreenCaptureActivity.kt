@@ -39,6 +39,7 @@ import com.google.mlkit.vision.common.InputImage
 import com.explapp.shortcut.automation.routines.TelegramBotSender
 import com.explapp.shortcut.execution.TaskExecutionReporter
 import com.explapp.shortcut.execution.TaskExecutionResult
+import com.explapp.shortcut.execution.TaskExecutionStatus
 import com.google.mlkit.vision.text.TextRecognition
 import com.google.mlkit.vision.text.latin.TextRecognizerOptions
 import java.io.File
@@ -631,7 +632,7 @@ class ScreenCaptureService : Service() {
     private fun handleAutomationResult(path: String?) {
         if (path.isNullOrBlank()) {
             reportAutomationScreenshot(
-                success = false,
+                status = TaskExecutionStatus.FAILURE,
                 reason = lastCaptureFailureReason.ifBlank { "Screen capture returned no image" },
                 details = listOf(
                     "SCREENSHOT_CAPTURE = FAILURE",
@@ -664,20 +665,22 @@ class ScreenCaptureService : Service() {
             uri
         }.getOrNull()
 
-        reportAutomationScreenshot(
-            success = savedUri != null,
-            reason = if (savedUri == null) "Could not save screenshot" else null,
-            details = buildList {
-                add("SCREENSHOT_CAPTURE = SUCCESS")
-                add("SCREENSHOT_SAVE = " + if (savedUri != null) "SUCCESS" else "FAILURE")
-                add("FramesSeen = $lastFramesSeen")
-                add("CaptureMode = ONE_SHOT")
-                add("ShareAnyApp = $shareAnyApp")
-                add("DateTimeStamp = $stampDateTime")
-                if (shareAnyApp) add("SHARE_ANY_APP = PREPARED")
-                savedUri?.let { add("Uri = $it") }
-            },
-        )
+        val baseDetails = buildList {
+            add("SCREENSHOT_CAPTURE = SUCCESS")
+            add("SCREENSHOT_SAVE = " + if (savedUri != null) "SUCCESS" else "FAILURE")
+            add("FramesSeen = $lastFramesSeen")
+            add("CaptureMode = ONE_SHOT")
+            add("ShareAnyApp = $shareAnyApp")
+            add("DateTimeStamp = $stampDateTime")
+            savedUri?.let { add("Uri = $it") }
+        }
+        if (savedUri == null) {
+            reportAutomationScreenshot(
+                status = TaskExecutionStatus.FAILURE,
+                reason = "Could not save screenshot",
+                details = baseDetails,
+            )
+        }
 
         when {
             telegramBotToken.isNotBlank() && telegramChatId.isNotBlank() -> {
@@ -687,6 +690,11 @@ class ScreenCaptureService : Service() {
                         telegramChatId,
                         telegramCaption,
                         file,
+                    )
+                    reportAutomationScreenshot(
+                        status = if (sent.isSuccess) TaskExecutionStatus.SUCCESS else TaskExecutionStatus.FAILURE,
+                        reason = sent.exceptionOrNull()?.message,
+                        details = baseDetails + ("TELEGRAM_SEND = " + if (sent.isSuccess) "SUCCESS" else "FAILURE"),
                     )
                     file.delete()
                     showResultNotification(
@@ -701,6 +709,11 @@ class ScreenCaptureService : Service() {
             }
 
             shareAnyApp && savedUri != null -> {
+                reportAutomationScreenshot(
+                    status = TaskExecutionStatus.PREPARED,
+                    reason = null,
+                    details = baseDetails + "SHARE_ANY_APP = PREPARED",
+                )
                 file.delete()
                 val shareIntent = Intent(Intent.ACTION_SEND).apply {
                     type = "image/png"
@@ -728,6 +741,11 @@ class ScreenCaptureService : Service() {
             }
 
             normalTelegramShare && savedUri != null -> {
+                reportAutomationScreenshot(
+                    status = TaskExecutionStatus.PREPARED,
+                    reason = null,
+                    details = baseDetails + "TELEGRAM_SHARE = PREPARED",
+                )
                 file.delete()
                 val shareIntent = Intent(Intent.ACTION_SEND).apply {
                     type = "image/png"
@@ -790,6 +808,13 @@ class ScreenCaptureService : Service() {
             }
 
             else -> {
+                if (savedUri != null) {
+                    reportAutomationScreenshot(
+                        status = TaskExecutionStatus.SUCCESS,
+                        reason = null,
+                        details = baseDetails,
+                    )
+                }
                 file.delete()
                 showResultNotification(
                     if (savedUri != null) local("Screenshot saved", "تم حفظ لقطة الشاشة")
@@ -804,17 +829,17 @@ class ScreenCaptureService : Service() {
     }
 
     private fun reportAutomationScreenshot(
-        success: Boolean,
+        status: TaskExecutionStatus,
         reason: String?,
         details: List<String>,
     ) {
         if (routineName.isBlank()) return
         val started = routineStartedAtMs.takeIf { it > 0L } ?: System.currentTimeMillis()
         val taskName = "$routineName / SCREENSHOT"
-        val result = if (success) {
-            TaskExecutionResult.success(taskName, started, details = details)
-        } else {
-            TaskExecutionResult.failure(taskName, reason ?: "Screenshot failed", started, details = details)
+        val result = when (status) {
+            TaskExecutionStatus.SUCCESS -> TaskExecutionResult.success(taskName, started, details = details)
+            TaskExecutionStatus.PREPARED -> TaskExecutionResult.prepared(taskName, started, details = details)
+            TaskExecutionStatus.FAILURE -> TaskExecutionResult.failure(taskName, reason ?: "Screenshot failed", started, details = details)
         }
         TaskExecutionReporter(applicationContext).report(result)
     }
