@@ -150,27 +150,38 @@ class ImageBatchActivity : AppCompatActivity() {
     }
 
     private fun merge(uris: List<Uri>, vertical: Boolean, cancelled: AtomicBoolean, step: (Int) -> Unit): Uri {
-        val bitmaps = mutableListOf<Bitmap>()
-        uris.forEachIndexed { index, uri ->
+        require(uris.isNotEmpty()) { "No images selected" }
+        val dimensions = uris.map { uri ->
             check(!cancelled.get()) { "Cancelled" }
-            bitmaps += loadOrientedBitmap(uri, 1600)
-            step(index + 1)
+            val bitmap = loadOrientedBitmap(uri, 1600)
+            val size = bitmap.width to bitmap.height
+            bitmap.recycle()
+            size
         }
-        val width = if (vertical) bitmaps.maxOf { it.width } else bitmaps.sumOf { it.width }
-        val height = if (vertical) bitmaps.sumOf { it.height } else bitmaps.maxOf { it.height }
-        require(width > 0 && height > 0 && width.toLong() * height <= 40_000_000L) { "Result is too large" }
+        val width = if (vertical) dimensions.maxOf { it.first } else dimensions.sumOf { it.first }
+        val height = if (vertical) dimensions.sumOf { it.second } else dimensions.maxOf { it.second }
+        require(width > 0 && height > 0 && width.toLong() * height <= MAX_MERGED_PIXELS) { "Result is too large" }
+
         val result = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
-        val canvas = Canvas(result)
-        var x = 0f
-        var y = 0f
-        bitmaps.forEach { bitmap ->
-            canvas.drawBitmap(bitmap, x, y, null)
-            if (vertical) y += bitmap.height else x += bitmap.width
+        try {
+            val canvas = Canvas(result)
+            var x = 0f
+            var y = 0f
+            uris.forEachIndexed { index, uri ->
+                check(!cancelled.get()) { "Cancelled" }
+                val bitmap = loadOrientedBitmap(uri, 1600)
+                try {
+                    canvas.drawBitmap(bitmap, x, y, null)
+                    if (vertical) y += bitmap.height else x += bitmap.width
+                } finally {
+                    bitmap.recycle()
+                }
+                step(index + 1)
+            }
+            return saveBitmap(result, "Merged_${System.currentTimeMillis()}.jpg", "image/jpeg", Bitmap.CompressFormat.JPEG, 92)
+        } finally {
+            result.recycle()
         }
-        val output = saveBitmap(result, "Merged_${System.currentTimeMillis()}.jpg", "image/jpeg", Bitmap.CompressFormat.JPEG, 92)
-        bitmaps.forEach(Bitmap::recycle)
-        result.recycle()
-        return output
     }
 
     private fun toPdf(uris: List<Uri>, cancelled: AtomicBoolean, step: (Int) -> Unit): Uri {
@@ -194,26 +205,33 @@ class ImageBatchActivity : AppCompatActivity() {
     }
 
     private fun toGif(uris: List<Uri>, cancelled: AtomicBoolean, step: (Int) -> Unit): Uri {
-        val selected = uris.take(20)
-        val frames = mutableListOf<Bitmap>()
-        selected.forEachIndexed { index, uri ->
+        val selected = uris.take(MAX_GIF_FRAMES)
+        require(selected.isNotEmpty()) { "No images selected" }
+        val dimensions = selected.map { uri ->
             check(!cancelled.get()) { "Cancelled" }
-            frames += loadOrientedBitmap(uri, 720)
-            step(index + 1)
+            val bitmap = loadOrientedBitmap(uri, 720)
+            val size = bitmap.width to bitmap.height
+            bitmap.recycle()
+            size
         }
-        val width = frames.maxOf { it.width }
-        val height = frames.maxOf { it.height }
+        val width = dimensions.maxOf { it.first }
+        val height = dimensions.maxOf { it.second }
         val bytes = ByteArrayOutputStream()
         val encoder = GifEncoder(bytes, width, height, 0)
         val options = ImageOptions().apply { setDelay(350, TimeUnit.MILLISECONDS) }
-        frames.forEach { frame ->
+        selected.forEachIndexed { index, uri ->
             check(!cancelled.get()) { "Cancelled" }
+            val frame = loadOrientedBitmap(uri, 720)
             val normalized = if (frame.width == width && frame.height == height) frame else Bitmap.createScaledBitmap(frame, width, height, true)
-            encoder.addImage(bitmapPixels(normalized), options)
-            if (normalized !== frame) normalized.recycle()
+            try {
+                encoder.addImage(bitmapPixels(normalized), options)
+            } finally {
+                if (normalized !== frame) normalized.recycle()
+                frame.recycle()
+            }
+            step(index + 1)
         }
         encoder.finishEncoding()
-        frames.forEach(Bitmap::recycle)
         val output = ToolOutputStore(this).create("Animated_${System.currentTimeMillis()}.gif", "image/gif", true)
         contentResolver.openOutputStream(output).use { out -> requireNotNull(out).write(bytes.toByteArray()) }
         return output
@@ -345,5 +363,9 @@ class ImageBatchActivity : AppCompatActivity() {
     private fun toast(text: String) = Toast.makeText(this, text, Toast.LENGTH_LONG).show()
     private fun local(en: String, ar: String): String = if (resources.configuration.locales[0].language == "ar") ar else en
 
-    companion object { const val EXTRA_TOOL = "tool" }
+    companion object {
+        const val EXTRA_TOOL = "tool"
+        private const val MAX_MERGED_PIXELS = 24_000_000L
+        private const val MAX_GIF_FRAMES = 20
+    }
 }
