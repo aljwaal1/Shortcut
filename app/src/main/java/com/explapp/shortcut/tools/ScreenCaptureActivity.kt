@@ -64,6 +64,15 @@ class ScreenCaptureActivity : AppCompatActivity() {
         override fun onReceive(context: Context, intent: Intent) {
             val path = intent.getStringExtra(ScreenCaptureService.EXTRA_PATH)
             if (path.isNullOrBlank()) {
+                reportRoutineScreenshot(
+                    success = false,
+                    reason = "Screen capture returned no image",
+                    details = listOf(
+                        "SCREENSHOT_CAPTURE = FAILURE",
+                        "DateTimeStamp = $stampDateTime",
+                        "ShareAnyApp = $shareAnyApp",
+                    ),
+                )
                 Toast.makeText(this@ScreenCaptureActivity, local("Could not capture screenshot", "تعذر التقاط الشاشة"), Toast.LENGTH_LONG).show()
                 finish()
                 return
@@ -248,18 +257,20 @@ class ScreenCaptureActivity : AppCompatActivity() {
             }
             uri
         }.onSuccess { uri ->
-            reportRoutineScreenshot(
-                success = true,
-                reason = null,
-                details = listOf(
-                    "SCREENSHOT_SAVE = SUCCESS",
-                    "Uri = $uri",
-                    "DateTimeStamp = $stampDateTime",
-                ),
+            val baseDetails = listOf(
+                "SCREENSHOT_SAVE = SUCCESS",
+                "Uri = $uri",
+                "DateTimeStamp = $stampDateTime",
+                "ShareAnyApp = $shareAnyApp",
             )
             if (telegramBotToken.isNotBlank() && telegramChatId.isNotBlank()) {
                 Thread {
                     val result = TelegramBotSender().sendPhoto(telegramBotToken, telegramChatId, telegramCaption, file)
+                    reportRoutineScreenshot(
+                        success = result.isSuccess,
+                        reason = result.exceptionOrNull()?.message,
+                        details = baseDetails + ("TELEGRAM_SEND = " + if (result.isSuccess) "SUCCESS" else "FAILURE"),
+                    )
                     runOnUiThread {
                         val message = if (result.isSuccess) {
                             local("Screenshot sent to Telegram", "تم إرسال لقطة الشاشة إلى تيليجرام")
@@ -272,7 +283,23 @@ class ScreenCaptureActivity : AppCompatActivity() {
                     file.delete()
                 }.start()
                 ToolResultActions.show(this, listOf(uri), ToolOutputResultPolicy.forTool(ToolId.SCREENSHOT_CAPTURE).mime)
+            } else if (shareAnyApp) {
+                reportRoutineScreenshotPrepared(baseDetails + "SHARE_ANY_APP = PREPARED")
+                file.delete()
+                val shareIntent = Intent(Intent.ACTION_SEND).apply {
+                    type = "image/png"
+                    putExtra(Intent.EXTRA_STREAM, uri)
+                    clipData = ClipData.newRawUri("Shortcut screenshot", uri)
+                    addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                }
+                runCatching {
+                    startActivity(Intent.createChooser(shareIntent, local("Share screenshot", "مشاركة لقطة الشاشة")))
+                }.onFailure {
+                    Toast.makeText(this, local("Could not open sharing", "تعذر فتح المشاركة"), Toast.LENGTH_LONG).show()
+                }
+                finish()
             } else if (normalTelegramShare) {
+                reportRoutineScreenshotPrepared(baseDetails + "TELEGRAM_SHARE = PREPARED")
                 file.delete()
                 val shareIntent = Intent(Intent.ACTION_SEND).apply {
                     type = "image/png"
@@ -291,6 +318,11 @@ class ScreenCaptureActivity : AppCompatActivity() {
                 }
                 finish()
             } else {
+                reportRoutineScreenshot(
+                    success = true,
+                    reason = null,
+                    details = baseDetails,
+                )
                 file.delete()
                 ToolResultActions.show(this, listOf(uri), ToolOutputResultPolicy.forTool(ToolId.SCREENSHOT_CAPTURE).mime)
             }
@@ -381,6 +413,15 @@ class ScreenCaptureActivity : AppCompatActivity() {
             TaskExecutionResult.failure(taskName, reason ?: "Screenshot failed", started, details = details)
         }
         TaskExecutionReporter(applicationContext).report(result, notifyUser = false)
+    }
+
+    private fun reportRoutineScreenshotPrepared(details: List<String>) {
+        if (routineName.isBlank()) return
+        val started = routineStartedAtMs.takeIf { it > 0L } ?: System.currentTimeMillis()
+        TaskExecutionReporter(applicationContext).report(
+            TaskExecutionResult.prepared("$routineName / SCREENSHOT", started, details = details),
+            notifyUser = false,
+        )
     }
 
     private fun local(en: String, ar: String): String =
