@@ -14,7 +14,7 @@ class CarModeActivity : AppCompatActivity() {
     }
 
     private val wifiStep = registerForActivityResult(ActivityResultContracts.StartActivityForResult()) {
-        bluetoothStep.launch(Intent(Settings.ACTION_BLUETOOTH_SETTINGS))
+        openBluetoothOrMaps()
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -24,7 +24,13 @@ class CarModeActivity : AppCompatActivity() {
         } else {
             Settings.ACTION_WIFI_SETTINGS
         }
-        wifiStep.launch(Intent(wifiAction))
+        runCatching { wifiStep.launch(Intent(wifiAction)) }
+            .onFailure { openBluetoothOrMaps() }
+    }
+
+    private fun openBluetoothOrMaps() {
+        runCatching { bluetoothStep.launch(Intent(Settings.ACTION_BLUETOOTH_SETTINGS)) }
+            .onFailure { openMaps() }
     }
 
     private fun openMaps() {
