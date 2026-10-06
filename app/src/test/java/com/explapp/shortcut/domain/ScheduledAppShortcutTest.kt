@@ -40,4 +40,20 @@ class ScheduledAppShortcutTest {
             RepeatOption.WEEKDAYS.isoWeekdays,
         )
     }
+
+    @Test
+    fun weeklyShortcutRequiresSelectedWeekday() {
+        val missingDay = ScheduledAppShortcut(
+            name = "Weekly",
+            packageName = "maps",
+            hour = 8,
+            minute = 0,
+            repeat = RepeatOption.WEEKLY,
+            weeklyDayIso = null,
+        )
+        val monday = missingDay.copy(weeklyDayIso = 1)
+
+        assertFalse(missingDay.isValid())
+        assertTrue(monday.isValid())
+    }
 }
