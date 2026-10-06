@@ -42,6 +42,11 @@ class RoutineStore(context: Context) {
 
     fun save(items: List<AutomationRoutine>) = synchronized(LOCK) {
         val distinct = items.distinctBy { it.id }
+        val activeRoutineIds = distinct.mapTo(mutableSetOf()) { it.id }
+        secrets.keys("").filter { key ->
+            key.substringBefore(':') !in activeRoutineIds
+        }.forEach(secrets::remove)
+
         val protected = distinct.map { routine ->
             val orphanedSecrets = secrets.keys("${routine.id}:").toMutableSet()
             val protectedRoutine = routine.copy(
