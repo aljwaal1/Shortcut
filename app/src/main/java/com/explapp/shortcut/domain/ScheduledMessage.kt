@@ -33,6 +33,7 @@ data class ScheduledMessage(
             message.isNotBlank() &&
             hour in 0..23 &&
             minute in 0..59 &&
+            (repeat != RepeatOption.WEEKLY || weeklyDayIso in 1..7) &&
             (weeklyDayIso == null || weeklyDayIso in 1..7) &&
             (deliveryMode == MessageDeliveryMode.PREPARED || platform == MessagePlatform.TELEGRAM)
 
