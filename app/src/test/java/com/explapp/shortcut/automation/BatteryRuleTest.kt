@@ -20,4 +20,15 @@ class BatteryRuleTest {
         assertTrue(rule.crossed(previous = 79, current = 80))
         assertFalse(rule.crossed(previous = 85, current = 90))
     }
+
+    @Test
+    fun invalidBatteryReadingsNeverTrigger() {
+        val below = BatteryRule(20, BatteryDirection.BELOW)
+        val above = BatteryRule(80, BatteryDirection.ABOVE)
+
+        assertFalse(below.crossed(30, -1))
+        assertFalse(below.crossed(-1, 10))
+        assertFalse(above.crossed(70, 101))
+        assertFalse(above.crossed(101, 90))
+    }
 }
