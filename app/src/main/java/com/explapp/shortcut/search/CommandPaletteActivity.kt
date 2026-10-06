@@ -128,9 +128,18 @@ private fun CommandPaletteScreen(onBack: () -> Unit) {
                             }
                         }
                         item.id.startsWith("routine:") -> routines.firstOrNull { it.id == item.id.substringAfter(':') }
-                            ?.let { RoutineDispatcher(context).executeAsync(it, userInitiated = true) }
+                            ?.let { routine ->
+                                if (routine.isEnabled && routine.isValid()) {
+                                    RoutineDispatcher(context).executeAsync(routine, userInitiated = true)
+                                } else {
+                                    context.startActivity(Intent(context, MyAutomationsActivity::class.java))
+                                }
+                            }
                         item.id.startsWith("scheduled-") -> context.startActivity(Intent(context, ScheduledTasksManagerActivity::class.java))
-                        item.id.startsWith("template:") -> context.startActivity(Intent(context, MyAutomationsActivity::class.java))
+                        item.id.startsWith("template:") -> context.startActivity(
+                            Intent(context, MyAutomationsActivity::class.java)
+                                .putExtra(MyAutomationsActivity.EXTRA_START_MODE, MyAutomationsActivity.MODE_TEMPLATES),
+                        )
                     }
                 },
             ) {
