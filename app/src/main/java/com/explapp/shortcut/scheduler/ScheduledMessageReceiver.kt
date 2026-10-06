@@ -52,11 +52,21 @@ class ScheduledMessageReceiver : BroadcastReceiver() {
                     )
                 }
             }
-            MessageDeliveryMode.TELEGRAM_BOT_AUTO -> TaskExecutionResult.failure(
-                message.name,
-                "Telegram Bot auto-send is not configured in this build",
-                startedAt,
-            )
+            MessageDeliveryMode.TELEGRAM_BOT_AUTO -> {
+                if (showReadyNotification(context, message, openIntent)) {
+                    TaskExecutionResult.prepared(
+                        message.name,
+                        startedAt,
+                        details = listOf("TELEGRAM_BOT_AUTO = FALLBACK_TO_PREPARED"),
+                    )
+                } else {
+                    TaskExecutionResult.failure(
+                        message.name,
+                        "Telegram Bot auto-send is unavailable and notification permission is required for the prepared fallback",
+                        startedAt,
+                    )
+                }
+            }
         }
         TaskExecutionReporter(context).report(result)
 
