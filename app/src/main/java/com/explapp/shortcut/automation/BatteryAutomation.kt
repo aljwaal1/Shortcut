@@ -113,11 +113,25 @@ class BatteryCheckReceiver : BroadcastReceiver() {
 class ChargerEventReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent) {
         val store = BatteryAutomationStore(context)
+        if (!store.enabled) return
         when (intent.action) {
             Intent.ACTION_BOOT_COMPLETED, Intent.ACTION_MY_PACKAGE_REPLACED -> {
-                if (!store.enabled) return
-                store.previousLevel = currentBatteryLevel(context)
+                val level = currentBatteryLevel(context)
+                if (level in 0..100) store.previousLevel = level
                 store.previousCharging = isDeviceCharging(context)
+                BatteryAutomationScheduler.schedule(context)
+            }
+
+            Intent.ACTION_POWER_CONNECTED,
+            Intent.ACTION_POWER_DISCONNECTED,
+            -> {
+                val connected = intent.action == Intent.ACTION_POWER_CONNECTED
+                val previous = store.previousCharging
+                if (store.chargerNotifications && previous != null && previous != connected) {
+                    if (connected) notify(context, "Charger connected", "Charging started")
+                    else notify(context, "Charger disconnected", "Charging stopped")
+                }
+                store.previousCharging = connected
                 BatteryAutomationScheduler.schedule(context)
             }
         }
@@ -128,9 +142,11 @@ fun currentBatteryLevel(context: Context): Int {
     val status = context.registerReceiver(null, IntentFilter(Intent.ACTION_BATTERY_CHANGED))
     val level = status?.getIntExtra(BatteryManager.EXTRA_LEVEL, -1) ?: -1
     val scale = status?.getIntExtra(BatteryManager.EXTRA_SCALE, -1) ?: -1
-    return if (level >= 0 && scale > 0) (level * 100 / scale) else {
-        context.getSystemService(BatteryManager::class.java).getIntProperty(BatteryManager.BATTERY_PROPERTY_CAPACITY)
-    }.coerceIn(0, 100)
+    if (level >= 0 && scale > 0) return (level * 100 / scale).coerceIn(0, 100)
+
+    val property = context.getSystemService(BatteryManager::class.java)
+        .getIntProperty(BatteryManager.BATTERY_PROPERTY_CAPACITY)
+    return property.takeIf { it in 0..100 } ?: -1
 }
 
 fun isDeviceCharging(context: Context): Boolean {
