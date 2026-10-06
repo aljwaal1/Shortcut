@@ -19,7 +19,12 @@ class RoutineStore(context: Context) {
                         when {
                             value == SECRET_MARKER -> {
                                 val secret = secrets.get(secretKey)
-                                if (secret.isNotBlank()) updated[key] = secret else updated.remove(key)
+                                if (secret.isNotBlank()) {
+                                    updated[key] = secret
+                                } else {
+                                    updated.remove(key)
+                                    migrated = true
+                                }
                             }
                             value.isNotBlank() -> {
                                 if (secrets.put(secretKey, value)) {
