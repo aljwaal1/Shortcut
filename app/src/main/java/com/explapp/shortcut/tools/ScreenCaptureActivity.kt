@@ -549,17 +549,37 @@ class ScreenCaptureService : Service() {
         var completed = false
         val captureAfterMs = SystemClock.uptimeMillis() + delayMs
         val readyAtMs = captureAfterMs + 350L
-        val forceAcceptAtMs = captureAfterMs + 5_000L
+        val forceAcceptAtMs = captureAfterMs + 2_500L
         val failAtMs = captureAfterMs + 12_000L
         var framesSeen = 0
+        var lastCandidate: Bitmap? = null
         lastFramesSeen = 0
         lastCaptureFailureReason = ""
 
         fun cleanup() {
+            lastCandidate?.recycle()
+            lastCandidate = null
             runCatching { display?.release() }
             runCatching { reader.close() }
             runCatching { p.stop() }
             projection = null
+        }
+
+        fun finishWithBitmap(bitmap: Bitmap, fallback: Boolean = false) {
+            if (completed) {
+                bitmap.recycle()
+                return
+            }
+            completed = true
+            lastCandidate?.takeIf { it !== bitmap }?.recycle()
+            lastCandidate = null
+            if (stampDateTime) ScreenshotStamp.apply(bitmap)
+            val file = File(cacheDir, "capture_${System.currentTimeMillis()}.png")
+            FileOutputStream(file).use { bitmap.compress(Bitmap.CompressFormat.PNG, 100, it) }
+            bitmap.recycle()
+            if (fallback) lastCaptureFailureReason = "Fallback frame accepted after waiting for app rendering"
+            cleanup()
+            complete(file.absolutePath)
         }
 
         p.registerCallback(object : MediaProjection.Callback() {
@@ -595,17 +615,12 @@ class ScreenCaptureService : Service() {
             val sample = sampleCenterGrid(cropped)
             val likelyBlank = ScreenFrameReadiness.isLikelyBlank(sample)
             if (likelyBlank && SystemClock.uptimeMillis() < forceAcceptAtMs) {
-                cropped.recycle()
+                lastCandidate?.recycle()
+                lastCandidate = cropped
                 return@setOnImageAvailableListener
             }
 
-            completed = true
-            if (stampDateTime) ScreenshotStamp.apply(cropped)
-            val file = File(cacheDir, "capture_${System.currentTimeMillis()}.png")
-            FileOutputStream(file).use { cropped.compress(Bitmap.CompressFormat.PNG, 100, it) }
-            cropped.recycle()
-            cleanup()
-            complete(file.absolutePath)
+            finishWithBitmap(cropped)
         }, handler)
 
         display = p.createVirtualDisplay(
@@ -619,17 +634,39 @@ class ScreenCaptureService : Service() {
             handler,
         )
 
+        if (display == null) {
+            lastCaptureFailureReason = "Virtual display could not be created"
+            cleanup()
+            complete(null)
+            return
+        }
+
+        handler.postDelayed({
+            if (!completed && framesSeen == 0) {
+                runCatching {
+                    display?.setSurface(null)
+                    display?.setSurface(reader.surface)
+                }
+            }
+        }, delayMs + 4_000L)
+
         handler.postDelayed({
             if (!completed) {
-                completed = true
                 lastFramesSeen = framesSeen
-                lastCaptureFailureReason = if (framesSeen == 0) {
-                    "No screen frames were received before timeout"
+                val fallback = lastCandidate
+                if (fallback != null) {
+                    lastCandidate = null
+                    finishWithBitmap(fallback, fallback = true)
                 } else {
-                    "No usable screen frame was available before timeout"
+                    completed = true
+                    lastCaptureFailureReason = if (framesSeen == 0) {
+                        "No screen frames were received before timeout"
+                    } else {
+                        "No usable screen frame was available before timeout"
+                    }
+                    cleanup()
+                    complete(null)
                 }
-                cleanup()
-                complete(null)
             }
         }, (failAtMs - SystemClock.uptimeMillis()).coerceAtLeast(1_000L))
     }
