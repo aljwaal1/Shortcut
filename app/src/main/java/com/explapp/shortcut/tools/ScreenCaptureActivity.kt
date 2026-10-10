@@ -512,6 +512,8 @@ class ScreenCaptureService : Service() {
             intent?.getParcelableExtra(EXTRA_DATA)
         }
         if (resultCode != Activity.RESULT_OK || data == null) {
+            lastFramesSeen = 0
+            lastCaptureFailureReason = "Screen capture permission data was unavailable"
             complete(null)
             return START_NOT_STICKY
         }
@@ -573,13 +575,25 @@ class ScreenCaptureService : Service() {
             completed = true
             lastCandidate?.takeIf { it !== bitmap }?.recycle()
             lastCandidate = null
-            if (stampDateTime) ScreenshotStamp.apply(bitmap)
             val file = File(cacheDir, "capture_${System.currentTimeMillis()}.png")
-            FileOutputStream(file).use { bitmap.compress(Bitmap.CompressFormat.PNG, 100, it) }
+            val saved = runCatching {
+                if (stampDateTime) ScreenshotStamp.apply(bitmap)
+                FileOutputStream(file).use { output ->
+                    check(bitmap.compress(Bitmap.CompressFormat.PNG, 100, output)) {
+                        "PNG encoding failed"
+                    }
+                }
+                check(file.length() > 0L) { "Screenshot file is empty" }
+            }
             bitmap.recycle()
-            if (fallback) lastCaptureFailureReason = "Fallback frame accepted after waiting for app rendering"
+            if (saved.isFailure) {
+                file.delete()
+                lastCaptureFailureReason = saved.exceptionOrNull()?.message ?: "Screenshot encoding failed"
+            } else if (fallback) {
+                lastCaptureFailureReason = "Fallback frame accepted after waiting for app rendering"
+            }
             cleanup()
-            complete(file.absolutePath)
+            complete(if (saved.isSuccess) file.absolutePath else null)
         }
 
         p.registerCallback(object : MediaProjection.Callback() {
@@ -753,11 +767,19 @@ class ScreenCaptureService : Service() {
             savedUri?.let { add("Uri = $it") }
         }
         if (savedUri == null) {
+            file.delete()
             reportAutomationScreenshot(
                 status = TaskExecutionStatus.FAILURE,
                 reason = "Could not save screenshot",
                 details = baseDetails,
             )
+            showResultNotification(
+                local("Screenshot failed", "فشل حفظ لقطة الشاشة"),
+                local("Could not save the screenshot.", "تعذر حفظ لقطة الشاشة."),
+            )
+            stopForeground(STOP_FOREGROUND_REMOVE)
+            stopSelf()
+            return
         }
 
         when {
