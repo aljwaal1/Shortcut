@@ -754,6 +754,15 @@ class ScreenCaptureService : Service() {
                 requireNotNull(out)
                 file.inputStream().use { it.copyTo(out) }
             }
+            // Verify the image contents rather than relying on a MediaStore URI.
+            val validImage = contentResolver.openInputStream(uri)?.use { input ->
+                BitmapFactory.decodeStream(input)?.let { bitmap ->
+                    val valid = bitmap.width > 0 && bitmap.height > 0
+                    bitmap.recycle()
+                    valid
+                }
+            } ?: false
+            check(validImage) { "Saved screenshot could not be decoded" }
             uri
         }.getOrNull()
 
