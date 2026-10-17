@@ -908,16 +908,10 @@ private fun DailyScreenshotTelegramWizard(
                                         secondaryValue = delayMs,
                                         parameters = mapOf(
                                             "persistentCapture" to keepCaptureSession.toString(),
-                                        ),
-                                    ),
-                                    RoutineAction(
-                                        type = RoutineActionType.SEND_TELEGRAM_BOT,
-                                        value = "telegram",
-                                        secondaryValue = caption,
-                                        parameters = mapOf(
-                                            "botToken" to botToken,
-                                            "chatId" to chatId,
-                                            "attachment" to "__screenshot_output__",
+                                            "telegramBotToken" to botToken.trim(),
+                                            "telegramChatId" to normalizedTelegramDestination(chatId),
+                                            "telegramCaption" to caption,
+                                            "stampDateTime" to "true",
                                         ),
                                     ),
                                 )
