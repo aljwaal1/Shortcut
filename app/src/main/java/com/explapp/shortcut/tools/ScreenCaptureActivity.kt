@@ -390,7 +390,7 @@ class ScreenCaptureActivity : AppCompatActivity() {
             )
             if (telegramBotToken.isNotBlank() && telegramChatId.isNotBlank()) {
                 Thread {
-                    val result = TelegramBotSender().sendPhoto(telegramBotToken, telegramChatId, telegramCaption, file)
+                    val result = TelegramBotSender(context).sendPhoto(telegramBotToken, telegramChatId, telegramCaption, file)
                     reportRoutineScreenshot(
                         success = result.isSuccess,
                         reason = result.exceptionOrNull()?.message,
@@ -990,7 +990,7 @@ class ScreenCaptureService : Service() {
         when {
             telegramBotToken.isNotBlank() && telegramChatId.isNotBlank() -> {
                 Thread {
-                    val sent = TelegramBotSender().sendPhoto(
+                    val sent = TelegramBotSender(context).sendPhoto(
                         telegramBotToken,
                         telegramChatId,
                         telegramCaption,
