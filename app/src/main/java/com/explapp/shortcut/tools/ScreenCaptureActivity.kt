@@ -864,6 +864,23 @@ class ScreenCaptureService : Service() {
         }
     }
 
+    private fun createGalleryScreenshotUri(name: String): Uri {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            val values = android.content.ContentValues().apply {
+                put(android.provider.MediaStore.MediaColumns.DISPLAY_NAME, name)
+                put(android.provider.MediaStore.MediaColumns.MIME_TYPE, "image/png")
+                put(android.provider.MediaStore.MediaColumns.RELATIVE_PATH, "Pictures/Shortcut Screenshots")
+            }
+            return requireNotNull(contentResolver.insert(android.provider.MediaStore.Images.Media.EXTERNAL_CONTENT_URI, values))
+        }
+        check(ContextCompat.checkSelfPermission(this, Manifest.permission.WRITE_EXTERNAL_STORAGE) == PackageManager.PERMISSION_GRANTED) {
+            "Gallery storage permission missing"
+        }
+        val folder = File(android.os.Environment.getExternalStoragePublicDirectory(android.os.Environment.DIRECTORY_PICTURES), "Shortcut Screenshots")
+        check(folder.isDirectory || folder.mkdirs()) { "Could not create gallery folder" }
+        return Uri.fromFile(File(folder, name))
+    }
+
     private fun handleAutomationResult(path: String?) {
         if (path.isNullOrBlank()) {
             reportAutomationScreenshot(
@@ -888,17 +905,19 @@ class ScreenCaptureService : Service() {
 
         val file = File(path)
         val savedUri = runCatching {
-            val uri = ToolOutputStore(this).create(
-                ScreenshotStamp.fileName(),
-                "image/png",
-                true,
-            )
-            contentResolver.openOutputStream(uri).use { out ->
-                requireNotNull(out)
-                file.inputStream().use { it.copyTo(out) }
+            val uri = if (galleryOnly) createGalleryScreenshotUri(ScreenshotStamp.fileName())
+                else ToolOutputStore(this).create(ScreenshotStamp.fileName(), "image/png", true)
+            if (galleryOnly && uri.scheme == "file") {
+                FileOutputStream(requireNotNull(uri.path)).use { out -> file.inputStream().use { it.copyTo(out) } }
+                android.media.MediaScannerConnection.scanFile(this, arrayOf(requireNotNull(uri.path)), arrayOf("image/png"), null)
+            } else {
+                contentResolver.openOutputStream(uri).use { out ->
+                    requireNotNull(out)
+                    file.inputStream().use { it.copyTo(out) }
+                }
             }
             // Verify the image contents rather than relying on a MediaStore URI.
-            val validImage = contentResolver.openInputStream(uri)?.use { input ->
+            val validImage = (if (uri.scheme == "file") File(requireNotNull(uri.path)).inputStream() else contentResolver.openInputStream(uri))?.use { input ->
                 BitmapFactory.decodeStream(input)?.let { bitmap ->
                     val valid = bitmap.width > 0 && bitmap.height > 0
                     bitmap.recycle()
