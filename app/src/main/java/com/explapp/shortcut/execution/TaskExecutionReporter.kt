@@ -224,6 +224,9 @@ class TaskExecutionReporter(private val context: Context) {
     }
 
     private fun notify(result: TaskExecutionResult) {
+        // PREPARED is an intermediate state, not a completed action. Keeping a
+        // permanent notification for it makes a finished screenshot look stuck.
+        if (result.status == TaskExecutionStatus.PREPARED) return
         if (Build.VERSION.SDK_INT >= 33 &&
             ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED
         ) return
