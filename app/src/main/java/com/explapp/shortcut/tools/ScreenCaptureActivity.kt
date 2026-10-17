@@ -60,6 +60,7 @@ class ScreenCaptureActivity : AppCompatActivity() {
     private var telegramCaption: String = ""
     private var normalTelegramShare: Boolean = false
     private var shareAnyApp: Boolean = false
+    private var galleryOnly: Boolean = false
     private var persistentStartOnly: Boolean = false
     private var stampDateTime: Boolean = false
     private var routineId: String = ""
@@ -128,6 +129,7 @@ class ScreenCaptureActivity : AppCompatActivity() {
                 .putExtra(ScreenCaptureService.EXTRA_NORMAL_TELEGRAM_SHARE, normalTelegramShare)
                 .putExtra(ScreenCaptureService.EXTRA_SHARE_ANY_APP, shareAnyApp)
                 .putExtra(ScreenCaptureService.EXTRA_STAMP_DATE_TIME, stampDateTime)
+                .putExtra(ScreenCaptureService.EXTRA_GALLERY_ONLY, galleryOnly)
                 .putExtra(ScreenCaptureService.EXTRA_ROUTINE_ID, routineId)
                 .putExtra(ScreenCaptureService.EXTRA_ROUTINE_NAME, routineName)
                 .putExtra(ScreenCaptureService.EXTRA_ROUTINE_STARTED_AT_MS, routineStartedAtMs)
@@ -203,7 +205,7 @@ class ScreenCaptureActivity : AppCompatActivity() {
             // Automatic delivery is available only for a configured Telegram bot; ordinary
             // messaging apps cannot be made to send a message without their user consent.
             val hasBot = telegramBotToken.isNotBlank() && telegramChatId.isNotBlank()
-            var automatic = hasBot && !shareAnyApp && !normalTelegramShare
+            var deliveryMode = if (hasBot && !shareAnyApp && !normalTelegramShare) 0 else 1
             val density = resources.displayMetrics.density
             fun dp(value: Int) = (value * density + 0.5f).toInt()
             val content = LinearLayout(this).apply {
@@ -237,9 +239,13 @@ class ScreenCaptureActivity : AppCompatActivity() {
                 local("2. Open another app", "٢. فتح تطبيق آخر"),
                 local("Open the share sheet with the dated screenshot attached; you confirm Send.", "فتح تطبيق آخر والصورة المختومة مرفقة؛ تؤكد الإرسال بنفسك."),
             )
+            val galleryCard = deliveryCard(
+                local("3. Save to gallery", "٣. الحفظ في الاستديو"),
+                local("Save the dated screenshot to Pictures/Shortcut Screenshots.", "حفظ الصورة المختومة في مجلد Shortcut Screenshots داخل الاستديو."),
+            )
             fun repaint() {
-                listOf(autoCard, manualCard).forEachIndexed { index, card ->
-                    val selected = if (index == 0) automatic else !automatic
+                listOf(autoCard, manualCard, galleryCard).forEachIndexed { index, card ->
+                    val selected = index == deliveryMode
                     card.background = GradientDrawable().apply {
                         cornerRadius = dp(12).toFloat()
                         setColor(if (selected) 0x193F8FCE else 0x12000000)
@@ -256,27 +262,32 @@ class ScreenCaptureActivity : AppCompatActivity() {
                         Toast.LENGTH_LONG,
                     ).show()
                 } else {
-                    automatic = true
+                    deliveryMode = 0
                     repaint()
                 }
             }
-            manualCard.setOnClickListener { automatic = false; repaint() }
+            manualCard.setOnClickListener { deliveryMode = 1; repaint() }
+            galleryCard.setOnClickListener { deliveryMode = 2; repaint() }
             repaint()
             AlertDialog.Builder(this)
                 .setTitle(local("Screenshot delivery", "طريقة مشاركة لقطة الشاشة"))
                 .setView(content)
                 .setPositiveButton(local("Allow and capture", "السماح والتقاط الشاشة")) { _, _ ->
                     stampDateTime = true
-                    if (automatic && hasBot) {
+                    galleryOnly = deliveryMode == 2
+                    if (deliveryMode == 0 && hasBot) {
                         shareAnyApp = false
                         normalTelegramShare = false
                     } else {
                         telegramBotToken = ""
                         telegramChatId = ""
                         normalTelegramShare = false
-                        shareAnyApp = true
+                        shareAnyApp = deliveryMode == 1
                     }
-                    launchConsent()
+                    if (galleryOnly && Build.VERSION.SDK_INT <= Build.VERSION_CODES.P &&
+                        ContextCompat.checkSelfPermission(this, Manifest.permission.WRITE_EXTERNAL_STORAGE) != PackageManager.PERMISSION_GRANTED
+                    ) galleryPermission.launch(Manifest.permission.WRITE_EXTERNAL_STORAGE)
+                    else launchConsent()
                 }
                 .setNeutralButton(local("App settings", "إعدادات التطبيق")) { _, _ ->
                     runCatching {
@@ -318,6 +329,13 @@ class ScreenCaptureActivity : AppCompatActivity() {
             .setNegativeButton(local("Cancel", "إلغاء")) { _, _ -> finish() }
             .setOnCancelListener { finish() }
             .show()
+    }
+
+    private val galleryPermission = registerForActivityResult(ActivityResultContracts.RequestPermission()) { allowed ->
+        if (allowed) launchConsent() else {
+            Toast.makeText(this, local("Storage permission required", "يلزم إذن التخزين للحفظ في الاستديو"), Toast.LENGTH_LONG).show()
+            finish()
+        }
     }
 
     private fun launchConsent() {
@@ -552,6 +570,7 @@ class ScreenCaptureService : Service() {
     private var normalTelegramShare = false
     private var shareAnyApp = false
     private var stampDateTime = false
+    private var galleryOnly = false
     private var routineId = ""
     private var routineName = ""
     private var routineStartedAtMs = 0L
@@ -621,6 +640,7 @@ class ScreenCaptureService : Service() {
         normalTelegramShare = intent?.getBooleanExtra(EXTRA_NORMAL_TELEGRAM_SHARE, false) == true
         shareAnyApp = intent?.getBooleanExtra(EXTRA_SHARE_ANY_APP, false) == true
         stampDateTime = intent?.getBooleanExtra(EXTRA_STAMP_DATE_TIME, false) == true
+        galleryOnly = intent?.getBooleanExtra(EXTRA_GALLERY_ONLY, false) == true
         routineId = intent?.getStringExtra(EXTRA_ROUTINE_ID).orEmpty()
         routineName = intent?.getStringExtra(EXTRA_ROUTINE_NAME).orEmpty()
         routineStartedAtMs = intent?.getLongExtra(EXTRA_ROUTINE_STARTED_AT_MS, System.currentTimeMillis()) ?: System.currentTimeMillis()
@@ -1114,6 +1134,7 @@ class ScreenCaptureService : Service() {
         const val EXTRA_NORMAL_TELEGRAM_SHARE = "normalTelegramShare"
         const val EXTRA_SHARE_ANY_APP = "shareAnyApp"
         const val EXTRA_STAMP_DATE_TIME = "stampDateTime"
+        const val EXTRA_GALLERY_ONLY = "galleryOnly"
         const val EXTRA_ROUTINE_ID = "routineId"
         const val EXTRA_ROUTINE_NAME = "routineName"
         const val EXTRA_ROUTINE_STARTED_AT_MS = "routineStartedAtMs"
