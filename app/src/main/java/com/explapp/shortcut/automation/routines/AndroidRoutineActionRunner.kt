@@ -136,12 +136,12 @@ class AndroidRoutineActionRunner(
             }
             val (file, temporary) = prepared.getOrThrow()
             try {
-                TelegramBotSender().sendDocument(token, destination, text, file)
+                TelegramBotSender(context).sendDocument(token, destination, text, file)
             } finally {
                 if (temporary) file.delete()
             }
         } else {
-            TelegramBotSender().sendText(token, destination, text)
+            TelegramBotSender(context).sendText(token, destination, text)
         }
         return result.exceptionOrNull()?.let {
             RoutineActionResult.failure(
