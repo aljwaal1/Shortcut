@@ -35,6 +35,7 @@ import android.os.SystemClock
 import android.widget.Toast
 import android.widget.LinearLayout
 import android.widget.TextView
+import android.widget.EditText
 import android.view.View
 import androidx.appcompat.app.AlertDialog
 import androidx.activity.result.contract.ActivityResultContracts
@@ -63,6 +64,7 @@ class ScreenCaptureActivity : AppCompatActivity() {
     private var galleryOnly: Boolean = false
     private var persistentStartOnly: Boolean = false
     private var stampDateTime: Boolean = false
+    private var stampName: String = ""
     private var routineId: String = ""
     private var routineName: String = ""
     private var routineStartedAtMs: Long = 0L
@@ -129,6 +131,7 @@ class ScreenCaptureActivity : AppCompatActivity() {
                 .putExtra(ScreenCaptureService.EXTRA_NORMAL_TELEGRAM_SHARE, normalTelegramShare)
                 .putExtra(ScreenCaptureService.EXTRA_SHARE_ANY_APP, shareAnyApp)
                 .putExtra(ScreenCaptureService.EXTRA_STAMP_DATE_TIME, stampDateTime)
+                .putExtra(ScreenCaptureService.EXTRA_STAMP_NAME, stampName)
                 .putExtra(ScreenCaptureService.EXTRA_GALLERY_ONLY, galleryOnly)
                 .putExtra(ScreenCaptureService.EXTRA_ROUTINE_ID, routineId)
                 .putExtra(ScreenCaptureService.EXTRA_ROUTINE_NAME, routineName)
@@ -165,6 +168,7 @@ class ScreenCaptureActivity : AppCompatActivity() {
         shareAnyApp = intent.getBooleanExtra(EXTRA_SHARE_ANY_APP, false)
         persistentStartOnly = intent.getBooleanExtra(EXTRA_PERSISTENT_START_ONLY, false)
         stampDateTime = intent.getBooleanExtra(EXTRA_STAMP_DATE_TIME, false)
+        stampName = intent.getStringExtra(EXTRA_STAMP_NAME).orEmpty()
         routineId = intent.getStringExtra(EXTRA_ROUTINE_ID).orEmpty()
         routineName = intent.getStringExtra(EXTRA_ROUTINE_NAME).orEmpty()
         routineStartedAtMs = System.currentTimeMillis()
@@ -269,11 +273,18 @@ class ScreenCaptureActivity : AppCompatActivity() {
             manualCard.setOnClickListener { deliveryMode = 1; repaint() }
             galleryCard.setOnClickListener { deliveryMode = 2; repaint() }
             repaint()
+            val stampInput = EditText(this).apply {
+                hint = local("Optional name (blank = date only)", "الاسم (اختياري؛ اتركه فارغًا للتاريخ فقط)")
+                setSingleLine(true)
+                setText(stampName)
+            }
+            content.addView(stampInput)
             AlertDialog.Builder(this)
                 .setTitle(local("Screenshot delivery", "طريقة مشاركة لقطة الشاشة"))
                 .setView(content)
                 .setPositiveButton(local("Allow and capture", "السماح والتقاط الشاشة")) { _, _ ->
                     stampDateTime = true
+                    stampName = stampInput.text.toString().trim().take(80)
                     galleryOnly = deliveryMode == 2
                     if (deliveryMode == 0 && hasBot) {
                         shareAnyApp = false
@@ -552,6 +563,7 @@ class ScreenCaptureActivity : AppCompatActivity() {
         const val EXTRA_SHARE_ANY_APP = "share_any_app"
         const val EXTRA_PERSISTENT_START_ONLY = "persistent_start_only"
         const val EXTRA_STAMP_DATE_TIME = "stamp_date_time"
+        const val EXTRA_STAMP_NAME = "stamp_name"
         const val EXTRA_ROUTINE_ID = "routine_id"
         const val EXTRA_ROUTINE_NAME = "routine_name"
         private const val DEFAULT_CAPTURE_DELAY_MS = 3_000L
@@ -570,6 +582,7 @@ class ScreenCaptureService : Service() {
     private var normalTelegramShare = false
     private var shareAnyApp = false
     private var stampDateTime = false
+    private var stampName = ""
     private var galleryOnly = false
     private var routineId = ""
     private var routineName = ""
@@ -640,6 +653,7 @@ class ScreenCaptureService : Service() {
         normalTelegramShare = intent?.getBooleanExtra(EXTRA_NORMAL_TELEGRAM_SHARE, false) == true
         shareAnyApp = intent?.getBooleanExtra(EXTRA_SHARE_ANY_APP, false) == true
         stampDateTime = intent?.getBooleanExtra(EXTRA_STAMP_DATE_TIME, false) == true
+        stampName = intent?.getStringExtra(EXTRA_STAMP_NAME).orEmpty()
         galleryOnly = intent?.getBooleanExtra(EXTRA_GALLERY_ONLY, false) == true
         routineId = intent?.getStringExtra(EXTRA_ROUTINE_ID).orEmpty()
         routineName = intent?.getStringExtra(EXTRA_ROUTINE_NAME).orEmpty()
@@ -696,7 +710,7 @@ class ScreenCaptureService : Service() {
             lastCandidate = null
             val file = File(cacheDir, "capture_${System.currentTimeMillis()}.png")
             val saved = runCatching {
-                if (stampDateTime) ScreenshotStamp.apply(bitmap)
+                if (stampDateTime) ScreenshotStamp.apply(bitmap, name = stampName)
                 FileOutputStream(file).use { output ->
                     check(bitmap.compress(Bitmap.CompressFormat.PNG, 100, output)) {
                         "PNG encoding failed"
@@ -1198,6 +1212,7 @@ class ScreenCaptureService : Service() {
         const val EXTRA_NORMAL_TELEGRAM_SHARE = "normalTelegramShare"
         const val EXTRA_SHARE_ANY_APP = "shareAnyApp"
         const val EXTRA_STAMP_DATE_TIME = "stampDateTime"
+        const val EXTRA_STAMP_NAME = "stampName"
         const val EXTRA_GALLERY_ONLY = "galleryOnly"
         const val EXTRA_ROUTINE_ID = "routineId"
         const val EXTRA_ROUTINE_NAME = "routineName"
