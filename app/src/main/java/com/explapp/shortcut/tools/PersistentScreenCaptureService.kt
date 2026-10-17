@@ -174,7 +174,7 @@ class PersistentScreenCaptureService : Service() {
                 val shareAnyApp = pendingShareAnyApp
                 if (token.isNotBlank() && chatId.isNotBlank()) {
                     Thread {
-                        val sent = TelegramBotSender().sendPhoto(token, chatId, caption, file)
+                        val sent = TelegramBotSender(this@PersistentScreenCaptureService).sendPhoto(token, chatId, caption, file)
                         file.delete()
                         notifyResult(
                             saved = saved.isSuccess,
