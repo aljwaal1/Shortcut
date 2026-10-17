@@ -1121,11 +1121,23 @@ class ScreenCaptureService : Service() {
                     )
                 }
                 file.delete()
+                val viewPending = savedUri?.let { imageUri ->
+                    val view = Intent(Intent.ACTION_VIEW).apply {
+                        setDataAndType(imageUri, "image/png")
+                        addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_ACTIVITY_NEW_TASK)
+                    }
+                    PendingIntent.getActivity(
+                        this, 8837, view,
+                        PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
+                    )
+                }
                 showResultNotification(
                     if (savedUri != null) local("Screenshot saved", "تم حفظ لقطة الشاشة")
                     else local("Screenshot failed", "فشل حفظ لقطة الشاشة"),
                     if (savedUri != null) local("The target app screenshot was saved.", "تم حفظ لقطة شاشة التطبيق.")
                     else local("Could not save the screenshot.", "تعذر حفظ لقطة الشاشة."),
+                    viewPending,
+                    local("View image", "عرض الصورة"),
                 )
                 stopForeground(STOP_FOREGROUND_REMOVE)
                 stopSelf()
@@ -1149,7 +1161,7 @@ class ScreenCaptureService : Service() {
         TaskExecutionReporter(applicationContext).report(result)
     }
 
-    private fun showResultNotification(title: String, text: String, pending: PendingIntent? = null) {
+    private fun showResultNotification(title: String, text: String, pending: PendingIntent? = null, actionLabel: String = local("Share image now", "مشاركة الصورة الآن")) {
         val manager = getSystemService(NotificationManager::class.java)
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             manager.createNotificationChannel(
@@ -1165,7 +1177,7 @@ class ScreenCaptureService : Service() {
             builder.setContentIntent(pending)
                 .addAction(
                     android.R.drawable.ic_menu_share,
-                    local("Share image now", "مشاركة الصورة الآن"),
+                    actionLabel,
                     pending,
                 )
                 .setPriority(NotificationCompat.PRIORITY_HIGH)
