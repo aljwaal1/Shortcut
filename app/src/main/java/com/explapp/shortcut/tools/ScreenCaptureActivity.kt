@@ -1147,7 +1147,32 @@ class ScreenCaptureService : Service() {
             .setContentTitle(title)
             .setContentText(text.take(180))
             .setAutoCancel(true)
-        if (pending != null) builder.setContentIntent(pending)
+        if (pending != null) {
+            builder.setContentIntent(pending)
+                .addAction(
+                    android.R.drawable.ic_menu_share,
+                    local("Share image now", "مشاركة الصورة الآن"),
+                    pending,
+                )
+                .setPriority(NotificationCompat.PRIORITY_HIGH)
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                manager.createNotificationChannel(
+                    NotificationChannel("screenshot_share_actions", local("Screenshot sharing", "مشاركة لقطات الشاشة"), NotificationManager.IMPORTANCE_HIGH),
+                )
+                builder.setChannelId("screenshot_share_actions")
+            }
+        }
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
+            ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED
+        ) {
+            // The screenshot remains saved, but Android disallows the share notification.
+            reportAutomationScreenshot(
+                status = TaskExecutionStatus.FAILURE,
+                reason = "Notification permission is denied; cannot present the share action",
+                details = listOf("SHARE_NOTIFICATION = BLOCKED", "POST_NOTIFICATIONS = DENIED"),
+            )
+            return
+        }
         manager.notify(RESULT_NOTIFICATION_ID, builder.build())
     }
 
