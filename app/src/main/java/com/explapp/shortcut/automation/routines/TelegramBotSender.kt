@@ -1,5 +1,7 @@
 package com.explapp.shortcut.automation.routines
 
+import android.content.Context
+import java.security.MessageDigest
 import java.io.DataOutputStream
 import java.io.File
 import java.net.HttpURLConnection
@@ -8,7 +10,22 @@ import java.net.URLEncoder
 import java.nio.charset.StandardCharsets
 import org.json.JSONObject
 
-class TelegramBotSender {
+class TelegramBotSender(private val context: Context? = null) {
+    private fun cacheKey(token: String, username: String): String {
+        val hash = MessageDigest.getInstance("SHA-256").digest(token.trim().toByteArray(StandardCharsets.UTF_8))
+            .joinToString("") { "%02x".format(it) }.take(24)
+        return "$hash:${username.lowercase(java.util.Locale.ROOT)}"
+    }
+    private fun cachedChat(token: String, username: String): String? =
+        context?.getSharedPreferences("telegram_recipient_chat_cache", Context.MODE_PRIVATE)
+            ?.getString(cacheKey(token, username), null)
+    private fun cacheChat(token: String, username: String, id: String) {
+        if (id.matches(Regex("-?\\d+"))) {
+            context?.getSharedPreferences("telegram_recipient_chat_cache", Context.MODE_PRIVATE)
+                ?.edit()?.putString(cacheKey(token, username), id)?.apply()
+        }
+    }
+
     fun validateBot(token: String): Result<Unit> = runCatching {
         val cleanToken = token.trim()
         require(cleanToken.isNotBlank()) { "Bot token is required" }
@@ -49,6 +66,7 @@ class TelegramBotSender {
         require(username.isNotBlank()) { "Telegram username is required" }
 
         val publicHandle = "@$username"
+        cachedChat(cleanToken, username)?.let { return@runCatching it }
         val direct = runCatching {
             val connection = open(
                 "https://api.telegram.org/bot$cleanToken/getChat?chat_id=" + enc(publicHandle),
@@ -93,7 +111,10 @@ class TelegramBotSender {
                 }
                 if (foundUsername.equals(username, ignoreCase = true)) {
                     val id = chat?.optLong("id", 0L) ?: 0L
-                    if (id != 0L) return@runCatching id.toString()
+                    if (id != 0L) {
+                        cacheChat(cleanToken, username, id.toString())
+                        return@runCatching id.toString()
+                    }
                 }
             }
         }
