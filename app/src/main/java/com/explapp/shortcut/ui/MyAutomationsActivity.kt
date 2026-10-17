@@ -776,7 +776,7 @@ private fun DailyScreenshotTelegramWizard(
                 Button(
                     onClick = {
                         Thread {
-                            val sender = TelegramBotSender()
+                            val sender = TelegramBotSender(context)
                             val normalized = normalizedTelegramDestination(chatId)
                             val destination = sender.validateDestination(botToken.trim(), normalized)
                             val result = if (destination.isSuccess) {
