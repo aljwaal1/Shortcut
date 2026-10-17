@@ -9,9 +9,11 @@ import java.util.Date
 import java.util.Locale
 
 object ScreenshotStamp {
-    fun apply(bitmap: Bitmap, nowMs: Long = System.currentTimeMillis()) {
+    fun apply(bitmap: Bitmap, nowMs: Long = System.currentTimeMillis(), name: String = "") {
         val canvas = Canvas(bitmap)
-        val label = SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.US).format(Date(nowMs))
+        val date = SimpleDateFormat("yyyy-MM-dd", Locale.US).format(Date(nowMs))
+        val safeName = name.trim().replace(Regex("[\\r\\n\\t]"), " ").take(80)
+        val label = if (safeName.isBlank()) date else "$safeName | $date"
         val density = bitmap.width.coerceAtLeast(1) / 1080f
         val textSize = (34f * density).coerceIn(22f, 52f)
         val padding = (18f * density).coerceIn(12f, 28f)
