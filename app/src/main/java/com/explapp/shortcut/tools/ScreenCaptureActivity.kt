@@ -18,6 +18,8 @@ import android.content.pm.ServiceInfo
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.graphics.PixelFormat
+import android.graphics.Color
+import android.graphics.drawable.GradientDrawable
 import android.hardware.display.DisplayManager
 import android.media.ImageReader
 import android.media.projection.MediaProjection
@@ -31,6 +33,9 @@ import android.os.IBinder
 import android.os.HandlerThread
 import android.os.SystemClock
 import android.widget.Toast
+import android.widget.LinearLayout
+import android.widget.TextView
+import android.view.View
 import androidx.appcompat.app.AlertDialog
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
@@ -194,27 +199,89 @@ class ScreenCaptureActivity : AppCompatActivity() {
                 packageManager.getApplicationLabel(info).toString()
             }.getOrDefault(packageNameToOpen)
 
-            AlertDialog.Builder(this)
-                .setTitle(local("Allow screen capture and sharing", "تفعيل تصوير الشاشة والمشاركة"))
-                .setMessage(
-                    local(
-                        "Before using this feature, Android must approve screen capture. On Android 14+, select ENTIRE SCREEN (not only Shortcut's window), then tap Start now. Shortcut will open $appLabel and wait ${captureDelayMs / 1000.0} seconds. Enable sharing below if you want to send the screenshot. The share destination may require your confirmation.",
-                        "قبل استخدام الميزة، يجب السماح بتصوير الشاشة من نافذة نظام أندرويد. اختر «الشاشة بالكامل» وليس «نافذة Shortcut فقط»، ثم اضغط «ابدأ الآن». سيفتح التطبيق $appLabel وينتظر ${captureDelayMs / 1000.0} ثانية. فعّل المشاركة أدناه إذا أردت إرسال الصورة؛ وقد تحتاج إلى تأكيد وجهة المشاركة.",
-                    ),
+            // The delivery choice is made before requesting the system capture permission.
+            // Automatic delivery is available only for a configured Telegram bot; ordinary
+            // messaging apps cannot be made to send a message without their user consent.
+            val hasBot = telegramBotToken.isNotBlank() && telegramChatId.isNotBlank()
+            var automatic = hasBot && !shareAnyApp && !normalTelegramShare
+            val density = resources.displayMetrics.density
+            fun dp(value: Int) = (value * density + 0.5f).toInt()
+            val content = LinearLayout(this).apply {
+                orientation = LinearLayout.VERTICAL
+                setPadding(dp(20), dp(10), dp(20), dp(6))
+            }
+            val explanation = TextView(this).apply {
+                text = local(
+                    "Approve full-screen capture in Android. $appLabel will open, then a dated screenshot will be taken after ${captureDelayMs / 1000.0} seconds. Choose how to deliver it:",
+                    "اسمح بتصوير الشاشة بالكامل من أندرويد. سيفتح $appLabel، ثم تُلتقط الصورة بعد ${captureDelayMs / 1000.0} ثانية مع ختم التاريخ والوقت. اختر طريقة إرسالها:",
                 )
-                .setMultiChoiceItems(
-                    arrayOf(local("Share screenshot after saving", "مشاركة الصورة بعد حفظها")),
-                    booleanArrayOf(shareAnyApp),
-                ) { _, _, enabled ->
-                    shareAnyApp = enabled
+                textSize = 14f
+                setPadding(0, 0, 0, dp(12))
+            }
+            content.addView(explanation)
+            fun deliveryCard(title: String, description: String): TextView = TextView(this).apply {
+                text = "$title\\n$description"
+                textSize = 15f
+                setPadding(dp(16), dp(14), dp(16), dp(14))
+                isClickable = true
+                isFocusable = true
+                val params = LinearLayout.LayoutParams(-1, -2)
+                params.bottomMargin = dp(10)
+                content.addView(this, params)
+            }
+            val autoCard = deliveryCard(
+                local("1. Automatic sending", "١. إرسال تلقائي"),
+                local("Send by configured Telegram bot, without opening the share sheet.", "إرسال عبر بوت تيليجرام المهيأ، دون فتح قائمة المشاركة."),
+            )
+            val manualCard = deliveryCard(
+                local("2. Open another app", "٢. فتح تطبيق آخر"),
+                local("Open the share sheet with the dated screenshot attached; you confirm Send.", "فتح تطبيق آخر والصورة المختومة مرفقة؛ تؤكد الإرسال بنفسك."),
+            )
+            fun repaint() {
+                listOf(autoCard, manualCard).forEachIndexed { index, card ->
+                    val selected = if (index == 0) automatic else !automatic
+                    card.background = GradientDrawable().apply {
+                        cornerRadius = dp(12).toFloat()
+                        setColor(if (selected) 0x193F8FCE else 0x12000000)
+                        setStroke(dp(if (selected) 2 else 1), if (selected) 0xFF277DC0.toInt() else 0xFF999999.toInt())
+                    }
+                    card.alpha = if (index == 0 && !hasBot) 0.65f else 1f
                 }
-                .setPositiveButton(local("Grant permission and capture", "السماح والتقاط الشاشة")) { _, _ -> launchConsent() }
+            }
+            autoCard.setOnClickListener {
+                if (!hasBot) {
+                    Toast.makeText(
+                        this,
+                        local("Set Telegram bot token and chat ID in the routine to enable automatic sending", "أدخل رمز بوت تيليجرام ومعرّف المحادثة في الاختصار لتفعيل الإرسال التلقائي"),
+                        Toast.LENGTH_LONG,
+                    ).show()
+                } else {
+                    automatic = true
+                    repaint()
+                }
+            }
+            manualCard.setOnClickListener { automatic = false; repaint() }
+            repaint()
+            AlertDialog.Builder(this)
+                .setTitle(local("Screenshot delivery", "طريقة مشاركة لقطة الشاشة"))
+                .setView(content)
+                .setPositiveButton(local("Allow and capture", "السماح والتقاط الشاشة")) { _, _ ->
+                    stampDateTime = true
+                    if (automatic && hasBot) {
+                        shareAnyApp = false
+                        normalTelegramShare = false
+                    } else {
+                        telegramBotToken = ""
+                        telegramChatId = ""
+                        normalTelegramShare = false
+                        shareAnyApp = true
+                    }
+                    launchConsent()
+                }
                 .setNeutralButton(local("App settings", "إعدادات التطبيق")) { _, _ ->
                     runCatching {
-                        startActivity(
-                            Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS)
-                                .setData(Uri.parse("package:$packageName")),
-                        )
+                        startActivity(Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS)
+                            .setData(Uri.parse("package:$packageName")))
                     }.onFailure {
                         Toast.makeText(this, local("Could not open app settings", "تعذر فتح إعدادات التطبيق"), Toast.LENGTH_LONG).show()
                     }
