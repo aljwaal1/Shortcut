@@ -650,7 +650,11 @@ class ScreenCaptureService : Service() {
 
     private fun capture(resultCode: Int, data: Intent, delayMs: Long) {
         val manager = getSystemService(MediaProjectionManager::class.java)
-        val p = manager.getMediaProjection(resultCode, data)
+        val p = runCatching { manager.getMediaProjection(resultCode, data) }.getOrElse { error ->
+            lastCaptureFailureReason = "MediaProjection request rejected: ${error.message}"
+            complete(null)
+            return
+        }
         if (p == null) {
             lastFramesSeen = 0
             lastCaptureFailureReason = "MediaProjection was unavailable"
@@ -667,7 +671,6 @@ class ScreenCaptureService : Service() {
         var completed = false
         val captureAfterMs = SystemClock.uptimeMillis() + delayMs
         val readyAtMs = captureAfterMs + 350L
-        val forceAcceptAtMs = captureAfterMs + 2_500L
         val failAtMs = captureAfterMs + 12_000L
         var framesSeen = 0
         var lastCandidate: Bitmap? = null
@@ -770,16 +773,24 @@ class ScreenCaptureService : Service() {
             finishWithBitmap(cropped)
         }, handler)
 
-        display = p.createVirtualDisplay(
-            "ShortcutScreenshot",
-            width,
-            height,
-            metrics.densityDpi,
-            DisplayManager.VIRTUAL_DISPLAY_FLAG_AUTO_MIRROR,
-            reader.surface,
-            null,
-            handler,
-        )
+        display = runCatching {
+            p.createVirtualDisplay(
+                "ShortcutScreenshot",
+                width,
+                height,
+                metrics.densityDpi,
+                DisplayManager.VIRTUAL_DISPLAY_FLAG_AUTO_MIRROR,
+                reader.surface,
+                null,
+                handler,
+            )
+        }.getOrElse { error ->
+            completed = true
+            lastCaptureFailureReason = "Virtual display creation failed: ${error.message}"
+            cleanup()
+            complete(null)
+            return
+        }
 
         if (display == null) {
             lastCaptureFailureReason = "Virtual display could not be created"
@@ -870,6 +881,7 @@ class ScreenCaptureService : Service() {
                 put(android.provider.MediaStore.MediaColumns.DISPLAY_NAME, name)
                 put(android.provider.MediaStore.MediaColumns.MIME_TYPE, "image/png")
                 put(android.provider.MediaStore.MediaColumns.RELATIVE_PATH, "Pictures/Shortcut Screenshots")
+                put(android.provider.MediaStore.MediaColumns.IS_PENDING, 1)
             }
             return requireNotNull(contentResolver.insert(android.provider.MediaStore.Images.Media.EXTERNAL_CONTENT_URI, values))
         }
@@ -914,6 +926,14 @@ class ScreenCaptureService : Service() {
                 contentResolver.openOutputStream(uri).use { out ->
                     requireNotNull(out)
                     file.inputStream().use { it.copyTo(out) }
+                }
+            }
+            if (galleryOnly && Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                val published = android.content.ContentValues().apply {
+                    put(android.provider.MediaStore.MediaColumns.IS_PENDING, 0)
+                }
+                check(contentResolver.update(uri, published, null, null) > 0) {
+                    "Failed to publish screenshot to gallery"
                 }
             }
             // Verify the image contents rather than relying on a MediaStore URI.
