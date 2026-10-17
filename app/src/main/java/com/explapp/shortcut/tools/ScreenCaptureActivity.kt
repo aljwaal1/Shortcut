@@ -254,7 +254,18 @@ class ScreenCaptureActivity : AppCompatActivity() {
     }
 
     private fun launchConsent() {
-        consent.launch(getSystemService(MediaProjectionManager::class.java).createScreenCaptureIntent())
+        val manager = getSystemService(MediaProjectionManager::class.java)
+        // Android 14+ defaults to a single-app selector. This routine launches another
+        // application after consent, so capturing Shortcut's own window produces blanks.
+        // Ask Android for the whole display instead; the system still requires consent.
+        val request = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
+            manager.createScreenCaptureIntent(
+                android.media.projection.MediaProjectionConfig.createConfigForDefaultDisplay(),
+            )
+        } else {
+            manager.createScreenCaptureIntent()
+        }
+        consent.launch(request)
     }
 
     override fun onDestroy() {
