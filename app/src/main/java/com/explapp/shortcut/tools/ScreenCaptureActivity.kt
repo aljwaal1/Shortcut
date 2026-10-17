@@ -25,6 +25,7 @@ import android.media.projection.MediaProjectionManager
 import android.net.Uri
 import android.os.Build
 import android.os.Bundle
+import android.provider.Settings
 import android.os.Handler
 import android.os.IBinder
 import android.os.HandlerThread
@@ -194,14 +195,31 @@ class ScreenCaptureActivity : AppCompatActivity() {
             }.getOrDefault(packageNameToOpen)
 
             AlertDialog.Builder(this)
-                .setTitle(local("Open app + screenshot", "فتح تطبيق + لقطة شاشة"))
+                .setTitle(local("Allow screen capture and sharing", "تفعيل تصوير الشاشة والمشاركة"))
                 .setMessage(
                     local(
-                        "Shortcut will ask Android for screen-capture permission, open $appLabel, wait ${captureDelayMs / 1000.0} seconds, take ONE screenshot of the whole visible screen, then stop automatically.",
-                        "سيطلب Shortcut موافقة Android على تصوير الشاشة، ثم يفتح $appLabel، وينتظر ${captureDelayMs / 1000.0} ثانية، ثم يلتقط صورة شاشة واحدة كاملة ويتوقف تلقائيًا.",
+                        "Before using this feature, Android must approve screen capture. On Android 14+, select ENTIRE SCREEN (not only Shortcut's window), then tap Start now. Shortcut will open $appLabel and wait ${captureDelayMs / 1000.0} seconds. Enable sharing below if you want to send the screenshot. The share destination may require your confirmation.",
+                        "قبل استخدام الميزة، يجب السماح بتصوير الشاشة من نافذة نظام أندرويد. اختر «الشاشة بالكامل» وليس «نافذة Shortcut فقط»، ثم اضغط «ابدأ الآن». سيفتح التطبيق $appLabel وينتظر ${captureDelayMs / 1000.0} ثانية. فعّل المشاركة أدناه إذا أردت إرسال الصورة؛ وقد تحتاج إلى تأكيد وجهة المشاركة.",
                     ),
                 )
-                .setPositiveButton(local("Continue", "متابعة")) { _, _ -> launchConsent() }
+                .setMultiChoiceItems(
+                    arrayOf(local("Share screenshot after saving", "مشاركة الصورة بعد حفظها")),
+                    booleanArrayOf(shareAnyApp),
+                ) { _, _, enabled ->
+                    shareAnyApp = enabled
+                }
+                .setPositiveButton(local("Grant permission and capture", "السماح والتقاط الشاشة")) { _, _ -> launchConsent() }
+                .setNeutralButton(local("App settings", "إعدادات التطبيق")) { _, _ ->
+                    runCatching {
+                        startActivity(
+                            Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS)
+                                .setData(Uri.parse("package:$packageName")),
+                        )
+                    }.onFailure {
+                        Toast.makeText(this, local("Could not open app settings", "تعذر فتح إعدادات التطبيق"), Toast.LENGTH_LONG).show()
+                    }
+                    finish()
+                }
                 .setNegativeButton(local("Cancel", "إلغاء")) { _, _ -> finish() }
                 .setOnCancelListener { finish() }
                 .show()
