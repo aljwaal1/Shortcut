@@ -611,29 +611,46 @@ class ScreenCaptureService : Service() {
             val image = imageReader.acquireLatestImage() ?: return@setOnImageAvailableListener
             framesSeen++
             lastFramesSeen = framesSeen
-            if (SystemClock.uptimeMillis() < captureAfterMs || framesSeen == 1 || SystemClock.uptimeMillis() < readyAtMs) {
+            if (SystemClock.uptimeMillis() < captureAfterMs) {
                 image.close()
                 return@setOnImageAvailableListener
             }
-            val plane = image.planes[0]
-            val pixelStride = plane.pixelStride
-            val rowStride = plane.rowStride
-            val rowPadding = rowStride - pixelStride * width
-            val paddedWidth = width + rowPadding / pixelStride
-            val padded = Bitmap.createBitmap(paddedWidth, height, Bitmap.Config.ARGB_8888)
-            padded.copyPixelsFromBuffer(plane.buffer)
-            val cropped = Bitmap.createBitmap(padded, 0, 0, width, height)
-            padded.recycle()
-            image.close()
+            // Always release ImageReader frames, even if conversion fails on a device.
+            // Keeping an acquired image open can stall the entire capture pipeline.
+            val cropped = try {
+                val plane = image.planes[0]
+                val pixelStride = plane.pixelStride
+                val rowStride = plane.rowStride
+                check(pixelStride > 0 && rowStride >= pixelStride * width)
+                val paddedWidth = rowStride / pixelStride
+                val padded = Bitmap.createBitmap(paddedWidth, height, Bitmap.Config.ARGB_8888)
+                try {
+                    padded.copyPixelsFromBuffer(plane.buffer)
+                    Bitmap.createBitmap(padded, 0, 0, width, height)
+                } finally {
+                    padded.recycle()
+                }
+            } catch (error: Exception) {
+                lastCaptureFailureReason = "Frame conversion failed: ${error.message}"
+                null
+            } finally {
+                image.close()
+            }
+            if (cropped == null) return@setOnImageAvailableListener
 
             val sample = sampleCenterGrid(cropped)
             val likelyBlank = ScreenFrameReadiness.isLikelyBlank(sample)
-            if (likelyBlank && SystemClock.uptimeMillis() < forceAcceptAtMs) {
+            if (likelyBlank) {
+                lastCandidate?.recycle()
+                lastCandidate = cropped
+                // A blank frame is not proof of the requested app's screenshot.
+                return@setOnImageAvailableListener
+            }
+            if (SystemClock.uptimeMillis() < readyAtMs) {
                 lastCandidate?.recycle()
                 lastCandidate = cropped
                 return@setOnImageAvailableListener
             }
-
             finishWithBitmap(cropped)
         }, handler)
 
@@ -670,7 +687,17 @@ class ScreenCaptureService : Service() {
                 val fallback = lastCandidate
                 if (fallback != null) {
                     lastCandidate = null
-                    finishWithBitmap(fallback, fallback = true)
+                    // Never count an unverified blank frame as a successful screenshot.
+                    val sample = sampleCenterGrid(fallback)
+                    if (ScreenFrameReadiness.isLikelyBlank(sample)) {
+                        fallback.recycle()
+                        completed = true
+                        lastCaptureFailureReason = "Only blank or protected screen frames were received"
+                        cleanup()
+                        complete(null)
+                    } else {
+                        finishWithBitmap(fallback, fallback = true)
+                    }
                 } else {
                     completed = true
                     lastCaptureFailureReason = if (framesSeen == 0) {
