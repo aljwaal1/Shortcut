@@ -8,6 +8,13 @@ import com.explapp.shortcut.automation.routines.RoutineStore
 import com.explapp.shortcut.data.MessageStore
 import com.explapp.shortcut.data.ShortcutStore
 import java.time.ZonedDateTime
+import androidx.work.BackoffPolicy
+import androidx.work.ExistingWorkPolicy
+import androidx.work.OneTimeWorkRequestBuilder
+import androidx.work.WorkManager
+import androidx.work.Worker
+import androidx.work.WorkerParameters
+import java.util.concurrent.TimeUnit
 
 class RestoreSchedulesReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent?) {
@@ -17,46 +24,61 @@ class RestoreSchedulesReceiver : BroadcastReceiver() {
         val appContext = context.applicationContext
         Thread {
             try {
-                val now = ZonedDateTime.now()
-
-                val shortcutStore = ShortcutStore(appContext)
-                val storedShortcuts = shortcutStore.load()
-                val reconciledShortcuts = RestorePolicy.pauseExpiredOneShots(now, storedShortcuts)
-                if (reconciledShortcuts != storedShortcuts) shortcutStore.save(reconciledShortcuts)
-                val appScheduler = AndroidAlarmScheduler(appContext)
-                val shortcutIdsToSchedule = RestorePolicy.shortcuts(reconciledShortcuts).map { it.id }.toSet()
-                val restoredShortcuts = reconciledShortcuts.map { item ->
-                    if (item.id !in shortcutIdsToSchedule) item
-                    else if (appScheduler.schedule(item)) item
-                    else item
-                }
-                if (restoredShortcuts != reconciledShortcuts) shortcutStore.save(restoredShortcuts)
-
-                val messageStore = MessageStore(appContext)
-                val storedMessages = messageStore.load()
-                val reconciledMessages = RestorePolicy.pauseExpiredMessageOneShots(now, storedMessages)
-                if (reconciledMessages != storedMessages) messageStore.save(reconciledMessages)
-                val messageScheduler = AndroidMessageScheduler(appContext)
-                val messageIdsToSchedule = RestorePolicy.messages(reconciledMessages).map { it.id }.toSet()
-                val restoredMessages = reconciledMessages.map { item ->
-                    if (item.id !in messageIdsToSchedule) item
-                    else if (messageScheduler.schedule(item)) item
-                    else item
-                }
-                if (restoredMessages != reconciledMessages) messageStore.save(restoredMessages)
-
-                val routineStore = RoutineStore(appContext)
-                val routineScheduler = RoutineScheduler(appContext)
-                val routines = routineStore.load()
-                val restoredRoutines = routines.map { item ->
-                    if (!item.isEnabled || !item.isValid()) item
-                    else if (routineScheduler.schedule(item)) item
-                    else item
-                }
-                if (restoredRoutines != routines) routineStore.save(restoredRoutines)
+                val restored = runCatching { ScheduleRestore.perform(appContext) }.getOrDefault(false)
+                if (!restored) ScheduleRestore.enqueueRetry(appContext)
             } finally {
                 pendingResult.finish()
             }
         }.start()
     }
+}
+
+internal object ScheduleRestore {
+    private const val RETRY_NAME = "shortcut-restore-schedules"
+    fun perform(context: Context): Boolean {
+        val now = ZonedDateTime.now()
+        var allScheduled = true
+        val shortcutStore = ShortcutStore(context)
+        val originalShortcuts = shortcutStore.load()
+        val shortcuts = RestorePolicy.pauseExpiredOneShots(now, originalShortcuts)
+        if (shortcuts != originalShortcuts) shortcutStore.save(shortcuts)
+        val shortcutScheduler = AndroidAlarmScheduler(context)
+        val ids = RestorePolicy.shortcuts(shortcuts).map { it.id }.toSet()
+        shortcuts.filter { it.id in ids }.forEach {
+            if (!shortcutScheduler.schedule(it)) allScheduled = false
+        }
+        val messageStore = MessageStore(context)
+        val originalMessages = messageStore.load()
+        val messages = RestorePolicy.pauseExpiredMessageOneShots(now, originalMessages)
+        if (messages != originalMessages) messageStore.save(messages)
+        val messageScheduler = AndroidMessageScheduler(context)
+        val messageIds = RestorePolicy.messages(messages).map { it.id }.toSet()
+        messages.filter { it.id in messageIds }.forEach {
+            if (!messageScheduler.schedule(it)) allScheduled = false
+        }
+        val routineScheduler = RoutineScheduler(context)
+        RoutineStore(context).load().filter { it.isEnabled && it.isValid() }.forEach {
+            if (!routineScheduler.schedule(it)) allScheduled = false
+        }
+        return allScheduled
+    }
+
+    fun enqueueRetry(context: Context) {
+        val request = OneTimeWorkRequestBuilder<ScheduleRestoreWorker>()
+            .setInitialDelay(15, TimeUnit.MINUTES)
+            .setBackoffCriteria(BackoffPolicy.EXPONENTIAL, 15, TimeUnit.MINUTES)
+            .build()
+        WorkManager.getInstance(context).enqueueUniqueWork(
+            RETRY_NAME, ExistingWorkPolicy.KEEP, request,
+        )
+    }
+}
+
+class ScheduleRestoreWorker(context: Context, parameters: WorkerParameters) : Worker(context, parameters) {
+    override fun doWork(): Result =
+        if (runCatching { ScheduleRestore.perform(applicationContext) }.getOrDefault(false)) {
+            Result.success()
+        } else {
+            Result.retry()
+        }
 }
