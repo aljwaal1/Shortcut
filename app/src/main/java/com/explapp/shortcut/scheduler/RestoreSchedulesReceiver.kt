@@ -28,7 +28,7 @@ class RestoreSchedulesReceiver : BroadcastReceiver() {
                 val restoredShortcuts = reconciledShortcuts.map { item ->
                     if (item.id !in shortcutIdsToSchedule) item
                     else if (appScheduler.schedule(item)) item
-                    else item.copy(isEnabled = false)
+                    else item
                 }
                 if (restoredShortcuts != reconciledShortcuts) shortcutStore.save(restoredShortcuts)
 
@@ -41,7 +41,7 @@ class RestoreSchedulesReceiver : BroadcastReceiver() {
                 val restoredMessages = reconciledMessages.map { item ->
                     if (item.id !in messageIdsToSchedule) item
                     else if (messageScheduler.schedule(item)) item
-                    else item.copy(isEnabled = false)
+                    else item
                 }
                 if (restoredMessages != reconciledMessages) messageStore.save(restoredMessages)
 
@@ -51,7 +51,7 @@ class RestoreSchedulesReceiver : BroadcastReceiver() {
                 val restoredRoutines = routines.map { item ->
                     if (!item.isEnabled || !item.isValid()) item
                     else if (routineScheduler.schedule(item)) item
-                    else item.copy(isEnabled = false)
+                    else item
                 }
                 if (restoredRoutines != routines) routineStore.save(restoredRoutines)
             } finally {
