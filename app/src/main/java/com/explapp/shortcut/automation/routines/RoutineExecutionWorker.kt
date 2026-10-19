@@ -43,7 +43,7 @@ class RoutineExecutionWorker(
 
     override suspend fun doWork(): Result = withContext(Dispatchers.IO) {
         val routineId = inputData.getString(KEY_ROUTINE_ID).orEmpty()
-        if (routineId.isBlank()) return@withContext Result.success()
+        if (routineId.isBlank()) return@withContext Result.failure()
 
         val store = RoutineStore(applicationContext)
         val routine = store
