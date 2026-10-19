@@ -55,7 +55,10 @@ class TelegramBotSender(private val context: Context? = null) {
                 10_000,
             )
             try {
-                ensureSuccess(connection)
+                val chat = JSONObject(readBodyAndEnsureSuccess(connection)).optJSONObject("result")
+                require(chat?.optString("type") == "private") {
+                    "Telegram destination must be a private user chat, not a group or channel"
+                }
                 return@runCatching raw
             } finally {
                 connection.disconnect()
