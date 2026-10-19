@@ -82,6 +82,22 @@ class TelegramBotSender(private val context: Context? = null) {
             forgetCachedChat(cleanToken, username)
         }
 
+        // Avoid competing with an existing webhook consumer and losing recipient updates.
+        val webhookConnection = open(
+            "https://api.telegram.org/bot$cleanToken/getWebhookInfo",
+            "GET", 8_000, 10_000,
+        )
+        val webhookInfo = try {
+            JSONObject(readBodyAndEnsureSuccess(webhookConnection)).optJSONObject("result")
+        } finally {
+            webhookConnection.disconnect()
+        }
+        if (!webhookInfo?.optString("url").isNullOrBlank()) {
+            throw IllegalStateException(
+                "Telegram bot uses a webhook. Recipient linking must be handled by that webhook; Shortcut will not poll or remove it."
+            )
+        }
+
         val updatesConnection = open(
             "https://api.telegram.org/bot$cleanToken/getUpdates?limit=100&timeout=0",
             "GET",
