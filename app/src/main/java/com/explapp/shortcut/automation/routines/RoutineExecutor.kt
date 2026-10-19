@@ -34,6 +34,15 @@ class RoutineExecutor(
                 routine.actions[index + 1].type == RoutineActionType.SEND_TELEGRAM_BOT
             ) {
                 val telegram = routine.actions[index + 1]
+                if (telegram.parameters["botToken"].isNullOrBlank() ||
+                    telegram.parameters["chatId"].isNullOrBlank()
+                ) {
+                    results += RoutineActionResult.failure(
+                        telegram,
+                        "Telegram bot token and recipient must be configured before capturing a screenshot",
+                    )
+                    break
+                }
                 action = action.copy(
                     parameters = action.parameters + mapOf(
                         "telegramBotToken" to telegram.parameters["botToken"].orEmpty(),
