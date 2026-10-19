@@ -63,25 +63,21 @@ class TelegramBotSender(private val context: Context? = null) {
         }
 
         val username = raw.removePrefix("@")
-        require(username.isNotBlank()) { "Telegram username is required" }
-
-        val publicHandle = "@$username"
-        cachedChat(cleanToken, username)?.let { return@runCatching it }
-        val direct = runCatching {
-            val connection = open(
-                "https://api.telegram.org/bot$cleanToken/getChat?chat_id=" + enc(publicHandle),
-                "GET",
-                8_000,
-                10_000,
-            )
-            try {
-                ensureSuccess(connection)
-                publicHandle
-            } finally {
-                connection.disconnect()
-            }
+        require(username.matches(Regex("[A-Za-z0-9_]{5,32}"))) {
+            "Telegram username must be 5–32 letters, digits or underscores"
         }
-        if (direct.isSuccess) return@runCatching direct.getOrThrow()
+        require(!username.endsWith("bot", ignoreCase = true)) {
+            "Choose a person, not another Telegram bot"
+        }
+
+        // Bot API does not resolve private users from @username using getChat.
+        // Bind only a private message sent by the matching user to this bot.
+        // Validate cached bindings before every send to prevent stale username reuse.
+        cachedChat(cleanToken, username)?.let { cached ->
+            val verified = runCatching { verifiedPrivateChat(cleanToken, cached, username) }.getOrDefault(false)
+            if (verified) return@runCatching cached
+            forgetCachedChat(cleanToken, username)
+        }
 
         val updatesConnection = open(
             "https://api.telegram.org/bot$cleanToken/getUpdates?limit=100&timeout=0",
@@ -91,37 +87,58 @@ class TelegramBotSender(private val context: Context? = null) {
         )
         val body = try {
             readBodyAndEnsureSuccess(updatesConnection)
+        } catch (error: IllegalStateException) {
+            if (error.message.orEmpty().contains("webhook", ignoreCase = true)) {
+                throw IllegalStateException(
+                    "Telegram bot has a webhook configured. Set up the recipient through the bot integration first; getUpdates is unavailable.",
+                )
+            }
+            throw error
         } finally {
             updatesConnection.disconnect()
         }
 
-        val root = JSONObject(body)
-        val updates = root.optJSONArray("result")
+        val updates = JSONObject(body).optJSONArray("result")
         if (updates != null) {
             for (i in updates.length() - 1 downTo 0) {
-                val update = updates.optJSONObject(i) ?: continue
-                val message = update.optJSONObject("message")
-                    ?: update.optJSONObject("edited_message")
-                    ?: update.optJSONObject("channel_post")
-                    ?: continue
-                val from = message.optJSONObject("from")
-                val chat = message.optJSONObject("chat")
-                val foundUsername = from?.optString("username").orEmpty().ifBlank {
-                    chat?.optString("username").orEmpty()
-                }
-                if (foundUsername.equals(username, ignoreCase = true)) {
-                    val id = chat?.optLong("id", 0L) ?: 0L
-                    if (id != 0L) {
-                        cacheChat(cleanToken, username, id.toString())
-                        return@runCatching id.toString()
-                    }
+                val message = updates.optJSONObject(i)?.optJSONObject("message") ?: continue
+                val from = message.optJSONObject("from") ?: continue
+                val chat = message.optJSONObject("chat") ?: continue
+                if (chat.optString("type") != "private") continue
+                if (from.optBoolean("is_bot", false)) continue
+                val fromId = from.optLong("id", 0L)
+                val chatId = chat.optLong("id", 0L)
+                if (fromId == 0L || fromId != chatId) continue
+                if (from.optString("username").equals(username, ignoreCase = true)) {
+                    val id = chatId.toString()
+                    cacheChat(cleanToken, username, id)
+                    return@runCatching id
                 }
             }
         }
-
         throw IllegalStateException(
-            "Telegram: username @$username was not found. Ask the person to open the bot, press Start, and send it one message, then try again."
+            "Telegram: @$username is not linked to this bot. Ask the person to open the bot, press Start and send a message, then verify the recipient again."
         )
+    }
+
+    private fun forgetCachedChat(token: String, username: String) {
+        context?.getSharedPreferences("telegram_recipient_chat_cache", Context.MODE_PRIVATE)
+            ?.edit()?.remove(cacheKey(token, username))?.apply()
+    }
+
+    private fun verifiedPrivateChat(token: String, id: String, username: String): Boolean {
+        if (!id.matches(Regex("[0-9]+"))) return false
+        val connection = open(
+            "https://api.telegram.org/bot${token.trim()}/getChat?chat_id=" + enc(id),
+            "GET", 8_000, 10_000,
+        )
+        return try {
+            val chat = JSONObject(readBodyAndEnsureSuccess(connection)).optJSONObject("result")
+            chat?.optString("type") == "private" &&
+                chat.optString("username").equals(username, ignoreCase = true)
+        } finally {
+            connection.disconnect()
+        }
     }
 
     fun sendText(token: String, chatId: String, text: String): Result<Unit> = runCatching {
