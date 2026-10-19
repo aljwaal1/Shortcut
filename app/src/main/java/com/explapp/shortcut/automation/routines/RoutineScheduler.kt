@@ -103,6 +103,7 @@ class RoutineScheduler(private val context: Context) {
 
             RoutineRepeat.WEEKLY -> {
                 val isoDay = trigger.repeatValue.toIntOrNull() ?: return null
+                if (isoDay !in 1..7) return null
                 val target = DayOfWeek.of(isoDay)
                 var date = now.toLocalDate().with(TemporalAdjusters.nextOrSame(target))
                 var candidate = at(date)
@@ -115,6 +116,7 @@ class RoutineScheduler(private val context: Context) {
 
             RoutineRepeat.MONTHLY -> {
                 val day = trigger.repeatValue.toIntOrNull() ?: return null
+                if (day !in 1..31) return null
                 var cursor = now.toLocalDate().withDayOfMonth(1)
                 repeat(24) {
                     if (day <= cursor.lengthOfMonth()) {
