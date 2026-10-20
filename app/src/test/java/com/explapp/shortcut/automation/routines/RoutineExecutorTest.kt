@@ -165,4 +165,28 @@ class RoutineExecutorTest {
         assertEquals(listOf(RoutineActionType.OPEN_APP_SCREENSHOT), seen)
     }
 
+    @Test
+    fun screenshotHandoffNeverClaimsTelegramWasSentWhenRunnerReturnsSuccess() {
+        val seen = mutableListOf<RoutineActionType>()
+        val runner = object : RoutineActionRunner {
+            override fun run(action: RoutineAction): RoutineActionResult {
+                seen += action.type
+                return RoutineActionResult.success(action)
+            }
+        }
+        val routine = AutomationRoutine(
+            name = "Screenshot delivery pending",
+            trigger = RoutineTrigger(RoutineTriggerType.MANUAL),
+            actions = listOf(
+                RoutineAction(RoutineActionType.OPEN_APP_SCREENSHOT, "com.example.app", "3000"),
+                RoutineAction(RoutineActionType.SEND_TELEGRAM_BOT, "", "Caption",
+                    parameters = mapOf("botToken" to "fake-token", "chatId" to "@testuser")),
+                RoutineAction(RoutineActionType.SHOW_NOTIFICATION, "not yet"),
+            ),
+        )
+        val result = RoutineExecutor(runner).execute(routine)
+        assertEquals(RoutineRunStatus.PREPARED, result.status)
+        assertEquals(listOf(RoutineActionType.OPEN_APP_SCREENSHOT), seen)
+    }
+
 }
