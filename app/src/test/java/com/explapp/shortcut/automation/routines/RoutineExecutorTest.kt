@@ -114,9 +114,11 @@ class RoutineExecutorTest {
     @Test
     fun screenshotAndTelegramAreCoalescedIntoOnePendingOperation() {
         val invoked = mutableListOf<RoutineAction>()
-        val runner = RoutineActionRunner { action ->
-            invoked += action
-            RoutineActionResult.prepared(action)
+        val runner = object : RoutineActionRunner {
+            override fun run(action: RoutineAction): RoutineActionResult {
+                invoked += action
+                return RoutineActionResult.prepared(action)
+            }
         }
         val routine = AutomationRoutine(
             name = "Deliver screenshot",
@@ -144,9 +146,11 @@ class RoutineExecutorTest {
     @Test
     fun standaloneFailureDoesNotRunLaterActions() {
         val seen = mutableListOf<RoutineActionType>()
-        val runner = RoutineActionRunner { action ->
-            seen += action.type
-            RoutineActionResult.failure(action, "capture failed")
+        val runner = object : RoutineActionRunner {
+            override fun run(action: RoutineAction): RoutineActionResult {
+                seen += action.type
+                return RoutineActionResult.failure(action, "capture failed")
+            }
         }
         val routine = AutomationRoutine(
             name = "Failure must stop",
