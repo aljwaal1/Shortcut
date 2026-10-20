@@ -62,9 +62,10 @@ class RoutineStore(context: Context) {
                             value.startsWith(SECRET_MARKER_V2) -> {
                                 val reference = value.removePrefix(SECRET_MARKER_V2)
                                 val storageKey = stableSecretKey(routine.id, reference, key)
-                                if (reference.isNotBlank() && secrets.get(storageKey).isNotBlank()) {
-                                    retainedSecrets += storageKey
-                                } else updated.remove(key)
+                                check(reference.isNotBlank() && secrets.get(storageKey).isNotBlank()) {
+                                    "Stored automation credential is unavailable; refusing to overwrite protected data"
+                                }
+                                retainedSecrets += storageKey
                             }
                             value == SECRET_MARKER -> {
                                 val oldKey = secretKey(routine.id, index, key)
@@ -75,7 +76,9 @@ class RoutineStore(context: Context) {
                                     check(secrets.put(newKey, oldValue)) { "Could not protect migrated credential" }
                                     retainedSecrets += newKey
                                     updated[key] = SECRET_MARKER_V2 + reference
-                                } else updated.remove(key)
+                                } else {
+                                    error("Legacy automation credential is unavailable; refusing unsafe migration")
+                                }
                             }
                             value.isBlank() -> updated.remove(key)
                             else -> {
