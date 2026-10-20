@@ -18,7 +18,7 @@ class TelegramApiException(
     /** Distinguish a proven rejection from a network timeout with unknown delivery status. */
     val isRateLimited: Boolean get() = httpStatus == 429
     val isPermanentRejection: Boolean get() = httpStatus in setOf(400, 401, 403, 404)
-    val canRetryWithoutDuplicateRisk: Boolean get() = isRateLimited || httpStatus in 500..599
+    val canRetryWithoutDuplicateRisk: Boolean get() = isRateLimited
 }
 
 /** Network failures after upload must not be retried blindly: Telegram may have delivered. */
