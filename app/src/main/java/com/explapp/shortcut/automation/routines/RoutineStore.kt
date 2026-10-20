@@ -25,8 +25,9 @@ class RoutineStore(context: Context) {
                                 if (secret.isNotBlank()) {
                                     updated[key] = secret
                                 } else {
-                                    updated.remove(key)
-                                    migrated = true
+                                    // Fail closed: do not overwrite the stored marker and
+                                    // delete encrypted data when Android Keystore is unavailable.
+                                    throw IllegalStateException("Stored automation credential cannot be decrypted")
                                 }
                             }
                             value.isNotBlank() -> {
