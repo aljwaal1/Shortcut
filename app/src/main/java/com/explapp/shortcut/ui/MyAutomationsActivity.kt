@@ -1532,11 +1532,16 @@ private fun RoutineBuilderScreen(
         }
 
         item {
-            OutlinedTextField(
+            AutomationBlueprintInputField(
+                label = if (ar) "اسم الاختصار" else "Shortcut name",
                 value = name,
+                placeholder = if (ar) "مثال: تقرير الصباح" else "Example: Morning report",
+                supportingText = if (ar) "اختر اسمًا واضحًا للتعرف على الاختصار" else "Choose a recognizable automation name",
+                errorText = if (name.isBlank()) {
+                    if (ar) "اسم الاختصار مطلوب" else "Shortcut name is required"
+                } else null,
+                keyboard = AutomationInputKeyboard.TEXT,
                 onValueChange = { name = it },
-                label = { Text(if (ar) "اسم الاختصار" else "Shortcut name") },
-                placeholder = { Text(if (ar) "مثال: تقرير الصباح" else "Example: Morning report") },
                 modifier = Modifier.fillMaxWidth(),
             )
         }
