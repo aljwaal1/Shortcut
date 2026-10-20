@@ -248,8 +248,8 @@ private fun MyAutomationsScreen(onBack: () -> Unit, initialMode: String = "") {
                             fontWeight = FontWeight.Bold,
                         )
                         Text(
-                            if (ar) "أدخل اسم مستخدم تيليجرام فقط، وسيحاول التطبيق العثور على المحادثة المناسبة تلقائيًا."
-                            else "Enter only the Telegram username; Shortcut will try to resolve the correct chat automatically.",
+                            if (ar) "أدخل المستلم ورمز البوت. يجب أن يكون المستلم قد بدأ محادثة مع البوت، ولا يكفي اسم المستخدم وحده دائمًا."
+                            else "Enter a recipient and bot token. The recipient must have started the bot chat; a username alone may not resolve.",
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
