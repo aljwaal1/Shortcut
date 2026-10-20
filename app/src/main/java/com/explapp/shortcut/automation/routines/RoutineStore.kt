@@ -48,10 +48,6 @@ class RoutineStore(context: Context) {
     fun save(items: List<AutomationRoutine>) = synchronized(LOCK) {
         val distinct = items.distinctBy { it.id }
         val activeRoutineIds = distinct.mapTo(mutableSetOf()) { it.id }
-        secrets.keys("").filter { key ->
-            key.substringBefore(':') !in activeRoutineIds
-        }.forEach(secrets::remove)
-
         val protected = distinct.map { routine ->
             val orphanedSecrets = secrets.keys("${routine.id}:").toMutableSet()
             val protectedRoutine = routine.copy(
@@ -85,7 +81,13 @@ class RoutineStore(context: Context) {
             orphanedSecrets.forEach(secrets::remove)
             protectedRoutine
         }
-        prefs.edit().putString(KEY, RoutineCodec.encode(protected)).apply()
+        check(prefs.edit().putString(KEY, RoutineCodec.encode(protected)).commit()) {
+            "Could not save automation routines"
+        }
+        // Only remove credentials after the new routine list is safely persisted.
+        secrets.keys("").filter { key ->
+            key.substringBefore(':') !in activeRoutineIds
+        }.forEach(secrets::remove)
     }
 
     fun upsert(item: AutomationRoutine) = synchronized(LOCK) {
