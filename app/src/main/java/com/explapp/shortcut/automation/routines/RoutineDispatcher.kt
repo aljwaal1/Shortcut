@@ -25,14 +25,7 @@ class RoutineDispatcher(private val context: Context) {
         val startedAt = System.currentTimeMillis()
         if (!runningRoutineIds.add(routine.id)) {
             val finishedAt = System.currentTimeMillis()
-            TaskExecutionReporter(context).report(
-                com.explapp.shortcut.execution.TaskExecutionResult.prepared(
-                    taskName = routine.name,
-                    startedAtMs = startedAt,
-                    finishedAtMs = finishedAt,
-                    details = listOf("ROUTINE_SKIPPED = ALREADY_RUNNING"),
-                ),
-            )
+            // Duplicate dispatch is skipped; do not add a misleading PREPARED record.
             return RoutineRunResult(
                 routineId = routine.id,
                 routineName = routine.name,
