@@ -1421,6 +1421,7 @@ private fun RoutineBuilderScreen(
     var params by remember { mutableStateOf<Map<String, String>>(emptyMap()) }
     var continueOnError by remember { mutableStateOf(false) }
     var editingActionRef by remember { mutableStateOf<RoutineAction?>(null) }
+    var lastRemovedAction by remember { mutableStateOf<Pair<Int, RoutineAction>?>(null) }
     var actionSearch by remember { mutableStateOf("") }
 
     var pendingRoutine by remember { mutableStateOf<AutomationRoutine?>(null) }
@@ -2207,6 +2208,21 @@ private fun RoutineBuilderScreen(
             }
         }
 
+        if (lastRemovedAction != null) {
+            item {
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically) {
+                    Text(if (ar) "تم حذف الخطوة" else "Step removed",
+                        style = MaterialTheme.typography.bodySmall)
+                    TextButton(onClick = {
+                        lastRemovedAction?.let { (position, removed) ->
+                            actions.add(position.coerceIn(0, actions.size), removed)
+                        }
+                        lastRemovedAction = null
+                    }) { Text(if (ar) "تراجع" else "Undo") }
+                }
+            }
+        }
         itemsIndexed(actions) { index, action ->
             val meta = RoutineCatalog.meta(action.type)
             ElevatedCard(Modifier.fillMaxWidth()) {
@@ -2242,6 +2258,7 @@ private fun RoutineBuilderScreen(
                         )
                         TextButton(onClick = {
                             actions.add(index + 1, action.copy(parameters = action.parameters.toMap()))
+                            lastRemovedAction = null
                         }) { Text(if (ar) "نسخ" else "Duplicate") }
                         TextButton(onClick = {
                             actionType = action.type
@@ -2253,6 +2270,7 @@ private fun RoutineBuilderScreen(
                         }) { Text(if (ar) "تعديل" else "Edit") }
                         TextButton(onClick = {
                             if (editingActionRef === action) resetActionEditor()
+                            lastRemovedAction = index to action
                             actions.remove(action)
                         }) { Text(if (ar) "حذف" else "Remove") }
                     }
