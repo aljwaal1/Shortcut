@@ -20,6 +20,8 @@ object RoutineReview {
         routine.conditions.forEachIndexed { i, condition ->
             if (!condition.isValid()) findings += Finding(Severity.ERROR, null, "INVALID_CONDITION_$i")
         }
+        if (routine.id.isBlank()) findings += Finding(Severity.ERROR, null, "ID_REQUIRED")
+        if (!routine.isEnabled) findings += Finding(Severity.WARNING, null, "ROUTINE_DISABLED")
         routine.actions.forEachIndexed { index, action ->
             if (!action.isValid()) findings += Finding(Severity.ERROR, index, "INVALID_ACTION")
             if (action.type == RoutineActionType.CUSTOM_SCRIPT) {
@@ -34,6 +36,18 @@ object RoutineReview {
                 action.parameters["chatId"].orEmpty().startsWith("@")
             ) {
                 findings += Finding(Severity.WARNING, index, "USERNAME_REQUIRES_EXISTING_BOT_CHAT")
+            }
+            if (action.type == RoutineActionType.OPEN_APP_SCREENSHOT ||
+                action.type == RoutineActionType.TAKE_SCREENSHOT
+            ) {
+                val next = routine.actions.getOrNull(index + 1)
+                if (next?.type == RoutineActionType.SEND_TELEGRAM_BOT) {
+                    if (next.parameters["botToken"].isNullOrBlank() ||
+                        next.parameters["chatId"].isNullOrBlank()
+                    ) {
+                        findings += Finding(Severity.ERROR, index + 1, "SCREENSHOT_DELIVERY_NOT_CONFIGURED")
+                    }
+                }
             }
             if (action.type == RoutineActionType.STOP_SHORTCUT && index < routine.actions.lastIndex) {
                 findings += Finding(Severity.WARNING, index, "ACTIONS_AFTER_STOP_UNREACHABLE")
