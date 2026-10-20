@@ -796,6 +796,19 @@ class ScreenCaptureService : Service() {
             finishWithBitmap(cropped)
         }, handler)
 
+        // A valid frame may arrive during the short settling window and no
+        // further frames may be emitted. Finish at readiness instead of waiting
+        // for the 12-second failure timeout.
+        handler.postDelayed({
+            if (!completed) {
+                val candidate = lastCandidate
+                if (candidate != null && !ScreenFrameReadiness.isLikelyBlank(sampleCenterGrid(candidate))) {
+                    lastCandidate = null
+                    finishWithBitmap(candidate)
+                }
+            }
+        }, (readyAtMs - SystemClock.uptimeMillis()).coerceAtLeast(0L))
+
         display = runCatching {
             p.createVirtualDisplay(
                 "ShortcutScreenshot",
