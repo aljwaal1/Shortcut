@@ -16,16 +16,14 @@ internal class RoutineSecretStore(context: Context) {
 
     fun put(key: String, value: String): Boolean = runCatching {
         if (value.isBlank()) {
-            prefs.edit().remove(key).apply()
-            true
+            prefs.edit().remove(key).commit()
         } else {
             val cipher = Cipher.getInstance(TRANSFORMATION)
             cipher.init(Cipher.ENCRYPT_MODE, secretKey())
             val encrypted = cipher.doFinal(value.toByteArray(StandardCharsets.UTF_8))
             val payload = Base64.encodeToString(cipher.iv, Base64.NO_WRAP) + ":" +
                 Base64.encodeToString(encrypted, Base64.NO_WRAP)
-            prefs.edit().putString(key, payload).apply()
-            true
+            prefs.edit().putString(key, payload).commit()
         }
     }.getOrDefault(false)
 
