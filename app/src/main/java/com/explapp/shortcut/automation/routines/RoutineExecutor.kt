@@ -68,6 +68,10 @@ class RoutineExecutor(
                 )
                 break
             }
+            if (screenshotTelegramHandoff && result.status == RoutineActionStatus.PREPARED) {
+                // The sender is part of the pending screenshot pipeline, not a second action.
+                break
+            }
             if (result.status == RoutineActionStatus.PREPARED) break
             if (result.status == RoutineActionStatus.FAILED && (screenshotTelegramHandoff || !action.continueOnError)) break
             if (action.type == RoutineActionType.STOP_SHORTCUT) break
