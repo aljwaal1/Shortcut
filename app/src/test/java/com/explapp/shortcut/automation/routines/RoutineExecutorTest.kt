@@ -111,4 +111,54 @@ class RoutineExecutorTest {
         assertEquals(RoutineRunStatus.SUCCESS, result.status)
         assertEquals(0, result.actionResults.size)
     }
+    @Test
+    fun screenshotAndTelegramAreCoalescedIntoOnePendingOperation() {
+        val invoked = mutableListOf<RoutineAction>()
+        val runner = RoutineActionRunner { action ->
+            invoked += action
+            RoutineActionResult.prepared(action)
+        }
+        val routine = AutomationRoutine(
+            name = "Deliver screenshot",
+            trigger = RoutineTrigger(RoutineTriggerType.MANUAL),
+            actions = listOf(
+                RoutineAction(RoutineActionType.OPEN_APP_SCREENSHOT, "com.example.app", "3000"),
+                RoutineAction(
+                    RoutineActionType.SEND_TELEGRAM_BOT,
+                    value = "",
+                    secondaryValue = "Today's screenshot",
+                    parameters = mapOf("botToken" to "fake-token", "chatId" to "@verifieduser"),
+                ),
+                RoutineAction(RoutineActionType.SHOW_NOTIFICATION, "must not run"),
+            ),
+        )
+
+        val result = RoutineExecutor(runner).execute(routine)
+
+        assertEquals(RoutineRunStatus.PREPARED, result.status)
+        assertEquals(1, invoked.size)
+        assertEquals("@verifieduser", invoked.single().parameters["telegramChatId"])
+        assertEquals("Today's screenshot", invoked.single().parameters["telegramCaption"])
+    }
+
+    @Test
+    fun standaloneFailureDoesNotRunLaterActions() {
+        val seen = mutableListOf<RoutineActionType>()
+        val runner = RoutineActionRunner { action ->
+            seen += action.type
+            RoutineActionResult.failure(action, "capture failed")
+        }
+        val routine = AutomationRoutine(
+            name = "Failure must stop",
+            trigger = RoutineTrigger(RoutineTriggerType.MANUAL),
+            actions = listOf(
+                RoutineAction(RoutineActionType.OPEN_APP_SCREENSHOT, "com.example.app", "3000"),
+                RoutineAction(RoutineActionType.SHOW_NOTIFICATION, "must not run"),
+            ),
+        )
+        val result = RoutineExecutor(runner).execute(routine)
+        assertEquals(RoutineRunStatus.FAILED, result.status)
+        assertEquals(listOf(RoutineActionType.OPEN_APP_SCREENSHOT), seen)
+    }
+
 }
