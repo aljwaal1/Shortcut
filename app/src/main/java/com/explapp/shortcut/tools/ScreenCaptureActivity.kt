@@ -590,6 +590,8 @@ class ScreenCaptureService : Service() {
     private var lastFramesSeen = 0
     private var lastCaptureFailureReason = ""
     private var captureStartElapsedMs = 0L
+    private var captureEncodeElapsedMs = 0L
+    private var captureFirstFrameElapsedMs = -1L
     @Volatile private var captureBusy = false
 
     override fun onBind(intent: Intent?): IBinder? = null
@@ -633,6 +635,8 @@ class ScreenCaptureService : Service() {
         }
         captureBusy = true
         captureStartElapsedMs = SystemClock.elapsedRealtime()
+        captureEncodeElapsedMs = 0L
+        captureFirstFrameElapsedMs = -1L
 
         val resultCode = intent?.getIntExtra(EXTRA_RESULT_CODE, Activity.RESULT_CANCELED) ?: Activity.RESULT_CANCELED
         val data = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
@@ -711,6 +715,7 @@ class ScreenCaptureService : Service() {
             lastCandidate?.takeIf { it !== bitmap }?.recycle()
             lastCandidate = null
             val file = File(cacheDir, "capture_${System.currentTimeMillis()}.png")
+            val encodingStarted = SystemClock.elapsedRealtime()
             val saved = runCatching {
                 if (stampDateTime) ScreenshotStamp.apply(bitmap, name = stampName)
                 FileOutputStream(file).use { output ->
@@ -720,6 +725,7 @@ class ScreenCaptureService : Service() {
                 }
                 check(file.length() > 0L) { "Screenshot file is empty" }
             }
+            captureEncodeElapsedMs = SystemClock.elapsedRealtime() - encodingStarted
             bitmap.recycle()
             if (saved.isFailure) {
                 file.delete()
@@ -745,6 +751,7 @@ class ScreenCaptureService : Service() {
             if (completed) return@setOnImageAvailableListener
             val image = imageReader.acquireLatestImage() ?: return@setOnImageAvailableListener
             framesSeen++
+            if (captureFirstFrameElapsedMs < 0L) captureFirstFrameElapsedMs = SystemClock.elapsedRealtime() - captureStartElapsedMs
             lastFramesSeen = framesSeen
             if (SystemClock.uptimeMillis() < captureAfterMs) {
                 image.close()
@@ -974,6 +981,8 @@ class ScreenCaptureService : Service() {
             add("FramesSeen = $lastFramesSeen")
             add("CaptureMode = ONE_SHOT")
             add("CaptureElapsedMs = ${SystemClock.elapsedRealtime() - captureStartElapsedMs}")
+            add("CaptureFirstFrameMs = $captureFirstFrameElapsedMs")
+            add("CaptureEncodeMs = $captureEncodeElapsedMs")
             add("ShareAnyApp = $shareAnyApp")
             add("DateTimeStamp = $stampDateTime")
             savedUri?.let { add("Uri = $it") }
