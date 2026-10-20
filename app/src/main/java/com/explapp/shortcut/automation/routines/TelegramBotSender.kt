@@ -14,7 +14,26 @@ class TelegramApiException(
     val httpStatus: Int,
     val retryAfterSeconds: Int?,
     message: String,
-) : IllegalStateException(message)
+) : IllegalStateException(message) {
+    /** Distinguish a proven rejection from a network timeout with unknown delivery status. */
+    val isRateLimited: Boolean get() = httpStatus == 429
+    val isPermanentRejection: Boolean get() = httpStatus in setOf(400, 401, 403, 404)
+    val canRetryWithoutDuplicateRisk: Boolean get() = isRateLimited || httpStatus in 500..599
+}
+
+/** Network failures after upload must not be retried blindly: Telegram may have delivered. */
+object TelegramDeliveryPolicy {
+    enum class Decision { RETRY_AFTER_REJECTION, STOP_PERMANENT, REVIEW_UNKNOWN }
+
+    fun classify(error: Throwable): Decision = when (error) {
+        is TelegramApiException -> when {
+            error.isPermanentRejection -> Decision.STOP_PERMANENT
+            error.canRetryWithoutDuplicateRisk -> Decision.RETRY_AFTER_REJECTION
+            else -> Decision.REVIEW_UNKNOWN
+        }
+        else -> Decision.REVIEW_UNKNOWN
+    }
+}
 
 class TelegramBotSender(private val context: Context? = null) {
     private fun cacheKey(token: String, username: String): String {
