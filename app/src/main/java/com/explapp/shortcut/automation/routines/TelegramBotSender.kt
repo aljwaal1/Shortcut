@@ -10,6 +10,12 @@ import java.net.URLEncoder
 import java.nio.charset.StandardCharsets
 import org.json.JSONObject
 
+class TelegramApiException(
+    val httpStatus: Int,
+    val retryAfterSeconds: Int?,
+    message: String,
+) : IllegalStateException(message)
+
 class TelegramBotSender(private val context: Context? = null) {
     private fun cacheKey(token: String, username: String): String {
         val hash = MessageDigest.getInstance("SHA-256").digest(token.trim().toByteArray(StandardCharsets.UTF_8))
@@ -317,13 +323,8 @@ class TelegramBotSender(private val context: Context? = null) {
                 ?.optJSONObject("parameters")
                 ?.optInt("retry_after", 0)
                 ?.takeIf { it > 0 }
-            val detail = when {
-                retryAfter != null && description != null -> description + " (retry after " + retryAfter + "s)"
-                description != null -> description
-                body.isNotBlank() -> body.take(300)
-                else -> "HTTP " + code
-            }
-            throw IllegalStateException("Telegram: " + detail)
+            val detail = description ?: "HTTP $code"
+            throw TelegramApiException(code, retryAfter, "Telegram: $detail")
         }
         return body
     }
@@ -344,13 +345,8 @@ class TelegramBotSender(private val context: Context? = null) {
                 ?.optInt("retry_after", 0)
                 ?.takeIf { it > 0 }
 
-            val detail = when {
-                retryAfter != null && description != null -> "$description (retry after ${retryAfter}s)"
-                description != null -> description
-                body.isNotBlank() -> body.take(300)
-                else -> "HTTP $code"
-            }
-            throw IllegalStateException("Telegram: $detail")
+            val detail = description ?: "HTTP $code"
+            throw TelegramApiException(code, retryAfter, "Telegram: $detail")
         }
     }
 
