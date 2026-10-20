@@ -43,4 +43,22 @@ class RoutineReviewTest {
         assertFalse(report.canRun)
         assertEquals(0, report.findings.first().actionIndex)
     }
+    @Test fun disabledAutomationGetsWarning() {
+        val report = RoutineReview.inspect(flow(listOf(
+            RoutineAction(RoutineActionType.SHOW_NOTIFICATION, "ready"),
+        )).copy(isEnabled = false))
+        assertTrue(report.canRun)
+        assertTrue(report.warnings.any { it.code == "ROUTINE_DISABLED" })
+    }
+
+    @Test fun screenshotDeliveryRequiresRecipientAndToken() {
+        val report = RoutineReview.inspect(flow(listOf(
+            RoutineAction(RoutineActionType.TAKE_SCREENSHOT, "3000"),
+            RoutineAction(RoutineActionType.SEND_TELEGRAM_BOT, "", "image",
+                parameters = mapOf("chatId" to "@exampleuser")),
+        )))
+        assertFalse(report.canRun)
+        assertTrue(report.findings.any { it.code == "SCREENSHOT_DELIVERY_NOT_CONFIGURED" && it.actionIndex == 1 })
+    }
+
 }
