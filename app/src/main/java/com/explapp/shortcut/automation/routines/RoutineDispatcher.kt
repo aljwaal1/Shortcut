@@ -37,10 +37,21 @@ class RoutineDispatcher(private val context: Context) {
         }
 
         return try {
-            val result = RoutineExecutor(
-                AndroidRoutineActionRunner(context, userInitiated, routine.id, routine.name),
-                AndroidRoutineConditionEvaluator(context),
-            ).execute(routine, startedAtMs = startedAt)
+            val result = runCatching {
+                RoutineExecutor(
+                    AndroidRoutineActionRunner(context, userInitiated, routine.id, routine.name),
+                    AndroidRoutineConditionEvaluator(context),
+                ).execute(routine, startedAtMs = startedAt)
+            }.getOrElse { _ ->
+                RoutineRunResult(
+                    routineId = routine.id,
+                    routineName = routine.name,
+                    status = RoutineRunStatus.FAILED,
+                    actionResults = emptyList(),
+                    startedAtMs = startedAt,
+                    finishedAtMs = System.currentTimeMillis(),
+                )
+            }
             val historyResult = result.toTaskExecutionResult().copy(
                 details = listOf(
                     "RUN_SOURCE = " + if (userInitiated) "MANUAL" else "SCHEDULED",
