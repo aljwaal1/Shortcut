@@ -215,4 +215,28 @@ class RoutineExecutorTest {
         assertEquals(listOf(RoutineActionType.OPEN_APP_SCREENSHOT), calls)
     }
 
+    @Test
+    fun pendingScreenshotDoesNotRunTelegramActionTwice() {
+        val calls = mutableListOf<RoutineActionType>()
+        val runner = object : RoutineActionRunner {
+            override fun run(action: RoutineAction): RoutineActionResult {
+                calls.add(action.type)
+                return RoutineActionResult.prepared(action, "awaiting screenshot")
+            }
+        }
+        val flow = AutomationRoutine(
+            name = "Pending delivery",
+            trigger = RoutineTrigger(RoutineTriggerType.MANUAL),
+            actions = listOf(
+                RoutineAction(RoutineActionType.OPEN_APP_SCREENSHOT, "com.example.app", "3000"),
+                RoutineAction(RoutineActionType.SEND_TELEGRAM_BOT, "", "Picture",
+                    parameters = mapOf("botToken" to "test-token", "chatId" to "@sampleuser")),
+                RoutineAction(RoutineActionType.SHOW_NOTIFICATION, "later"),
+            ),
+        )
+        val result = RoutineExecutor(runner).execute(flow)
+        assertEquals(RoutineRunStatus.PREPARED, result.status)
+        assertEquals(listOf(RoutineActionType.OPEN_APP_SCREENSHOT), calls)
+    }
+
 }
