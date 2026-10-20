@@ -27,6 +27,7 @@ class RoutineExecutor(
         var index = 0
         while (index < routine.actions.size) {
             var action = routine.actions[index]
+            var screenshotTelegramHandoff = false
 
             if (
                 action.type in setOf(RoutineActionType.OPEN_APP_SCREENSHOT, RoutineActionType.TAKE_SCREENSHOT) &&
@@ -53,16 +54,24 @@ class RoutineExecutor(
                 // This action hands delivery to the screenshot pipeline. Only skip the
                 // standalone Telegram action when the capture was successfully queued.
                 // A failed capture must never be reported as a completed send.
-                index += 1
+                screenshotTelegramHandoff = true
             }
 
             val result = runCatching { runner.run(action) }
                 .getOrElse { RoutineActionResult.failure(action, it.message ?: it.javaClass.simpleName) }
             results += result
+            if (screenshotTelegramHandoff && result.status == RoutineActionStatus.SUCCESS) {
+                // Capturing and delivering happen asynchronously; completion is not proof of sending.
+                results += RoutineActionResult.prepared(
+                    routine.actions[index + 1],
+                    "Screenshot delivery has not been confirmed",
+                )
+                break
+            }
             if (result.status == RoutineActionStatus.PREPARED) break
             if (result.status == RoutineActionStatus.FAILED && !action.continueOnError) break
             if (action.type == RoutineActionType.STOP_SHORTCUT) break
-            index += 1
+            index += if (screenshotTelegramHandoff) 2 else 1
         }
 
         val status = when {
