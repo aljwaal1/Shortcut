@@ -189,4 +189,30 @@ class RoutineExecutorTest {
         assertEquals(listOf(RoutineActionType.OPEN_APP_SCREENSHOT), seen)
     }
 
+    @Test
+    fun screenshotFailureDoesNotExecuteTheFollowingActions() {
+        val calls = mutableListOf<RoutineActionType>()
+        val runner = object : RoutineActionRunner {
+            override fun run(action: RoutineAction): RoutineActionResult {
+                calls.add(action.type)
+                return RoutineActionResult.failure(action, "capture unavailable")
+            }
+        }
+        val flow = AutomationRoutine(
+            name = "Protected image delivery",
+            trigger = RoutineTrigger(RoutineTriggerType.MANUAL),
+            actions = listOf(
+                RoutineAction(RoutineActionType.OPEN_APP_SCREENSHOT, "com.example.app", "3000", continueOnError = true),
+                RoutineAction(
+                    RoutineActionType.SEND_TELEGRAM_BOT, "", "Image",
+                    parameters = mapOf("botToken" to "test-token", "chatId" to "@sampleuser")
+                ),
+                RoutineAction(RoutineActionType.SHOW_NOTIFICATION, "finished"),
+            ),
+        )
+        val result = RoutineExecutor(runner).execute(flow)
+        assertEquals(RoutineRunStatus.FAILED, result.status)
+        assertEquals(listOf(RoutineActionType.OPEN_APP_SCREENSHOT), calls)
+    }
+
 }
