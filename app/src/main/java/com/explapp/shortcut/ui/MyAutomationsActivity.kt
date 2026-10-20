@@ -1488,6 +1488,21 @@ private fun RoutineBuilderScreen(
         }
     }
 
+    val previewRoutine = AutomationRoutine(
+        id = stableId,
+        name = name.ifBlank { if (ar) "اختصار جديد" else "New shortcut" },
+        isEnabled = initial?.isEnabled ?: true,
+        trigger = RoutineTrigger(
+            type = triggerType,
+            value = triggerValue,
+            repeat = if (triggerType == RoutineTriggerType.TIME) triggerRepeat else RoutineRepeat.DAILY,
+            repeatValue = if (triggerType == RoutineTriggerType.TIME) triggerRepeatValue else "",
+        ),
+        conditions = conditions.toList(),
+        actions = actions.toList(),
+    )
+    val previewReview = RoutineReview.inspect(previewRoutine)
+
     LazyColumn(
         Modifier.fillMaxSize().navigationBarsPadding(),
         contentPadding = PaddingValues(start = 18.dp, top = 18.dp, end = 18.dp, bottom = 32.dp),
@@ -2200,6 +2215,21 @@ private fun RoutineBuilderScreen(
                     val appLabel = installedApps.firstOrNull { it.packageName == action.value }?.label
                     val summary = actionSummary(action, appLabel, ar)
                     if (summary.isNotBlank()) Text(summary, style = MaterialTheme.typography.bodySmall)
+                    previewReview.findings.filter { it.actionIndex == index }.forEach { finding ->
+                        val message = when (finding.code) {
+                            "INVALID_ACTION" -> if (ar) "هذه الخطوة غير صالحة" else "This step is invalid"
+                            "SCREENSHOT_DELIVERY_NOT_CONFIGURED" -> if (ar) "أكمل إعدادات إرسال الصورة" else "Configure screenshot delivery"
+                            "USERNAME_REQUIRES_EXISTING_BOT_CHAT" -> if (ar) "يجب أن يكون المستلم قد بدأ محادثة مع البوت" else "Recipient must have started a bot chat"
+                            "SCRIPT_REQUIRES_REVIEW" -> if (ar) "راجع السكربت قبل تشغيله" else "Review the script before running"
+                            "USER_INTERACTION_REQUIRED" -> if (ar) "تتطلب الخطوة تدخلاً يدويًا" else "This step requires user interaction"
+                            "ACTIONS_AFTER_STOP_UNREACHABLE" -> if (ar) "لن تُنفذ الخطوات التالية بعد الإيقاف" else "Steps after stop will not execute"
+                            else -> finding.code
+                        }
+                        Text(message,
+                            style = MaterialTheme.typography.bodySmall,
+                            color = if (finding.severity == RoutineReview.Severity.ERROR)
+                                MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
                     Row(horizontalArrangement = Arrangement.spacedBy(2.dp), verticalAlignment = Alignment.CenterVertically) {
                         ReorderHandle(
                             ar = ar,
@@ -2210,6 +2240,9 @@ private fun RoutineBuilderScreen(
                                 actions.add(to, moved)
                             },
                         )
+                        TextButton(onClick = {
+                            actions.add(index + 1, action.copy(parameters = action.parameters.toMap()))
+                        }) { Text(if (ar) "نسخ" else "Duplicate") }
                         TextButton(onClick = {
                             actionType = action.type
                             value = action.value
