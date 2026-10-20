@@ -589,6 +589,7 @@ class ScreenCaptureService : Service() {
     private var routineStartedAtMs = 0L
     private var lastFramesSeen = 0
     private var lastCaptureFailureReason = ""
+    private var captureStartElapsedMs = 0L
     @Volatile private var captureBusy = false
 
     override fun onBind(intent: Intent?): IBinder? = null
@@ -631,6 +632,7 @@ class ScreenCaptureService : Service() {
             return START_NOT_STICKY
         }
         captureBusy = true
+        captureStartElapsedMs = SystemClock.elapsedRealtime()
 
         val resultCode = intent?.getIntExtra(EXTRA_RESULT_CODE, Activity.RESULT_CANCELED) ?: Activity.RESULT_CANCELED
         val data = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
@@ -967,6 +969,7 @@ class ScreenCaptureService : Service() {
             add("SCREENSHOT_SAVE = " + if (savedUri != null) "SUCCESS" else "FAILURE")
             add("FramesSeen = $lastFramesSeen")
             add("CaptureMode = ONE_SHOT")
+            add("CaptureElapsedMs = ${SystemClock.elapsedRealtime() - captureStartElapsedMs}")
             add("ShareAnyApp = $shareAnyApp")
             add("DateTimeStamp = $stampDateTime")
             savedUri?.let { add("Uri = $it") }
