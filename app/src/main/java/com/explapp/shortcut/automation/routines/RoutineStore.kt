@@ -96,8 +96,11 @@ class RoutineStore(context: Context) {
     }
 
     fun removeById(id: String) = synchronized(LOCK) {
+        // Load and persist the remaining routines before dropping credentials.
+        // Doing the reverse can erase unrelated encrypted values during hydration.
+        val remaining = load().filterNot { it.id == id }
+        save(remaining)
         secrets.removePrefix("$id:")
-        save(load().filterNot { it.id == id })
     }
 
     private fun secretKey(routineId: String, actionIndex: Int, parameter: String): String =
