@@ -60,14 +60,23 @@ class RoutineStore(context: Context) {
                     SECRET_KEYS.forEach { key ->
                         val storageKey = secretKey(routine.id, index, key)
                         val value = updated[key].orEmpty()
-                        if (value.isBlank() || value == SECRET_MARKER) {
-                            updated.remove(key)
-                        } else {
-                            check(secrets.put(storageKey, value)) {
-                                "Could not store automation credential securely"
+                        when {
+                            value == SECRET_MARKER && secrets.get(storageKey).isNotBlank() -> {
+                                // A previously protected routine may be saved without hydration.
+                                // Preserve the encrypted credential instead of silently deleting it.
+                                orphanedSecrets.remove(storageKey)
+                                updated[key] = SECRET_MARKER
                             }
-                            orphanedSecrets.remove(storageKey)
-                            updated[key] = SECRET_MARKER
+                            value.isBlank() || value == SECRET_MARKER -> {
+                                updated.remove(key)
+                            }
+                            else -> {
+                                check(secrets.put(storageKey, value)) {
+                                    "Could not store automation credential securely"
+                                }
+                                orphanedSecrets.remove(storageKey)
+                                updated[key] = SECRET_MARKER
+                            }
                         }
                     }
                     action.copy(parameters = updated)
