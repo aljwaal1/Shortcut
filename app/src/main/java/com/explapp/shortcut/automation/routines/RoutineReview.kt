@@ -40,6 +40,11 @@ object RoutineReview {
             if (action.type == RoutineActionType.OPEN_APP_SCREENSHOT ||
                 action.type == RoutineActionType.TAKE_SCREENSHOT
             ) {
+                if (routine.trigger.type == RoutineTriggerType.TIME &&
+                    action.parameters["persistentCapture"] != "true"
+                ) {
+                    findings += Finding(Severity.WARNING, index, "SCHEDULED_CAPTURE_MAY_REQUIRE_CONSENT")
+                }
                 val next = routine.actions.getOrNull(index + 1)
                 if (next?.type == RoutineActionType.SEND_TELEGRAM_BOT) {
                     if (next.parameters["botToken"].isNullOrBlank() ||
