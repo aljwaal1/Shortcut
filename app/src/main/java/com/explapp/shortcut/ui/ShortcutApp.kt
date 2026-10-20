@@ -939,6 +939,7 @@ private fun TemplatesScreen(
 ) {
     val configuration = LocalConfiguration.current
     val ar = configuration.locales[0].language == "ar"
+    var templateSearch by rememberSaveable { mutableStateOf("") }
     data class TemplateUi(val title: Int, val accent: Color, val action: () -> Unit)
     val templates = listOf(
         TemplateUi(R.string.ready_templates, MaterialTheme.colorScheme.primary, onOpenAdvancedTemplates),
@@ -957,7 +958,33 @@ private fun TemplatesScreen(
                 subtitle = if (ar) "ابدأ من قالب جاهز ثم عدله كما تريد" else "Start from a ready template and make it yours",
             )
         }
-        items(templates) { template ->
+        item {
+            androidx.compose.material3.OutlinedTextField(
+                value = templateSearch,
+                onValueChange = { templateSearch = it },
+                label = { Text(if (ar) "ابحث عن قالب" else "Search templates") },
+                leadingIcon = { Icon(Icons.Default.Search, contentDescription = null) },
+                singleLine = true,
+                modifier = Modifier.fillMaxWidth(),
+            )
+        }
+        val visibleTemplates = templates.filter { template ->
+            val title = when (template.title) {
+                R.string.ready_templates -> if (ar) "أتمتة متقدمة قوالب تدفق" else "Advanced automation flow templates"
+                R.string.template_open_app -> if (ar) "فتح تطبيق" else "Open app"
+                R.string.template_whatsapp -> if (ar) "واتساب رسائل" else "WhatsApp messages"
+                R.string.template_telegram -> if (ar) "تيليجرام رسائل بوت" else "Telegram messages bot"
+                else -> ""
+            }
+            templateSearch.isBlank() || title.contains(templateSearch.trim(), ignoreCase = true)
+        }
+        if (visibleTemplates.isEmpty()) {
+            item {
+                Text(if (ar) "لا توجد قوالب مطابقة. جرّب كلمة أخرى." else "No matching templates. Try another search.",
+                    style = MaterialTheme.typography.bodyMedium)
+            }
+        }
+        items(visibleTemplates) { template ->
             ElevatedCard(
                 modifier = Modifier.fillMaxWidth(),
                 colors = CardDefaults.elevatedCardColors(containerColor = template.accent.copy(alpha = 0.09f)),
