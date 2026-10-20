@@ -54,14 +54,17 @@ class RoutineExecutionWorker(
         // RoutineDispatcher records the actual routine result in execution history.
         // The Worker itself succeeds even when a user-defined action fails; retrying
         // the whole routine could duplicate actions that already completed.
-        try {
+        val execution = runCatching {
             RoutineDispatcher(applicationContext).execute(routine, userInitiated = false)
-        } finally {
-            if (RoutineWork.shouldDisableAfterAttempt(routine)) {
+        }
+        if (RoutineWork.shouldDisableAfterAttempt(routine)) {
+            runCatching {
                 store.upsert(routine.copy(isEnabled = false, updatedAtMs = System.currentTimeMillis()))
             }
         }
-        Result.success()
+        // Do not retry completed user actions: network sends may already have succeeded.
+        // Unexpected infrastructure failures still surface as a failed worker.
+        if (execution.isFailure) Result.failure() else Result.success()
     }
 
     private fun local(en: String, ar: String): String =
