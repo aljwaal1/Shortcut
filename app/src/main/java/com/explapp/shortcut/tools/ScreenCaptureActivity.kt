@@ -920,6 +920,7 @@ class ScreenCaptureService : Service() {
                     "DateTimeStamp = $stampDateTime",
                     "ShareAnyApp = $shareAnyApp",
                     "CaptureMode = ONE_SHOT",
+                    "CaptureElapsedMs = ${SystemClock.elapsedRealtime() - captureStartElapsedMs}",
                 ),
             )
             showResultNotification(
