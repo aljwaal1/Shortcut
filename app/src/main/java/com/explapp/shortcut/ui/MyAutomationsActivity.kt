@@ -1435,6 +1435,7 @@ private fun RoutineBuilderScreen(
     var editingActionRef by remember { mutableStateOf<RoutineAction?>(null) }
     var lastRemovedAction by remember { mutableStateOf<Pair<Int, RoutineAction>?>(null) }
     var actionSearch by remember { mutableStateOf("") }
+    var preflightExpanded by remember { mutableStateOf(true) }
 
     var pendingRoutine by remember { mutableStateOf<AutomationRoutine?>(null) }
     var permissionError by remember { mutableStateOf(false) }
@@ -2365,9 +2366,21 @@ private fun RoutineBuilderScreen(
             if (review.findings.isNotEmpty()) {
                 ElevatedCard(modifier = Modifier.fillMaxWidth()) {
                     Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                        Text(if (ar) "فحص الاختصار قبل الحفظ" else "Automation preflight",
-                            style = MaterialTheme.typography.titleSmall)
-                        review.findings.forEach { finding ->
+                        Row(
+                            Modifier.fillMaxWidth().expandCollapseToggle(preflightExpanded) {
+                                preflightExpanded = !preflightExpanded
+                            },
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            Text(
+                                if (ar) "فحص الاختصار: ${review.findings.size} ملاحظات"
+                                else "Automation preflight: ${review.findings.size} findings",
+                                style = MaterialTheme.typography.titleSmall,
+                            )
+                            Text(if (preflightExpanded) "−" else "+")
+                        }
+                        if (preflightExpanded) review.findings.forEach { finding ->
                             val label = when (finding.code) {
                                 "INVALID_ACTION" -> if (ar) "إجراء غير صالح" else "Invalid action"
                                 "INVALID_TRIGGER" -> if (ar) "مشغّل غير صالح" else "Invalid trigger"
