@@ -65,4 +65,25 @@ class RoutineCodecTest {
         assertNotEquals(original.id, copy.id)
         assertEquals(true, copy.isEnabled)
     }
+    @Test
+    fun encryptedReferencesRemainAttachedToActionsWhenReordered() {
+        val first = RoutineAction(
+            RoutineActionType.SEND_TELEGRAM_BOT, "", "First message",
+            parameters = mapOf("botToken" to "__shortcut_secret_v2__:first-ref", "chatId" to "@recipient1"),
+        )
+        val second = RoutineAction(
+            RoutineActionType.SEND_TELEGRAM_BOT, "", "Second message",
+            parameters = mapOf("botToken" to "__shortcut_secret_v2__:second-ref", "chatId" to "@recipient2"),
+        )
+        val routine = AutomationRoutine(
+            id = "secure-flow",
+            name = "Two recipients",
+            trigger = RoutineTrigger(RoutineTriggerType.MANUAL),
+            actions = listOf(second, first),
+        )
+        val restored = RoutineCodec.decode(RoutineCodec.encode(listOf(routine))).single()
+        assertEquals("second-ref", restored.actions[0].parameters["botToken"]?.removePrefix("__shortcut_secret_v2__:"))
+        assertEquals("first-ref", restored.actions[1].parameters["botToken"]?.removePrefix("__shortcut_secret_v2__:"))
+    }
+
 }
