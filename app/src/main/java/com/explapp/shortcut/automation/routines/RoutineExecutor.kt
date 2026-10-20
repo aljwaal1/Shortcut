@@ -69,7 +69,7 @@ class RoutineExecutor(
                 break
             }
             if (result.status == RoutineActionStatus.PREPARED) break
-            if (result.status == RoutineActionStatus.FAILED && !action.continueOnError) break
+            if (result.status == RoutineActionStatus.FAILED && (screenshotTelegramHandoff || !action.continueOnError)) break
             if (action.type == RoutineActionType.STOP_SHORTCUT) break
             index += if (screenshotTelegramHandoff) 2 else 1
         }
