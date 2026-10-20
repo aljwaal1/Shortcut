@@ -951,24 +951,37 @@ private fun TemplatesScreen(
     val configuration = LocalConfiguration.current
     val ar = configuration.locales[0].language == "ar"
     var templateSearch by rememberSaveable { mutableStateOf("") }
-    data class TemplateUi(val title: String, val description: String, val accent: Color, val action: () -> Unit)
+    val context = LocalContext.current
+    val store = remember(context) { TemplateLibraryStore(context) }
+    var favorites by remember { mutableStateOf(store.favorites()) }
+    var recent by remember { mutableStateOf(store.recent()) }
+    var selectedCategory by rememberSaveable { mutableStateOf(TemplateLibraryFilter.ALL) }
+    data class TemplateUi(val id: String, val category: String, val title: String, val description: String, val accent: Color, val action: () -> Unit)
     val templates = listOf(
-        TemplateUi(if (ar) "قوالب الأتمتة المتقدمة" else "Advanced automations",
+        TemplateUi("advanced", "automation", if (ar) "قوالب الأتمتة المتقدمة" else "Advanced automations",
             if (ar) "سلاسل إجراءات جاهزة يمكنك تعديلها" else "Ready multi-step workflows to customize",
             MaterialTheme.colorScheme.primary, onOpenAdvancedTemplates),
-        TemplateUi(if (ar) "فتح تطبيق وتصوير الشاشة" else "Open app and capture screen",
+        TemplateUi("screenshot", "media", if (ar) "فتح تطبيق وتصوير الشاشة" else "Open app and capture screen",
             if (ar) "اختر التطبيق وأضف التاريخ واحفظ الصورة" else "Choose an app, stamp the date and save the image",
             MaterialTheme.colorScheme.secondary, onOpenScreenshotTemplate),
-        TemplateUi(stringResource(R.string.template_open_app),
+        TemplateUi("scheduled_app", "automation", stringResource(R.string.template_open_app),
             if (ar) "افتح تطبيقًا في وقت تحدده" else "Open an app at a chosen time",
             MaterialTheme.colorScheme.primary, onCreateShortcut),
-        TemplateUi(stringResource(R.string.template_whatsapp),
+        TemplateUi("whatsapp", "messaging", stringResource(R.string.template_whatsapp),
             if (ar) "إعداد رسالة واتساب مجدولة" else "Prepare a scheduled WhatsApp message",
             MaterialTheme.colorScheme.secondary) { onCreateMessage(MessagePlatform.WHATSAPP) },
-        TemplateUi(stringResource(R.string.template_telegram),
+        TemplateUi("telegram", "messaging", stringResource(R.string.template_telegram),
             if (ar) "إعداد رسالة تيليجرام" else "Prepare a Telegram message",
             MaterialTheme.colorScheme.tertiary) { onCreateMessage(MessagePlatform.TELEGRAM) },
     )
+    val visibleTemplates = TemplateLibraryFilter.select(
+        templates.map { TemplateDescriptor(it.id, it.title, it.description, it.category) },
+        templateSearch, selectedCategory, favorites, recent,
+    ).mapNotNull { descriptor -> templates.firstOrNull { it.id == descriptor.id } }
+    val openTemplate: (TemplateUi) -> Unit = { template ->
+        recent = store.recordOpen(template.id)
+        template.action()
+    }
     LazyColumn(
         modifier = Modifier.fillMaxSize().padding(padding),
         contentPadding = PaddingValues(18.dp),
@@ -990,10 +1003,25 @@ private fun TemplatesScreen(
                 modifier = Modifier.fillMaxWidth(),
             )
         }
-        val visibleTemplates = templates.filter { template ->
-            templateSearch.isBlank() ||
-                template.title.contains(templateSearch.trim(), ignoreCase = true) ||
-                template.description.contains(templateSearch.trim(), ignoreCase = true)
+        item {
+            androidx.compose.foundation.lazy.LazyRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                val filters = listOf(
+                    TemplateLibraryFilter.ALL to (if (ar) "الكل" else "All"),
+                    TemplateLibraryFilter.FAVORITES to (if (ar) "المفضلة" else "Favorites"),
+                    TemplateLibraryFilter.RECENT to (if (ar) "الأخيرة" else "Recent"),
+                    "automation" to (if (ar) "الأتمتة" else "Automation"),
+                    "messaging" to (if (ar) "الرسائل" else "Messages"),
+                    "media" to (if (ar) "الوسائط" else "Media"),
+                )
+                items(filters.size) { index ->
+                    val (key, label) = filters[index]
+                    androidx.compose.material3.FilterChip(
+                        selected = selectedCategory == key,
+                        onClick = { selectedCategory = key },
+                        label = { Text(label) },
+                    )
+                }
+            }
         }
         if (visibleTemplates.isEmpty()) {
             item {
@@ -1013,7 +1041,7 @@ private fun TemplatesScreen(
             ElevatedCard(
                 modifier = Modifier.fillMaxWidth(),
                 colors = CardDefaults.elevatedCardColors(containerColor = template.accent.copy(alpha = 0.09f)),
-                onClick = template.action,
+                onClick = { openTemplate(template) },
             ) {
                 Row(
                     modifier = Modifier.fillMaxWidth().padding(18.dp),
@@ -1029,7 +1057,10 @@ private fun TemplatesScreen(
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
                     }
-                    Text("→", color = template.accent, style = MaterialTheme.typography.titleLarge)
+                    TextButton(onClick = { favorites = store.toggleFavorite(template.id) }) {
+                        Text(if (template.id in favorites) "★" else "☆",
+                            color = template.accent, style = MaterialTheme.typography.titleLarge)
+                    }
                 }
             }
         }
