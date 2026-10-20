@@ -13,7 +13,7 @@ class RoutineExecutor(
         startedAtMs: Long = System.currentTimeMillis(),
         finishedAtMs: Long? = null,
     ): RoutineRunResult {
-        if (!routine.isEnabled || !routine.isValid()) {
+        if (!routine.isEnabled || !routine.isValid() || !RoutineReview.inspect(routine).canRun) {
             val end = finishedAtMs ?: System.currentTimeMillis()
             return RoutineRunResult(routine.id, routine.name, RoutineRunStatus.FAILED, emptyList(), startedAtMs, end)
         }
