@@ -326,7 +326,7 @@ private fun MainShell(
                 containerColor = MaterialTheme.colorScheme.surface,
                 tonalElevation = 5.dp,
             ) {
-                MainTab.entries.forEach { tab ->
+                MainTab.entries.filter { it == MainTab.HOME || it == MainTab.TEMPLATES || it == MainTab.TOOLS }.forEach { tab ->
                     NavigationBarItem(
                         selected = selected == tab,
                         onClick = {
@@ -359,6 +359,7 @@ private fun MainShell(
                 onOpenTools = onOpenTools,
                 onOpenTemplates = { selected = MainTab.TEMPLATES },
                 onOpenHistory = { selected = MainTab.HISTORY },
+                onOpenSettings = { selected = MainTab.SETTINGS },
                 onEditShortcut = onEditShortcut,
                 onEditMessage = onEditMessage,
                 onDeleteShortcut = onDeleteShortcut,
@@ -504,6 +505,7 @@ private fun HomeScreen(
     onOpenTools: () -> Unit,
     onOpenTemplates: () -> Unit,
     onOpenHistory: () -> Unit,
+    onOpenSettings: () -> Unit,
     onEditShortcut: (ScheduledAppShortcut) -> Unit,
     onEditMessage: (ScheduledMessage) -> Unit,
     onDeleteShortcut: (ScheduledAppShortcut) -> Unit,
@@ -623,6 +625,13 @@ private fun HomeScreen(
                     accent = MaterialTheme.colorScheme.error,
                     modifier = Modifier.fillMaxWidth(),
                 ) { onOpenHistory() }
+                HomeNavCard(
+                    title = if (ar) "الإعدادات والخصوصية" else "Settings and privacy",
+                    subtitle = if (ar) "الأذونات والمظهر والنسخ الاحتياطي" else "Permissions, appearance and backup",
+                    icon = Icons.Default.Settings,
+                    accent = MaterialTheme.colorScheme.secondary,
+                    modifier = Modifier.fillMaxWidth(),
+                ) { onOpenSettings() }
                 HomeNavCard(
                     title = if (ar) "الأدوات" else "Tools",
                     subtitle = if (ar) "الوصول إلى جميع أدوات Shortcut" else "Open all Shortcut tools",
