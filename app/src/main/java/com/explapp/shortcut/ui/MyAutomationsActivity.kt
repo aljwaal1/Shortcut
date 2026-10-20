@@ -76,6 +76,7 @@ import com.explapp.shortcut.automation.routines.RoutinePermissionPolicy
 import com.explapp.shortcut.automation.routines.RoutineRepeat
 import com.explapp.shortcut.automation.routines.RoutineScheduler
 import com.explapp.shortcut.automation.routines.RoutineStore
+import com.explapp.shortcut.automation.routines.RoutineReview
 import com.explapp.shortcut.automation.routines.RoutineTemplateCatalog
 import com.explapp.shortcut.automation.routines.RoutineTrigger
 import com.explapp.shortcut.automation.routines.RoutineTriggerType
@@ -2291,6 +2292,40 @@ private fun RoutineBuilderScreen(
                 actions = actions.toList(),
             )
 
+            val review = RoutineReview.inspect(routine)
+            if (review.findings.isNotEmpty()) {
+                ElevatedCard(modifier = Modifier.fillMaxWidth()) {
+                    Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                        Text(if (ar) "فحص الاختصار قبل الحفظ" else "Automation preflight",
+                            style = MaterialTheme.typography.titleSmall)
+                        review.findings.forEach { finding ->
+                            val label = when (finding.code) {
+                                "INVALID_ACTION" -> if (ar) "إجراء غير صالح" else "Invalid action"
+                                "INVALID_TRIGGER" -> if (ar) "مشغّل غير صالح" else "Invalid trigger"
+                                "NAME_REQUIRED" -> if (ar) "اسم الاختصار مطلوب" else "Name is required"
+                                "NO_ACTIONS" -> if (ar) "أضف إجراءً واحدًا على الأقل" else "Add at least one action"
+                                "ID_REQUIRED" -> if (ar) "معرّف الاختصار غير صالح" else "Invalid automation ID"
+                                "ROUTINE_DISABLED" -> if (ar) "الاختصار متوقف" else "Automation disabled"
+                                "SCRIPT_REQUIRES_REVIEW" -> if (ar) "راجع السكربت قبل التشغيل" else "Review script before running"
+                                "USER_INTERACTION_REQUIRED" -> if (ar) "يتطلب تدخل المستخدم" else "User interaction required"
+                                "USERNAME_REQUIRES_EXISTING_BOT_CHAT" -> if (ar) "يجب أن يكون المستخدم قد بدأ محادثة مع البوت" else "Recipient must have started the bot"
+                                "ACTIONS_AFTER_STOP_UNREACHABLE" -> if (ar) "خطوات بعد الإيقاف لن تنفذ" else "Steps after stop cannot run"
+                                "SCREENSHOT_DELIVERY_NOT_CONFIGURED" -> if (ar) "إعداد إرسال الصورة غير مكتمل" else "Screenshot delivery is not configured"
+                                else -> if (finding.code.startsWith("INVALID_CONDITION")) {
+                                    if (ar) "شرط غير صالح" else "Invalid condition"
+                                } else finding.code
+                            }
+                            val location = finding.actionIndex?.let {
+                                if (ar) "الخطوة ${it + 1}: " else "Step ${it + 1}: "
+                            }.orEmpty()
+                            Text(location + label,
+                                color = if (finding.severity == RoutineReview.Severity.ERROR)
+                                    MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant,
+                                style = MaterialTheme.typography.bodySmall)
+                        }
+                    }
+                }
+            }
             if (permissionError) {
                 Text(
                     if (ar) "يلزم السماح بالإشعارات لهذا النوع من الأتمتة."
@@ -2304,7 +2339,7 @@ private fun RoutineBuilderScreen(
                 TextButton(onClick = onCancel, modifier = Modifier.weight(1f)) { Text(if (ar) "إلغاء" else "Cancel") }
                 Button(
                     onClick = { saveWithNeededPermissions(routine) },
-                    enabled = routine.isValid(),
+                    enabled = routine.isValid() && review.canRun,
                     modifier = Modifier.weight(1f),
                 ) { Text(if (ar) "حفظ" else "Save") }
             }
