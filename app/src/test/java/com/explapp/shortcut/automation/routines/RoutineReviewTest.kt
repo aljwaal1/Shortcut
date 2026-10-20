@@ -61,4 +61,23 @@ class RoutineReviewTest {
         assertTrue(report.findings.any { it.code == "SCREENSHOT_DELIVERY_NOT_CONFIGURED" && it.actionIndex == 1 })
     }
 
+    @Test fun timedCaptureWithoutPersistentSessionWarnsAboutConsent() {
+        val routine = flow(listOf(RoutineAction(RoutineActionType.TAKE_SCREENSHOT, "3000")))
+            .copy(trigger = RoutineTrigger(RoutineTriggerType.TIME, "08:30"))
+        val review = RoutineReview.inspect(routine)
+        assertTrue(review.canRun)
+        assertTrue(review.warnings.any {
+            it.actionIndex == 0 && it.code == "SCHEDULED_CAPTURE_MAY_REQUIRE_CONSENT"
+        })
+    }
+
+    @Test fun timedCaptureWithPersistentSessionAvoidsConsentWarning() {
+        val routine = flow(listOf(RoutineAction(
+            RoutineActionType.TAKE_SCREENSHOT, "3000",
+            parameters = mapOf("persistentCapture" to "true"),
+        ))).copy(trigger = RoutineTrigger(RoutineTriggerType.TIME, "08:30"))
+        val review = RoutineReview.inspect(routine)
+        assertFalse(review.warnings.any { it.code == "SCHEDULED_CAPTURE_MAY_REQUIRE_CONSENT" })
+    }
+
 }
