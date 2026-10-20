@@ -373,6 +373,12 @@ private fun MainShell(
                             .putExtra(MyAutomationsActivity.EXTRA_START_MODE, MyAutomationsActivity.MODE_TEMPLATES),
                     )
                 },
+                onOpenScreenshotTemplate = {
+                    context.startActivity(
+                        Intent(context, MyAutomationsActivity::class.java)
+                            .putExtra(MyAutomationsActivity.EXTRA_START_MODE, MyAutomationsActivity.MODE_SCREENSHOT),
+                    )
+                },
             )
             MainTab.TOOLS -> Unit
             MainTab.HISTORY -> ExecutionHistoryScreen(padding)
@@ -936,16 +942,28 @@ private fun TemplatesScreen(
     onCreateShortcut: () -> Unit,
     onCreateMessage: (MessagePlatform) -> Unit,
     onOpenAdvancedTemplates: () -> Unit,
+    onOpenScreenshotTemplate: () -> Unit,
 ) {
     val configuration = LocalConfiguration.current
     val ar = configuration.locales[0].language == "ar"
     var templateSearch by rememberSaveable { mutableStateOf("") }
-    data class TemplateUi(val title: Int, val accent: Color, val action: () -> Unit)
+    data class TemplateUi(val title: String, val description: String, val accent: Color, val action: () -> Unit)
     val templates = listOf(
-        TemplateUi(R.string.ready_templates, MaterialTheme.colorScheme.primary, onOpenAdvancedTemplates),
-        TemplateUi(R.string.template_open_app, MaterialTheme.colorScheme.primary, onCreateShortcut),
-        TemplateUi(R.string.template_whatsapp, MaterialTheme.colorScheme.secondary) { onCreateMessage(MessagePlatform.WHATSAPP) },
-        TemplateUi(R.string.template_telegram, MaterialTheme.colorScheme.tertiary) { onCreateMessage(MessagePlatform.TELEGRAM) },
+        TemplateUi(if (ar) "قوالب الأتمتة المتقدمة" else "Advanced automations",
+            if (ar) "سلاسل إجراءات جاهزة يمكنك تعديلها" else "Ready multi-step workflows to customize",
+            MaterialTheme.colorScheme.primary, onOpenAdvancedTemplates),
+        TemplateUi(if (ar) "فتح تطبيق وتصوير الشاشة" else "Open app and capture screen",
+            if (ar) "اختر التطبيق وأضف التاريخ واحفظ الصورة" else "Choose an app, stamp the date and save the image",
+            MaterialTheme.colorScheme.secondary, onOpenScreenshotTemplate),
+        TemplateUi(stringResource(R.string.template_open_app),
+            if (ar) "افتح تطبيقًا في وقت تحدده" else "Open an app at a chosen time",
+            MaterialTheme.colorScheme.primary, onCreateShortcut),
+        TemplateUi(stringResource(R.string.template_whatsapp),
+            if (ar) "إعداد رسالة واتساب مجدولة" else "Prepare a scheduled WhatsApp message",
+            MaterialTheme.colorScheme.secondary) { onCreateMessage(MessagePlatform.WHATSAPP) },
+        TemplateUi(stringResource(R.string.template_telegram),
+            if (ar) "إعداد رسالة تيليجرام" else "Prepare a Telegram message",
+            MaterialTheme.colorScheme.tertiary) { onCreateMessage(MessagePlatform.TELEGRAM) },
     )
     LazyColumn(
         modifier = Modifier.fillMaxSize().padding(padding),
@@ -969,14 +987,9 @@ private fun TemplatesScreen(
             )
         }
         val visibleTemplates = templates.filter { template ->
-            val title = when (template.title) {
-                R.string.ready_templates -> if (ar) "أتمتة متقدمة قوالب تدفق" else "Advanced automation flow templates"
-                R.string.template_open_app -> if (ar) "فتح تطبيق" else "Open app"
-                R.string.template_whatsapp -> if (ar) "واتساب رسائل" else "WhatsApp messages"
-                R.string.template_telegram -> if (ar) "تيليجرام رسائل بوت" else "Telegram messages bot"
-                else -> ""
-            }
-            templateSearch.isBlank() || title.contains(templateSearch.trim(), ignoreCase = true)
+            templateSearch.isBlank() ||
+                template.title.contains(templateSearch.trim(), ignoreCase = true) ||
+                template.description.contains(templateSearch.trim(), ignoreCase = true)
         }
         if (visibleTemplates.isEmpty()) {
             item {
@@ -997,12 +1010,9 @@ private fun TemplatesScreen(
                 ) {
                     AccentIcon(Icons.Default.AutoAwesome, template.accent)
                     Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                        Text(stringResource(template.title), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                        Text(template.title, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
                         Text(
-                            if (template.title == R.string.ready_templates) {
-                                if (ar) "معرض الأتمتة المتقدمة والقوالب متعددة الخطوات"
-                                else "Advanced automation gallery and multi-step routines"
-                            } else if (ar) "إعداد سريع بخطوات قليلة" else "Quick setup in a few steps",
+                            template.description,
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
