@@ -120,9 +120,21 @@ private fun MyAutomationsScreen(onBack: () -> Unit, initialMode: String = "") {
     var lastDeleted by remember { mutableStateOf<AutomationRoutine?>(null) }
 
     fun persist(items: List<AutomationRoutine>) {
-        itemsState.clear()
-        itemsState.addAll(items)
-        store.save(items)
+        // Commit the durable data before showing the user a successful edit.
+        // If encrypted storage fails, preserve the currently displayed routines.
+        runCatching { store.save(items) }
+            .onSuccess {
+                itemsState.clear()
+                itemsState.addAll(items)
+            }
+            .onFailure {
+                Toast.makeText(
+                    context,
+                    if (ar) "تعذر حفظ الأتمتة. بقيت البيانات السابقة دون تغيير."
+                    else "Could not save automation. Previous data was preserved.",
+                    Toast.LENGTH_LONG,
+                ).show()
+            }
     }
 
     fun upsert(item: AutomationRoutine) {
