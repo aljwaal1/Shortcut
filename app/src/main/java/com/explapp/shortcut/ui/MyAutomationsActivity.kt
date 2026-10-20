@@ -2235,6 +2235,7 @@ private fun RoutineBuilderScreen(
                         val message = when (finding.code) {
                             "INVALID_ACTION" -> if (ar) "هذه الخطوة غير صالحة" else "This step is invalid"
                             "SCREENSHOT_DELIVERY_NOT_CONFIGURED" -> if (ar) "أكمل إعدادات إرسال الصورة" else "Configure screenshot delivery"
+                            "SCHEDULED_CAPTURE_MAY_REQUIRE_CONSENT" -> if (ar) "قد تحتاج موافقة تصوير الشاشة وقت التشغيل" else "Screen capture consent may be needed at run time"
                             "USERNAME_REQUIRES_EXISTING_BOT_CHAT" -> if (ar) "يجب أن يكون المستلم قد بدأ محادثة مع البوت" else "Recipient must have started a bot chat"
                             "SCRIPT_REQUIRES_REVIEW" -> if (ar) "راجع السكربت قبل تشغيله" else "Review the script before running"
                             "USER_INTERACTION_REQUIRED" -> if (ar) "تتطلب الخطوة تدخلاً يدويًا" else "This step requires user interaction"
@@ -2362,6 +2363,7 @@ private fun RoutineBuilderScreen(
                                 "USERNAME_REQUIRES_EXISTING_BOT_CHAT" -> if (ar) "يجب أن يكون المستخدم قد بدأ محادثة مع البوت" else "Recipient must have started the bot"
                                 "ACTIONS_AFTER_STOP_UNREACHABLE" -> if (ar) "خطوات بعد الإيقاف لن تنفذ" else "Steps after stop cannot run"
                                 "SCREENSHOT_DELIVERY_NOT_CONFIGURED" -> if (ar) "إعداد إرسال الصورة غير مكتمل" else "Screenshot delivery is not configured"
+                                "SCHEDULED_CAPTURE_MAY_REQUIRE_CONSENT" -> if (ar) "التصوير المجدول قد يحتاج موافقة تصوير الشاشة" else "Scheduled capture may require screen recording consent"
                                 else -> if (finding.code.startsWith("INVALID_CONDITION")) {
                                     if (ar) "شرط غير صالح" else "Invalid condition"
                                 } else finding.code
