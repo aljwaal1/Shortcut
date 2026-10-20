@@ -993,8 +993,16 @@ private fun TemplatesScreen(
         }
         if (visibleTemplates.isEmpty()) {
             item {
-                Text(if (ar) "لا توجد قوالب مطابقة. جرّب كلمة أخرى." else "No matching templates. Try another search.",
-                    style = MaterialTheme.typography.bodyMedium)
+                InlineNotice(
+                    title = if (ar) "لا توجد قوالب مطابقة" else "No matching templates",
+                    body = if (ar) "جرّب البحث بكلمة أخرى أو امسح حقل البحث." else "Try another term or clear your search.",
+                    color = MaterialTheme.colorScheme.primary,
+                    action = {
+                        TextButton(onClick = { templateSearch = "" }) {
+                            Text(if (ar) "عرض جميع القوالب" else "Show all templates")
+                        }
+                    },
+                )
             }
         }
         items(visibleTemplates) { template ->
