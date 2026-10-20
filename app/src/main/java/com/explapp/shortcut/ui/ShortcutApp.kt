@@ -365,7 +365,15 @@ private fun MainShell(
                 onDeleteShortcut = onDeleteShortcut,
                 onDeleteMessage = onDeleteMessage,
             )
-            MainTab.TEMPLATES -> TemplatesScreen(padding, onCreateShortcut, onCreateMessage)
+            MainTab.TEMPLATES -> TemplatesScreen(
+                padding, onCreateShortcut, onCreateMessage,
+                onOpenAdvancedTemplates = {
+                    context.startActivity(
+                        Intent(context, MyAutomationsActivity::class.java)
+                            .putExtra(MyAutomationsActivity.EXTRA_START_MODE, MyAutomationsActivity.MODE_TEMPLATES),
+                    )
+                },
+            )
             MainTab.TOOLS -> Unit
             MainTab.HISTORY -> ExecutionHistoryScreen(padding)
             MainTab.SETTINGS -> SettingsScreen(padding, onOpenPermissions)
@@ -927,11 +935,13 @@ private fun TemplatesScreen(
     padding: PaddingValues,
     onCreateShortcut: () -> Unit,
     onCreateMessage: (MessagePlatform) -> Unit,
+    onOpenAdvancedTemplates: () -> Unit,
 ) {
     val configuration = LocalConfiguration.current
     val ar = configuration.locales[0].language == "ar"
     data class TemplateUi(val title: Int, val accent: Color, val action: () -> Unit)
     val templates = listOf(
+        TemplateUi(R.string.ready_templates, MaterialTheme.colorScheme.primary, onOpenAdvancedTemplates),
         TemplateUi(R.string.template_open_app, MaterialTheme.colorScheme.primary, onCreateShortcut),
         TemplateUi(R.string.template_whatsapp, MaterialTheme.colorScheme.secondary) { onCreateMessage(MessagePlatform.WHATSAPP) },
         TemplateUi(R.string.template_telegram, MaterialTheme.colorScheme.tertiary) { onCreateMessage(MessagePlatform.TELEGRAM) },
@@ -962,7 +972,10 @@ private fun TemplatesScreen(
                     Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
                         Text(stringResource(template.title), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
                         Text(
-                            if (ar) "إعداد سريع بخطوات قليلة" else "Quick setup in a few steps",
+                            if (template.title == R.string.ready_templates) {
+                                if (ar) "معرض الأتمتة المتقدمة والقوالب متعددة الخطوات"
+                                else "Advanced automation gallery and multi-step routines"
+                            } else if (ar) "إعداد سريع بخطوات قليلة" else "Quick setup in a few steps",
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
