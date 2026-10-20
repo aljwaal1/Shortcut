@@ -1,6 +1,7 @@
 package com.explapp.shortcut.automation.routines
 
 import android.content.Context
+import java.util.UUID
 
 class RoutineStore(context: Context) {
     private val prefs = context.getSharedPreferences("automation_routines", Context.MODE_PRIVATE)
@@ -15,9 +16,11 @@ class RoutineStore(context: Context) {
                     val updated = action.parameters.toMutableMap()
                     SECRET_KEYS.forEach { key ->
                         val value = updated[key].orEmpty()
-                        val secretKey = secretKey(routine.id, index, key)
+                        val secretKey = if (value.startsWith(SECRET_MARKER_V2)) {
+                            stableSecretKey(routine.id, value.removePrefix(SECRET_MARKER_V2), key)
+                        } else secretKey(routine.id, index, key)
                         when {
-                            value == SECRET_MARKER -> {
+                            value == SECRET_MARKER || value.startsWith(SECRET_MARKER_V2) -> {
                                 val secret = secrets.get(secretKey)
                                 if (secret.isNotBlank()) {
                                     updated[key] = secret
@@ -47,38 +50,45 @@ class RoutineStore(context: Context) {
 
     fun save(items: List<AutomationRoutine>) = synchronized(LOCK) {
         val distinct = items.distinctBy { it.id }
-        val activeRoutineIds = distinct.mapTo(mutableSetOf()) { it.id }
+        val retainedSecrets = mutableSetOf<String>()
         val protected = distinct.map { routine ->
-            val orphanedSecrets = secrets.keys("${routine.id}:").toMutableSet()
             val protectedRoutine = routine.copy(
                 actions = routine.actions.mapIndexed { index, action ->
                     val updated = action.parameters.toMutableMap()
                     SECRET_KEYS.forEach { key ->
-                        val storageKey = secretKey(routine.id, index, key)
                         val value = updated[key].orEmpty()
                         when {
-                            value == SECRET_MARKER && secrets.get(storageKey).isNotBlank() -> {
-                                // A previously protected routine may be saved without hydration.
-                                // Preserve the encrypted credential instead of silently deleting it.
-                                orphanedSecrets.remove(storageKey)
-                                updated[key] = SECRET_MARKER
+                            value.startsWith(SECRET_MARKER_V2) -> {
+                                val reference = value.removePrefix(SECRET_MARKER_V2)
+                                val storageKey = stableSecretKey(routine.id, reference, key)
+                                if (reference.isNotBlank() && secrets.get(storageKey).isNotBlank()) {
+                                    retainedSecrets += storageKey
+                                } else updated.remove(key)
                             }
-                            value.isBlank() || value == SECRET_MARKER -> {
-                                updated.remove(key)
+                            value == SECRET_MARKER -> {
+                                val oldKey = secretKey(routine.id, index, key)
+                                val oldValue = secrets.get(oldKey)
+                                if (oldValue.isNotBlank()) {
+                                    val reference = UUID.randomUUID().toString()
+                                    val newKey = stableSecretKey(routine.id, reference, key)
+                                    check(secrets.put(newKey, oldValue)) { "Could not protect migrated credential" }
+                                    retainedSecrets += newKey
+                                    updated[key] = SECRET_MARKER_V2 + reference
+                                } else updated.remove(key)
                             }
+                            value.isBlank() -> updated.remove(key)
                             else -> {
-                                check(secrets.put(storageKey, value)) {
-                                    "Could not store automation credential securely"
-                                }
-                                orphanedSecrets.remove(storageKey)
-                                updated[key] = SECRET_MARKER
+                                val reference = UUID.randomUUID().toString()
+                                val storageKey = stableSecretKey(routine.id, reference, key)
+                                check(secrets.put(storageKey, value)) { "Could not protect automation credential" }
+                                retainedSecrets += storageKey
+                                updated[key] = SECRET_MARKER_V2 + reference
                             }
                         }
                     }
                     action.copy(parameters = updated)
                 },
             )
-            orphanedSecrets.forEach(secrets::remove)
             protectedRoutine
         }
         check(prefs.edit().putString(KEY, RoutineCodec.encode(protected)).commit()) {
@@ -86,7 +96,7 @@ class RoutineStore(context: Context) {
         }
         // Only remove credentials after the new routine list is safely persisted.
         secrets.keys("").filter { key ->
-            key.substringBefore(':') !in activeRoutineIds
+            key !in retainedSecrets
         }.forEach(secrets::remove)
     }
 
@@ -105,12 +115,16 @@ class RoutineStore(context: Context) {
         secrets.removePrefix("$id:")
     }
 
+    private fun stableSecretKey(routineId: String, reference: String, parameter: String): String =
+        "$routineId:v2:$reference:$parameter"
+
     private fun secretKey(routineId: String, actionIndex: Int, parameter: String): String =
         "$routineId:$actionIndex:$parameter"
 
     companion object {
         private const val KEY = "items"
         private const val SECRET_MARKER = "__shortcut_secret_v1__"
+        private const val SECRET_MARKER_V2 = "__shortcut_secret_v2__:"
         private val SECRET_KEYS = setOf("botToken", "telegramBotToken")
         private val LOCK = Any()
     }
