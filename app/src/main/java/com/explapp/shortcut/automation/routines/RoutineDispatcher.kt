@@ -11,8 +11,17 @@ class RoutineDispatcher(private val context: Context) {
         onComplete: ((RoutineRunResult) -> Unit)? = null,
     ) {
         Thread {
-            val result = execute(routine, userInitiated)
-            onComplete?.invoke(result)
+            val result = runCatching { execute(routine, userInitiated) }.getOrElse {
+                RoutineRunResult(
+                    routineId = routine.id,
+                    routineName = routine.name,
+                    status = RoutineRunStatus.FAILED,
+                    actionResults = emptyList(),
+                    startedAtMs = System.currentTimeMillis(),
+                    finishedAtMs = System.currentTimeMillis(),
+                )
+            }
+            runCatching { onComplete?.invoke(result) }
         }.start()
     }
 
