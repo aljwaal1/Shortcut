@@ -809,6 +809,9 @@ class ScreenCaptureService : Service() {
         }
 
         if (display == null) {
+            // Mark terminal state before cleanup: the timeout callback must not
+            // attempt a second completion or create a duplicate history entry.
+            completed = true
             lastCaptureFailureReason = "Virtual display could not be created"
             cleanup()
             complete(null)
