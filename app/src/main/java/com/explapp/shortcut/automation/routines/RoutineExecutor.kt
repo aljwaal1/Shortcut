@@ -50,6 +50,9 @@ class RoutineExecutor(
                         "telegramCaption" to telegram.secondaryValue,
                     ),
                 )
+                // This action hands delivery to the screenshot pipeline. Only skip the
+                // standalone Telegram action when the capture was successfully queued.
+                // A failed capture must never be reported as a completed send.
                 index += 1
             }
 
