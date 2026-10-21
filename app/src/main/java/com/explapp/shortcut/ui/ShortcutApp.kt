@@ -101,6 +101,7 @@ import com.explapp.shortcut.automation.routines.RoutineStore
 import com.explapp.shortcut.search.CommandPaletteActivity
 import com.explapp.shortcut.tools.ToolCatalog
 import com.explapp.shortcut.tools.ToolRouter
+import com.explapp.shortcut.tools.ToolPreferencesStore
 import com.explapp.shortcut.tools.PersistentScreenCaptureService
 import com.explapp.shortcut.scheduler.AndroidAlarmScheduler
 import com.explapp.shortcut.scheduler.AndroidMessageScheduler
@@ -954,6 +955,7 @@ private fun TemplatesScreen(
     var templateSearch by rememberSaveable { mutableStateOf("") }
     val context = LocalContext.current
     val store = remember(context) { TemplateLibraryStore(context) }
+    val toolStore = remember(context) { ToolPreferencesStore(context.applicationContext) }
     var favorites by remember { mutableStateOf(store.favorites()) }
     var recent by remember { mutableStateOf(store.recent()) }
     var selectedCategory by rememberSaveable { mutableStateOf(TemplateLibraryFilter.ALL) }
@@ -986,7 +988,10 @@ private fun TemplatesScreen(
                 "files" -> MaterialTheme.colorScheme.tertiary
                 else -> MaterialTheme.colorScheme.primary
             },
-            action = { context.startActivity(ToolRouter.intent(context, preset.tool)) },
+            action = {
+                context.startActivity(ToolRouter.intent(context, preset.tool))
+                toolStore.recordRecent(preset.tool)
+            },
         )
     }
     val visibleTemplates = TemplateLibraryFilter.select(
