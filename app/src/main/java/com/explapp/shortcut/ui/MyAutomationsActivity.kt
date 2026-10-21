@@ -120,10 +120,9 @@ private fun MyAutomationsScreen(onBack: () -> Unit, initialMode: String = "") {
     var showDailyScreenshotTelegramChat by remember { mutableStateOf(false) }
     var lastDeleted by remember { mutableStateOf<AutomationRoutine?>(null) }
 
-    fun persist(items: List<AutomationRoutine>) {
-        // Commit the durable data before showing the user a successful edit.
-        // If encrypted storage fails, preserve the currently displayed routines.
-        runCatching { store.save(items) }
+    fun persist(items: List<AutomationRoutine>): Boolean {
+        // Persist first. Never cancel the previous schedule if the write fails.
+        return runCatching { store.save(items) }
             .onSuccess {
                 itemsState.clear()
                 itemsState.addAll(items)
@@ -135,26 +134,28 @@ private fun MyAutomationsScreen(onBack: () -> Unit, initialMode: String = "") {
                     else "Could not save automation. Previous data was preserved.",
                     Toast.LENGTH_LONG,
                 ).show()
-            }
+            }.isSuccess
     }
 
     fun upsert(item: AutomationRoutine) {
+        val next = itemsState.toMutableList()
+        val index = next.indexOfFirst { it.id == item.id }
+        if (index >= 0) next[index] = item else next += item
+        if (!persist(next)) return
+
+        // Change AlarmManager entries only after durable storage succeeds.
         scheduler.cancel(item.id)
-        val persisted = if (item.isEnabled && !scheduler.schedule(item)) {
+        if (item.isEnabled && !scheduler.schedule(item)) {
+            val paused = item.copy(isEnabled = false)
+            val pausedItems = itemsState.map { if (it.id == item.id) paused else it }
+            persist(pausedItems)
             Toast.makeText(
                 context,
-                if (ar) "تعذر جدولة الأتمتة. تم حفظها كمتوقفة حتى لا تظهر كأنها تعمل."
-                else "Could not schedule the automation. It was saved paused so it does not appear active.",
+                if (ar) "تعذر جدولة الأتمتة. تم إيقافها لتجنب إظهارها كأنها تعمل."
+                else "Scheduling failed. Automation was paused rather than shown as active.",
                 Toast.LENGTH_LONG,
             ).show()
-            item.copy(isEnabled = false)
-        } else {
-            item
         }
-        val next = itemsState.toMutableList()
-        val index = next.indexOfFirst { it.id == persisted.id }
-        if (index >= 0) next[index] = persisted else next += persisted
-        persist(next)
     }
 
     when {
@@ -363,9 +364,10 @@ private fun MyAutomationsScreen(onBack: () -> Unit, initialMode: String = "") {
                             TextButton(onClick = { editing = routine }) { Text(if (ar) "تعديل" else "Edit") }
                             TextButton(onClick = { upsert(routine.duplicate()) }) { Text(if (ar) "نسخ" else "Copy") }
                             TextButton(onClick = {
-                                scheduler.cancel(routine.id)
-                                lastDeleted = routine
-                                persist(itemsState.filterNot { it.id == routine.id })
+                                if (persist(itemsState.filterNot { it.id == routine.id })) {
+                                    scheduler.cancel(routine.id)
+                                    lastDeleted = routine
+                                }
                             }) { Text(if (ar) "حذف" else "Delete") }
                         }
                         if (routine.trigger.type == RoutineTriggerType.NFC) {
