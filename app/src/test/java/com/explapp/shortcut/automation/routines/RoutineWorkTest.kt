@@ -6,6 +6,19 @@ import org.junit.Test
 
 class RoutineWorkTest {
     @Test
+    fun telegramBotRoutineRequiresConnectivityBeforeWorkerStarts() {
+        val routine = AutomationRoutine(
+            name = "Network",
+            trigger = RoutineTrigger(RoutineTriggerType.MANUAL),
+            actions = listOf(RoutineAction(RoutineActionType.SEND_TELEGRAM_BOT, "", "Hello",
+                parameters = mapOf("botToken" to "test", "chatId" to "123"))),
+        )
+        assertEquals(true, RoutineWork.requiresNetwork(routine))
+        assertEquals(false, RoutineWork.requiresNetwork(routine.copy(
+            actions = listOf(RoutineAction(RoutineActionType.SHOW_NOTIFICATION, "Local")))))
+    }
+
+    @Test
     fun uniqueWorkNameIsStablePerRoutine() {
         assertEquals(
             RoutineWork.uniqueName("routine-a"),
