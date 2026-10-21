@@ -57,7 +57,7 @@ class RoutineExecutionWorker(
         val execution = runCatching {
             RoutineDispatcher(applicationContext).execute(routine, userInitiated = false)
         }
-        if (RoutineWork.shouldDisableAfterAttempt(routine) && execution.isSuccess) {
+        if (RoutineWork.shouldDisableAfterAttempt(routine, execution.isSuccess)) {
             runCatching {
                 store.upsert(routine.copy(isEnabled = false, updatedAtMs = System.currentTimeMillis()))
             }
@@ -102,8 +102,8 @@ object RoutineWork {
 
     internal fun uniqueName(routineId: String): String = "shortcut-routine:$routineId"
 
-    internal fun shouldDisableAfterAttempt(routine: AutomationRoutine): Boolean =
-        routine.trigger.type == RoutineTriggerType.TIME &&
+    internal fun shouldDisableAfterAttempt(routine: AutomationRoutine, dispatchSucceeded: Boolean = true): Boolean =
+        dispatchSucceeded && routine.trigger.type == RoutineTriggerType.TIME &&
             routine.trigger.repeat == RoutineRepeat.ONCE
 
     private const val TAG = "shortcut-routine-execution"
