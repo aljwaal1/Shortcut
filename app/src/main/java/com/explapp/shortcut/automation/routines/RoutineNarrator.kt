@@ -19,7 +19,7 @@ object RoutineNarrator {
         } else {
             parts += if (ar) "ستُنفذ الخطوات التالية بالترتيب:" else "The following steps run in order:"
             routine.actions.forEachIndexed { index, action ->
-                val behavior = action(action, ar)
+                val behavior = describeAction(action, ar)
                 val error = if (action.continueOnError) {
                     if (ar) " عند الفشل، تابع إلى الخطوة التالية." else " If it fails, continue to the next step."
                 } else {
@@ -88,7 +88,7 @@ object RoutineNarrator {
             if (ar) "المتغير ${safe(value.value)} يحتوي على القيمة المحددة" else "variable ${safe(value.value)} contains the chosen value"
     }
 
-    private fun action(value: RoutineAction, ar: Boolean): String {
+    private fun describeAction(value: RoutineAction, ar: Boolean): String {
         val title = RoutineCatalog.meta(value.type).let { if (ar) it.titleAr else it.titleEn }
         val suffix = when (value.type) {
             RoutineActionType.WAIT -> if (ar) " لمدة ${safe(value.value)} مللي ثانية." else " for ${safe(value.value)} milliseconds."
