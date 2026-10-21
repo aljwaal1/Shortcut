@@ -100,6 +100,7 @@ import com.explapp.shortcut.quality.CrashLogStore
 import com.explapp.shortcut.automation.routines.RoutineStore
 import com.explapp.shortcut.search.CommandPaletteActivity
 import com.explapp.shortcut.tools.ToolCatalog
+import com.explapp.shortcut.tools.ToolRouter
 import com.explapp.shortcut.tools.PersistentScreenCaptureService
 import com.explapp.shortcut.scheduler.AndroidAlarmScheduler
 import com.explapp.shortcut.scheduler.AndroidMessageScheduler
@@ -973,9 +974,31 @@ private fun TemplatesScreen(
         TemplateUi("telegram", "messaging", stringResource(R.string.template_telegram),
             if (ar) "إعداد رسالة تيليجرام" else "Prepare a Telegram message",
             MaterialTheme.colorScheme.tertiary) { onCreateMessage(MessagePlatform.TELEGRAM) },
-    )
+    ) + TemplateToolPresets.entries.map { preset ->
+        TemplateUi(
+            id = preset.id,
+            category = preset.category,
+            title = if (ar) preset.titleAr else preset.titleEn,
+            description = if (ar) preset.descriptionAr else preset.descriptionEn,
+            accent = when (preset.category) {
+                "pdf" -> MaterialTheme.colorScheme.primary
+                "images" -> MaterialTheme.colorScheme.secondary
+                "files" -> MaterialTheme.colorScheme.tertiary
+                else -> MaterialTheme.colorScheme.primary
+            },
+            action = { context.startActivity(ToolRouter.intent(context, preset.tool)) },
+        )
+    }
     val visibleTemplates = TemplateLibraryFilter.select(
-        templates.map { TemplateDescriptor(it.id, it.title, it.description, it.category) },
+        templates.map { template ->
+            val preset = TemplateToolPresets.entries.firstOrNull { it.id == template.id }
+            TemplateDescriptor(
+                template.id, template.title, template.description, template.category,
+                searchTerms = preset?.let {
+                    "${it.titleAr} ${it.titleEn} ${it.descriptionAr} ${it.descriptionEn}"
+                }.orEmpty(),
+            )
+        },
         templateSearch, selectedCategory, favorites, recent,
     ).mapNotNull { descriptor -> templates.firstOrNull { it.id == descriptor.id } }
     val openTemplate: (TemplateUi) -> Unit = { template ->
@@ -1012,6 +1035,10 @@ private fun TemplatesScreen(
                     "automation" to (if (ar) "الأتمتة" else "Automation"),
                     "messaging" to (if (ar) "الرسائل" else "Messages"),
                     "media" to (if (ar) "الوسائط" else "Media"),
+                    "pdf" to "PDF",
+                    "images" to (if (ar) "الصور" else "Images"),
+                    "files" to (if (ar) "الملفات" else "Files"),
+                    "quick" to (if (ar) "أدوات سريعة" else "Quick"),
                 )
                 items(filters.size) { index ->
                     val (key, label) = filters[index]
@@ -1030,14 +1057,14 @@ private fun TemplatesScreen(
                     body = if (ar) "جرّب البحث بكلمة أخرى أو امسح حقل البحث." else "Try another term or clear your search.",
                     color = MaterialTheme.colorScheme.primary,
                     action = {
-                        TextButton(onClick = { templateSearch = "" }) {
+                        TextButton(onClick = { templateSearch = ""; selectedCategory = TemplateLibraryFilter.ALL }) {
                             Text(if (ar) "عرض جميع القوالب" else "Show all templates")
                         }
                     },
                 )
             }
         }
-        items(visibleTemplates) { template ->
+        items(visibleTemplates, key = { it.id }) { template ->
             ElevatedCard(
                 modifier = Modifier.fillMaxWidth(),
                 colors = CardDefaults.elevatedCardColors(containerColor = template.accent.copy(alpha = 0.09f)),
@@ -1057,9 +1084,16 @@ private fun TemplatesScreen(
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
                     }
-                    TextButton(onClick = { favorites = store.toggleFavorite(template.id) }) {
-                        Text(if (template.id in favorites) "★" else "☆",
-                            color = template.accent, style = MaterialTheme.typography.titleLarge)
+                    IconButton(onClick = { favorites = store.toggleFavorite(template.id) }) {
+                        Icon(
+                            imageVector = if (template.id in favorites) Icons.Default.Star else Icons.Default.StarBorder,
+                            contentDescription = if (template.id in favorites) {
+                                if (ar) "إزالة من المفضلة" else "Remove from favorites"
+                            } else {
+                                if (ar) "إضافة إلى المفضلة" else "Add to favorites"
+                            },
+                            tint = template.accent,
+                        )
                     }
                 }
             }
