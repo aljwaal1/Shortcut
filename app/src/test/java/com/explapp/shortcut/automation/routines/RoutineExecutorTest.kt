@@ -30,6 +30,29 @@ class RoutineExecutorTest {
     }
 
     @Test
+    fun variableMutationCannotRunInParallel() {
+        val flow = AutomationRoutine(
+            name = "Unsafe shared state",
+            trigger = RoutineTrigger(RoutineTriggerType.MANUAL),
+            actions = listOf(
+                RoutineAction(RoutineActionType.SET_VARIABLE, "x", "1", parameters = mapOf("parallelGroup" to "g")),
+                RoutineAction(RoutineActionType.SET_VARIABLE, "x", "2", parameters = mapOf("parallelGroup" to "g")),
+            ),
+        )
+        assertEquals(false, RoutineReview.inspect(flow).canRun)
+    }
+
+    @Test
+    fun singletonParallelGroupIsRejected() {
+        val flow = AutomationRoutine(
+            name = "Singleton",
+            trigger = RoutineTrigger(RoutineTriggerType.MANUAL),
+            actions = listOf(RoutineAction(RoutineActionType.WAIT, "100", parameters = mapOf("parallelGroup" to "g"))),
+        )
+        assertEquals(false, RoutineReview.inspect(flow).canRun)
+    }
+
+    @Test
     fun unsafeParallelActionFailsReview() {
         val flow = AutomationRoutine(
             name = "Unsafe",
