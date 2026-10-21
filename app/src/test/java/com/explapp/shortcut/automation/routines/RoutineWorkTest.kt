@@ -34,6 +34,8 @@ class RoutineWorkTest {
 
         assertEquals(true, RoutineWork.shouldDisableAfterAttempt(once))
         assertEquals(false, RoutineWork.shouldDisableAfterAttempt(daily))
+        assertEquals(false, RoutineWork.shouldDisableAfterAttempt(once, dispatchSucceeded = false))
+        assertEquals(true, RoutineWork.shouldDisableAfterAttempt(once, dispatchSucceeded = true))
     }
 }
 
