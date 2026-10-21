@@ -40,6 +40,7 @@ internal data class TemplateDescriptor(
     val title: String,
     val description: String,
     val category: String,
+    val searchTerms: String = "",
 )
 
 /** Pure filtering logic, shared by the UI and JVM tests. */
@@ -63,7 +64,8 @@ internal object TemplateLibraryFilter {
                 else -> template.category == category
             }) && (normalized.isBlank() ||
                 template.title.contains(normalized, ignoreCase = true) ||
-                template.description.contains(normalized, ignoreCase = true))
+                template.description.contains(normalized, ignoreCase = true) ||
+                template.searchTerms.contains(normalized, ignoreCase = true))
         }
         return if (category == RECENT) {
             val order = recent.withIndex().associate { it.value to it.index }
