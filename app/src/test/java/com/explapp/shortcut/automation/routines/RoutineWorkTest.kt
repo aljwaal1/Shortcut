@@ -19,6 +19,11 @@ class RoutineWorkTest {
     }
 
     @Test
+    fun cancellingOneRoutineKeepsOtherWorkNameDistinct() {
+        assertNotEquals(RoutineWork.uniqueName("a"), RoutineWork.uniqueName("b"))
+    }
+
+    @Test
     fun uniqueWorkNameIsStablePerRoutine() {
         assertEquals(
             RoutineWork.uniqueName("routine-a"),

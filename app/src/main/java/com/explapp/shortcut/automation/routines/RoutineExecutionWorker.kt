@@ -103,6 +103,11 @@ object RoutineWork {
         )
     }
 
+    /** Cancel queued/scheduled work; a running non-cooperative external action may still finish. */
+    fun cancel(context: Context, routineId: String) {
+        WorkManager.getInstance(context.applicationContext).cancelUniqueWork(uniqueName(routineId))
+    }
+
     fun enqueueMatching(context: Context, event: RoutineEvent) {
         RoutineStore(context.applicationContext)
             .load()

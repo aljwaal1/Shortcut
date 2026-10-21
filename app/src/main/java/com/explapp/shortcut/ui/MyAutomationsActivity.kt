@@ -75,6 +75,8 @@ import com.explapp.shortcut.automation.routines.RoutineDispatcher
 import com.explapp.shortcut.automation.routines.RoutinePermissionPolicy
 import com.explapp.shortcut.automation.routines.RoutineRepeat
 import com.explapp.shortcut.automation.routines.RoutineScheduler
+import com.explapp.shortcut.automation.routines.RoutineProgressStore
+import com.explapp.shortcut.automation.routines.RoutineWork
 import com.explapp.shortcut.automation.routines.RoutineStore
 import com.explapp.shortcut.automation.routines.RoutineReview
 import com.explapp.shortcut.automation.routines.RoutineNarrator
@@ -361,6 +363,10 @@ private fun MyAutomationsScreen(onBack: () -> Unit, initialMode: String = "") {
                         }
                         Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
                             TextButton(onClick = { RoutineDispatcher(context).executeAsync(routine, userInitiated = true) }) { Text(if (ar) "تشغيل" else "Run") }
+                            TextButton(onClick = {
+                                RoutineWork.cancel(context, routine.id)
+                                Toast.makeText(context, if (ar) "أُلغي العمل المجدول؛ قد يكتمل الإجراء الجاري" else "Queued work cancelled; current action may finish", Toast.LENGTH_LONG).show()
+                            }) { Text(if (ar) "إلغاء" else "Cancel") }
                             TextButton(onClick = { editing = routine }) { Text(if (ar) "تعديل" else "Edit") }
                             TextButton(onClick = { upsert(routine.duplicate()) }) { Text(if (ar) "نسخ" else "Copy") }
                             TextButton(onClick = {
@@ -369,6 +375,13 @@ private fun MyAutomationsScreen(onBack: () -> Unit, initialMode: String = "") {
                                     lastDeleted = routine
                                 }
                             }) { Text(if (ar) "حذف" else "Delete") }
+                        }
+                        RoutineProgressStore(context).snapshot(routine.id)?.let { progress ->
+                            Text(
+                                if (ar) "آخر تنفيذ: ${progress.status} • آخر خطوة ${progress.lastCompletedActionIndex + 1}"
+                                else "Last run: ${progress.status} • Last step ${progress.lastCompletedActionIndex + 1}",
+                                style = MaterialTheme.typography.bodySmall,
+                            )
                         }
                         if (routine.trigger.type == RoutineTriggerType.NFC) {
                             TextButton(onClick = {
