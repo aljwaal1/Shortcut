@@ -5,6 +5,8 @@ import android.app.NotificationManager
 import android.content.Context
 import android.os.Build
 import androidx.core.app.NotificationCompat
+import androidx.work.Constraints
+import androidx.work.NetworkType
 import androidx.work.CoroutineWorker
 import androidx.work.ForegroundInfo
 import androidx.work.ExistingWorkPolicy
@@ -80,7 +82,15 @@ class RoutineExecutionWorker(
 object RoutineWork {
     fun enqueue(context: Context, routineId: String) {
         if (routineId.isBlank()) return
+        val needsNetwork = RoutineStore(context.applicationContext).load()
+            .firstOrNull { it.id == routineId }
+            ?.let(::requiresNetwork) == true
         val request = OneTimeWorkRequestBuilder<RoutineExecutionWorker>()
+            .setConstraints(
+                Constraints.Builder()
+                    .setRequiredNetworkType(if (needsNetwork) NetworkType.CONNECTED else NetworkType.NOT_REQUIRED)
+                    .build(),
+            )
             .setInputData(workDataOf(RoutineExecutionWorker.KEY_ROUTINE_ID to routineId))
             .setExpedited(OutOfQuotaPolicy.RUN_AS_NON_EXPEDITED_WORK_REQUEST)
             .addTag(TAG)
@@ -99,6 +109,9 @@ object RoutineWork {
             .filter { RoutineTriggerMatcher.matches(it, event) }
             .forEach { enqueue(context, it.id) }
     }
+
+    internal fun requiresNetwork(routine: AutomationRoutine): Boolean =
+        routine.actions.any { it.type == RoutineActionType.SEND_TELEGRAM_BOT }
 
     internal fun uniqueName(routineId: String): String = "shortcut-routine:$routineId"
 
