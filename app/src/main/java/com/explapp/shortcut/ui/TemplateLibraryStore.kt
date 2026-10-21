@@ -56,16 +56,17 @@ internal object TemplateLibraryFilter {
         favorites: Set<String>,
         recent: List<String>,
     ): List<TemplateDescriptor> {
-        val normalized = query.trim()
+        val terms = query.trim().split(Regex("\\s+")).filter(String::isNotBlank)
         val filtered = templates.filter { template ->
             (category == ALL || when (category) {
                 FAVORITES -> template.id in favorites
                 RECENT -> template.id in recent
                 else -> template.category == category
-            }) && (normalized.isBlank() ||
-                template.title.contains(normalized, ignoreCase = true) ||
-                template.description.contains(normalized, ignoreCase = true) ||
-                template.searchTerms.contains(normalized, ignoreCase = true))
+            }) && terms.all { term ->
+                template.title.contains(term, ignoreCase = true) ||
+                template.description.contains(term, ignoreCase = true) ||
+                template.searchTerms.contains(term, ignoreCase = true)
+            }
         }
         return if (category == RECENT) {
             val order = recent.withIndex().associate { it.value to it.index }
