@@ -77,6 +77,7 @@ import com.explapp.shortcut.automation.routines.RoutineRepeat
 import com.explapp.shortcut.automation.routines.RoutineScheduler
 import com.explapp.shortcut.automation.routines.RoutineStore
 import com.explapp.shortcut.automation.routines.RoutineReview
+import com.explapp.shortcut.automation.routines.RoutineNarrator
 import com.explapp.shortcut.automation.routines.RoutineTemplateCatalog
 import com.explapp.shortcut.automation.routines.RoutineTrigger
 import com.explapp.shortcut.automation.routines.RoutineTriggerType
@@ -1788,6 +1789,22 @@ private fun RoutineBuilderScreen(
                         )
                     }
                 }
+            } else if (conditionType == RoutineConditionType.DAY_OF_WEEK) {
+                Text(if (ar) "اختر يوم الأسبوع" else "Choose weekday", fontWeight = FontWeight.Bold)
+                val dayOptions = if (ar) {
+                    listOf("الاثنين", "الثلاثاء", "الأربعاء", "الخميس", "الجمعة", "السبت", "الأحد")
+                } else {
+                    listOf("Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday")
+                }
+                LazyRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    items(dayOptions.indices.toList()) { index ->
+                        FilterChip(
+                            selected = conditionValue == (index + 1).toString(),
+                            onClick = { conditionValue = (index + 1).toString() },
+                            label = { Text(dayOptions[index]) },
+                        )
+                    }
+                }
             } else {
                 OutlinedTextField(
                     value = conditionValue,
@@ -2343,6 +2360,32 @@ private fun RoutineBuilderScreen(
                             Text(if (ar) "تفعيل التصوير المستمر للقطات" else "Enable persistent capture")
                         }
                     }
+                }
+            }
+        }
+
+        item {
+            Column(
+                modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                Text(
+                    if (ar) "ماذا ستفعل هذه الأتمتة؟" else "What will this automation do?",
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold,
+                )
+                val explanation = RoutineNarrator.describe(previewRoutine, ar)
+                Text(explanation, style = MaterialTheme.typography.bodyMedium)
+                TextButton(onClick = {
+                    val clipboard = context.getSystemService(ClipboardManager::class.java)
+                    clipboard.setPrimaryClip(ClipData.newPlainText("Shortcut automation preview", explanation))
+                    Toast.makeText(
+                        context,
+                        if (ar) "تم نسخ وصف الأتمتة" else "Automation description copied",
+                        Toast.LENGTH_SHORT,
+                    ).show()
+                }) {
+                    Text(if (ar) "نسخ الوصف" else "Copy description")
                 }
             }
         }
