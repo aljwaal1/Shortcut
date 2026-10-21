@@ -1,5 +1,8 @@
 package com.explapp.shortcut.automation.routines
 
+import java.util.concurrent.Callable
+import java.util.concurrent.Executors
+
 fun interface RoutineConditionEvaluator {
     fun matches(condition: RoutineCondition): Boolean
 }
@@ -26,6 +29,31 @@ class RoutineExecutor(
         val results = mutableListOf<RoutineActionResult>()
         var index = 0
         while (index < routine.actions.size) {
+            val group = routine.actions[index].parameters["parallelGroup"].orEmpty()
+            if (group.isNotBlank()) {
+                val batch = routine.actions.drop(index).takeWhile { it.parameters["parallelGroup"] == group }
+                val pool = Executors.newFixedThreadPool(batch.size.coerceAtMost(4))
+                val outcomes = try {
+                    val jobs = batch.map { item ->
+                        pool.submit(Callable {
+                            runCatching { runner.run(item) }
+                                .getOrElse { RoutineActionResult.failure(item, it.message ?: it.javaClass.simpleName) }
+                        })
+                    }
+                    jobs.mapIndexed { i, job ->
+                        runCatching { job.get() }
+                            .getOrElse { RoutineActionResult.failure(batch[i], it.message ?: it.javaClass.simpleName) }
+                    }
+                } finally {
+                    pool.shutdown()
+                }
+                results.addAll(outcomes)
+                if (outcomes.any { it.status == RoutineActionStatus.PREPARED } ||
+                    outcomes.indices.any { i -> outcomes[i].status == RoutineActionStatus.FAILED && !batch[i].continueOnError }
+                ) break
+                index += batch.size
+                continue
+            }
             var action = routine.actions[index]
             var screenshotTelegramHandoff = false
 
