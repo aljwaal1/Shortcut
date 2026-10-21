@@ -2,10 +2,12 @@ package com.explapp.shortcut
 
 import android.app.Application
 import com.explapp.shortcut.quality.CrashLogStore
+import com.explapp.shortcut.automation.routines.RoutineUnlockMonitor
 
 class ShortcutApplication : Application() {
     override fun onCreate() {
         super.onCreate()
+        RoutineUnlockMonitor.start(this)
         val previous = Thread.getDefaultUncaughtExceptionHandler()
         Thread.setDefaultUncaughtExceptionHandler { thread, error ->
             runCatching { CrashLogStore(this).save(thread, error) }

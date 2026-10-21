@@ -18,6 +18,9 @@ enum class RoutineTriggerType {
     BATTERY_BELOW,
     NFC,
     BOOT,
+    DEVICE_UNLOCKED,
+    FIRST_UNLOCK_DAILY,
+    FIRST_UNLOCK_AFTER_BOOT,
 }
 
 enum class RoutineConditionType {

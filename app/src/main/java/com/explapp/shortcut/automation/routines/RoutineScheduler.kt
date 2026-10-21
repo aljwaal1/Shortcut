@@ -55,6 +55,9 @@ class RoutineScheduler(private val context: Context) {
             RoutineTriggerType.MANUAL,
             RoutineTriggerType.NFC,
             RoutineTriggerType.BOOT,
+            RoutineTriggerType.DEVICE_UNLOCKED,
+            RoutineTriggerType.FIRST_UNLOCK_DAILY,
+            RoutineTriggerType.FIRST_UNLOCK_AFTER_BOOT,
             -> true // Event/manual triggers do not need an AlarmManager entry.
         }
     }

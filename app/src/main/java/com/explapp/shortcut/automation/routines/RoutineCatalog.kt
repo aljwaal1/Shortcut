@@ -64,5 +64,8 @@ object RoutineCatalog {
         RoutineTriggerType.BATTERY_BELOW -> if (ar) "اكتب نسبة مثل 20. يبدأ الاختصار عندما تنخفض البطارية إلى أقل من هذه النسبة." else "Enter a percentage such as 20. The shortcut starts when battery drops below it."
         RoutineTriggerType.NFC -> if (ar) "بعد الحفظ، اكتب هذا الاختصار على وسم NFC. عند لمس الوسم سيبدأ الاختصار." else "After saving, write this shortcut to an NFC tag. Tapping the tag will start it."
         RoutineTriggerType.BOOT -> if (ar) "يبدأ بعد تشغيل الهاتف أو إعادة تشغيله، وفق قيود أندرويد على التشغيل في الخلفية." else "Starts after device boot or restart, subject to Android background limits."
+        RoutineTriggerType.DEVICE_UNLOCKED -> if (ar) "يستجيب لفتح القفل حين تكون مراقبة الحدث مفعلة؛ قد يتوقف بعد إيقاف التطبيق قسريًا." else "Responds to unlock while event monitoring is active; force-stop disables monitoring."
+        RoutineTriggerType.FIRST_UNLOCK_DAILY -> if (ar) "مرة واحدة يوميًا عند فتح القفل أثناء عمل المراقبة." else "Once daily on unlock while event monitoring is active."
+        RoutineTriggerType.FIRST_UNLOCK_AFTER_BOOT -> if (ar) "أول فتح للقفل بعد إعادة التشغيل أثناء عمل المراقبة." else "First unlock after reboot while monitoring is active."
     }
 }

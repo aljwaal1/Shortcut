@@ -81,6 +81,12 @@ object RoutineNarrator {
             if (ar) "عند قراءة وسم NFC المرتبط بالأتمتة:" else "When the linked NFC tag is scanned:"
         RoutineTriggerType.BOOT ->
             if (ar) "بعد تشغيل الجهاز، وفق قيود Android:" else "After device boot, subject to Android restrictions:"
+        RoutineTriggerType.DEVICE_UNLOCKED ->
+            if (ar) "عند فتح قفل الهاتف (بعد توفر مستقبل الحدث):" else "When the phone is unlocked (when event monitoring is active):"
+        RoutineTriggerType.FIRST_UNLOCK_DAILY ->
+            if (ar) "عند أول فتح للقفل خلال اليوم:" else "On the first unlock each day:"
+        RoutineTriggerType.FIRST_UNLOCK_AFTER_BOOT ->
+            if (ar) "عند أول فتح للقفل بعد إعادة التشغيل:" else "On the first unlock after restart:"
     }
 
     private fun condition(value: RoutineCondition, ar: Boolean): String = when (value.type) {

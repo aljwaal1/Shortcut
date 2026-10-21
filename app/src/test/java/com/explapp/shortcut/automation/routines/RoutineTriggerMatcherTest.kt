@@ -15,6 +15,16 @@ class RoutineTriggerMatcherTest {
     }
 
     @Test
+    fun unlockEventsMatchOnlyTheirOwnTrigger() {
+        assertTrue(RoutineTriggerMatcher.matches(
+            RoutineTrigger(RoutineTriggerType.DEVICE_UNLOCKED),
+            RoutineEvent(RoutineTriggerType.DEVICE_UNLOCKED)))
+        assertFalse(RoutineTriggerMatcher.matches(
+            RoutineTrigger(RoutineTriggerType.FIRST_UNLOCK_DAILY),
+            RoutineEvent(RoutineTriggerType.FIRST_UNLOCK_AFTER_BOOT)))
+    }
+
+    @Test
     fun pausedRoutineNeverMatches() {
         val routine = AutomationRoutine(
             name = "Paused",
