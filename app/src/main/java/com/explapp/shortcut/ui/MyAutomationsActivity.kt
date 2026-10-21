@@ -2216,6 +2216,31 @@ private fun RoutineBuilderScreen(
                         ar,
                     )
 
+                    val parallelAllowed = actionType !in setOf(
+                        RoutineActionType.OPEN_APP_SCREENSHOT,
+                        RoutineActionType.TAKE_SCREENSHOT,
+                        RoutineActionType.STOP_SHORTCUT,
+                        RoutineActionType.PREPARE_WHATSAPP,
+                        RoutineActionType.PREPARE_TELEGRAM,
+                        RoutineActionType.SHARE_FILE,
+                        RoutineActionType.SHARE_TEXT,
+                    )
+                    if (parallelAllowed) {
+                        OutlinedTextField(
+                            value = params["parallelGroup"].orEmpty(),
+                            onValueChange = { newGroup ->
+                                params = if (newGroup.isBlank()) params - "parallelGroup"
+                                else params + ("parallelGroup" to newGroup.trim().take(40))
+                            },
+                            label = { Text(if (ar) "مجموعة تنفيذ متوازي (اختياري)" else "Parallel group (optional)") },
+                            supportingText = {
+                                Text(if (ar) "الخطوات المتجاورة التي تحمل الاسم نفسه تعمل بالتوازي، ثم ينتظر المحرك اكتمالها."
+                                else "Adjacent steps with the same name run concurrently; following steps wait for completion.")
+                            },
+                            modifier = Modifier.fillMaxWidth(),
+                        )
+                    }
+
                     val draft = RoutineAction(actionType, value, secondary, continueOnError, params)
                     Button(
                         onClick = {
