@@ -53,6 +53,19 @@ class TemplateLibrarySearchRegressionTest {
         ).isEmpty())
     }
 
+    @Test fun arabicAlefVariantsAndDiacriticsMatch() {
+        assertEquals(listOf("pdf"), TemplateLibraryFilter.select(
+            entries, "إِسْتِخْراج", TemplateLibraryFilter.ALL, emptySet(), emptyList()
+        ).map { it.id })
+    }
+
+    @Test fun arabicAlifAndYaNormalization() {
+        val templates = listOf(TemplateDescriptor("a", "إلى الملفات", "", "files"))
+        assertEquals(listOf("a"), TemplateLibraryFilter.select(
+            templates, "الي", TemplateLibraryFilter.ALL, emptySet(), emptyList()
+        ).map { it.id })
+    }
+
     @Test fun presetsHaveUniqueIdsAndCategories() {
         assertEquals(TemplateToolPresets.entries.size, TemplateToolPresets.entries.map { it.id }.toSet().size)
         assertTrue(TemplateToolPresets.entries.all { it.id.isNotBlank() && it.category in setOf("pdf", "images", "files", "quick") })
