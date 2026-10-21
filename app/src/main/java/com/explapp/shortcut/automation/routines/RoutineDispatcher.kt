@@ -54,12 +54,29 @@ class RoutineDispatcher(private val context: Context) {
                     emptyList(), startedAt, System.currentTimeMillis(),
                 )
             }
-            if (!resumeSafeWaits) progress.begin(routine.id)
+            if (!resumeSafeWaits) {
+                // A scheduled dispatch must not erase an uncertain checkpoint from a
+                // previous process crash: that could replay an external side effect.
+                if (!userInitiated && progress.snapshot(routine.id)?.status == "UNCERTAIN") {
+                    return RoutineRunResult(
+                        routine.id, routine.name, RoutineRunStatus.FAILED,
+                        emptyList(), startedAt, System.currentTimeMillis(),
+                    )
+                }
+                if (!progress.begin(routine.id)) {
+                    return RoutineRunResult(
+                        routine.id, routine.name, RoutineRunStatus.FAILED,
+                        emptyList(), startedAt, System.currentTimeMillis(),
+                    )
+                }
+            }
             val result = runCatching {
                 RoutineExecutor(
                     AndroidRoutineActionRunner(context, userInitiated, routine.id, routine.name),
                     AndroidRoutineConditionEvaluator(context),
-                    onProgress = { index, status -> progress.record(routine.id, index, status) },
+                    onProgress = { index, status ->
+                        check(progress.record(routine.id, index, status)) { "Unable to persist automation progress" }
+                    },
                     shouldContinue = { !progress.isCancelled(routine.id) },
                     startIndex = resumeIndex ?: 0,
                 ).execute(routine, startedAtMs = startedAt)
