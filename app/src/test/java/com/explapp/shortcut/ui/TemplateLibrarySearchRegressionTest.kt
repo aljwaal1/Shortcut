@@ -38,6 +38,21 @@ class TemplateLibrarySearchRegressionTest {
         ).map { it.id })
     }
 
+    @Test fun unorderedMixedLanguageQueryMatchesAcrossFields() {
+        assertEquals(listOf("pdf"), TemplateLibraryFilter.select(
+            entries, "PDF استخراج", TemplateLibraryFilter.ALL, emptySet(), emptyList()
+        ).map { it.id })
+        assertEquals(listOf("pdf"), TemplateLibraryFilter.select(
+            entries, "استخراج PDF", TemplateLibraryFilter.ALL, emptySet(), emptyList()
+        ).map { it.id })
+    }
+
+    @Test fun allTermsMustMatch() {
+        assertTrue(TemplateLibraryFilter.select(
+            entries, "PDF Telegram", TemplateLibraryFilter.ALL, emptySet(), emptyList()
+        ).isEmpty())
+    }
+
     @Test fun presetsHaveUniqueIdsAndCategories() {
         assertEquals(TemplateToolPresets.entries.size, TemplateToolPresets.entries.map { it.id }.toSet().size)
         assertTrue(TemplateToolPresets.entries.all { it.id.isNotBlank() && it.category in setOf("pdf", "images", "files", "quick") })
