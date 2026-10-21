@@ -67,5 +67,7 @@ object RoutineCatalog {
         RoutineTriggerType.DEVICE_UNLOCKED -> if (ar) "يستجيب لفتح القفل حين تكون مراقبة الحدث مفعلة؛ قد يتوقف بعد إيقاف التطبيق قسريًا." else "Responds to unlock while event monitoring is active; force-stop disables monitoring."
         RoutineTriggerType.FIRST_UNLOCK_DAILY -> if (ar) "مرة واحدة يوميًا عند فتح القفل أثناء عمل المراقبة." else "Once daily on unlock while event monitoring is active."
         RoutineTriggerType.FIRST_UNLOCK_AFTER_BOOT -> if (ar) "أول فتح للقفل بعد إعادة التشغيل أثناء عمل المراقبة." else "First unlock after reboot while monitoring is active."
+        RoutineTriggerType.INTERNET_CONNECTED -> if (ar) "عند عودة اتصال الإنترنت أثناء عمل التطبيق." else "When internet connectivity returns while monitoring is active."
+        RoutineTriggerType.INTERNET_DISCONNECTED -> if (ar) "عند انقطاع الإنترنت أثناء عمل التطبيق." else "When internet connectivity drops while monitoring is active."
     }
 }

@@ -21,6 +21,8 @@ enum class RoutineTriggerType {
     DEVICE_UNLOCKED,
     FIRST_UNLOCK_DAILY,
     FIRST_UNLOCK_AFTER_BOOT,
+    INTERNET_CONNECTED,
+    INTERNET_DISCONNECTED,
 }
 
 enum class RoutineConditionType {

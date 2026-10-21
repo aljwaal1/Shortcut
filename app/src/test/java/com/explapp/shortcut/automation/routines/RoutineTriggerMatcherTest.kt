@@ -25,6 +25,16 @@ class RoutineTriggerMatcherTest {
     }
 
     @Test
+    fun connectivityEventsAreDistinct() {
+        assertTrue(RoutineTriggerMatcher.matches(
+            RoutineTrigger(RoutineTriggerType.INTERNET_CONNECTED),
+            RoutineEvent(RoutineTriggerType.INTERNET_CONNECTED)))
+        assertFalse(RoutineTriggerMatcher.matches(
+            RoutineTrigger(RoutineTriggerType.INTERNET_CONNECTED),
+            RoutineEvent(RoutineTriggerType.INTERNET_DISCONNECTED)))
+    }
+
+    @Test
     fun pausedRoutineNeverMatches() {
         val routine = AutomationRoutine(
             name = "Paused",

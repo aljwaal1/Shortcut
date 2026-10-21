@@ -58,6 +58,8 @@ class RoutineScheduler(private val context: Context) {
             RoutineTriggerType.DEVICE_UNLOCKED,
             RoutineTriggerType.FIRST_UNLOCK_DAILY,
             RoutineTriggerType.FIRST_UNLOCK_AFTER_BOOT,
+            RoutineTriggerType.INTERNET_CONNECTED,
+            RoutineTriggerType.INTERNET_DISCONNECTED,
             -> true // Event/manual triggers do not need an AlarmManager entry.
         }
     }

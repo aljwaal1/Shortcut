@@ -2734,6 +2734,8 @@ private fun triggerTitle(type: RoutineTriggerType, ar: Boolean): String = when (
     RoutineTriggerType.DEVICE_UNLOCKED -> if (ar) "فتح قفل الهاتف" else "Device unlocked"
     RoutineTriggerType.FIRST_UNLOCK_DAILY -> if (ar) "أول فتح يوميًا" else "First daily unlock"
     RoutineTriggerType.FIRST_UNLOCK_AFTER_BOOT -> if (ar) "أول فتح بعد التشغيل" else "First unlock after boot"
+    RoutineTriggerType.INTERNET_CONNECTED -> if (ar) "عودة الإنترنت" else "Internet connected"
+    RoutineTriggerType.INTERNET_DISCONNECTED -> if (ar) "انقطاع الإنترنت" else "Internet disconnected"
 }
 
 private fun triggerValueLabel(type: RoutineTriggerType, ar: Boolean): String = when (type) {

@@ -87,6 +87,10 @@ object RoutineNarrator {
             if (ar) "عند أول فتح للقفل خلال اليوم:" else "On the first unlock each day:"
         RoutineTriggerType.FIRST_UNLOCK_AFTER_BOOT ->
             if (ar) "عند أول فتح للقفل بعد إعادة التشغيل:" else "On the first unlock after restart:"
+        RoutineTriggerType.INTERNET_CONNECTED ->
+            if (ar) "عند عودة الإنترنت أثناء تفعيل المراقبة:" else "When internet returns while monitoring is active:"
+        RoutineTriggerType.INTERNET_DISCONNECTED ->
+            if (ar) "عند انقطاع الإنترنت أثناء تفعيل المراقبة:" else "When internet disconnects while monitoring is active:"
     }
 
     private fun condition(value: RoutineCondition, ar: Boolean): String = when (value.type) {
