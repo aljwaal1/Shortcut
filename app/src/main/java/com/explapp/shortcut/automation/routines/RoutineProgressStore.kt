@@ -1,6 +1,7 @@
 package com.explapp.shortcut.automation.routines
 
 import android.content.Context
+import java.security.MessageDigest
 
 /**
  * Persist only execution metadata, never payloads, recipients or credentials.
@@ -16,6 +17,21 @@ class RoutineProgressStore(context: Context) {
         .putBoolean("$id:cancel", false)
         .commit()
 
+    fun bindRoutine(routine: AutomationRoutine): Boolean = prefs.edit()
+        .putString("${routine.id}:fingerprint", fingerprint(routine))
+        .commit()
+
+    private fun fingerprint(routine: AutomationRoutine): String {
+        val definition = buildString {
+            append(routine.trigger)
+            routine.conditions.forEach { append('|'); append(it) }
+            routine.actions.forEach { append('|'); append(it) }
+        }
+        return MessageDigest.getInstance("SHA-256")
+            .digest(definition.toByteArray(Charsets.UTF_8))
+            .joinToString("") { "%02x".format(it) }
+    }
+
     fun record(id: String, index: Int, status: RoutineActionStatus): Boolean = prefs.edit()
         .putInt("$id:index", index)
         .putString("$id:last", status.name)
@@ -28,6 +44,7 @@ class RoutineProgressStore(context: Context) {
     fun safeResumeIndex(routine: AutomationRoutine): Int? {
         val state = snapshot(routine.id) ?: return null
         if (state.status != "UNCERTAIN") return null
+        if (prefs.getString("${routine.id}:fingerprint", null) != fingerprint(routine)) return null
         val index = state.lastCompletedActionIndex
         if (index < 0) return 0
         if (index >= routine.actions.size) return null
