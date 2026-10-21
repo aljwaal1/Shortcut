@@ -24,20 +24,18 @@ object RoutineReview {
         if (!routine.isEnabled) findings += Finding(Severity.WARNING, null, "ROUTINE_DISABLED")
         routine.actions.forEachIndexed { index, action ->
             if (action.parameters["parallelGroup"].orEmpty().isNotBlank() &&
-                action.type in setOf(
-                    RoutineActionType.OPEN_APP_SCREENSHOT,
-                    RoutineActionType.TAKE_SCREENSHOT,
-                    RoutineActionType.STOP_SHORTCUT,
-                    RoutineActionType.PREPARE_WHATSAPP,
-                    RoutineActionType.PREPARE_TELEGRAM,
-                    RoutineActionType.SHARE_FILE,
-                    RoutineActionType.SHARE_TEXT,
+                action.type !in setOf(
+                    RoutineActionType.WAIT,
+                    RoutineActionType.SHOW_NOTIFICATION,
                 )
             ) findings += Finding(Severity.ERROR, index, "ACTION_UNSAFE_FOR_PARALLEL")
             if (action.parameters["parallelGroup"].orEmpty().isNotBlank() &&
                 routine.actions.take(index).any { it.parameters["parallelGroup"] == action.parameters["parallelGroup"] } &&
                 routine.actions.getOrNull(index - 1)?.parameters?.get("parallelGroup") != action.parameters["parallelGroup"]
             ) findings += Finding(Severity.ERROR, index, "PARALLEL_GROUP_NOT_CONTIGUOUS")
+            if (action.parameters["parallelGroup"].orEmpty().isNotBlank() &&
+                routine.actions.count { it.parameters["parallelGroup"] == action.parameters["parallelGroup"] } < 2
+            ) findings += Finding(Severity.ERROR, index, "PARALLEL_GROUP_NEEDS_TWO_ACTIONS")
             if (!action.isValid()) findings += Finding(Severity.ERROR, index, "INVALID_ACTION")
             if (action.type == RoutineActionType.CUSTOM_SCRIPT) {
                 findings += Finding(Severity.WARNING, index, "SCRIPT_REQUIRES_REVIEW")
