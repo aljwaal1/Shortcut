@@ -2731,6 +2731,9 @@ private fun triggerTitle(type: RoutineTriggerType, ar: Boolean): String = when (
     RoutineTriggerType.BATTERY_BELOW -> if (ar) "البطارية أقل من" else "Battery below"
     RoutineTriggerType.NFC -> "NFC"
     RoutineTriggerType.BOOT -> if (ar) "تشغيل الجهاز" else "Device boot"
+    RoutineTriggerType.DEVICE_UNLOCKED -> if (ar) "فتح قفل الهاتف" else "Device unlocked"
+    RoutineTriggerType.FIRST_UNLOCK_DAILY -> if (ar) "أول فتح يوميًا" else "First daily unlock"
+    RoutineTriggerType.FIRST_UNLOCK_AFTER_BOOT -> if (ar) "أول فتح بعد التشغيل" else "First unlock after boot"
 }
 
 private fun triggerValueLabel(type: RoutineTriggerType, ar: Boolean): String = when (type) {
