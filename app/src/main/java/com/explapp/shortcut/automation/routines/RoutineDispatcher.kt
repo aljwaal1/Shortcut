@@ -53,6 +53,7 @@ class RoutineDispatcher(private val context: Context) {
                     AndroidRoutineActionRunner(context, userInitiated, routine.id, routine.name),
                     AndroidRoutineConditionEvaluator(context),
                     onProgress = { index, status -> progress.record(routine.id, index, status) },
+                    shouldContinue = { !progress.isCancelled(routine.id) },
                 ).execute(routine, startedAtMs = startedAt)
             }.getOrElse { _ ->
                 RoutineRunResult(

@@ -105,6 +105,7 @@ object RoutineWork {
 
     /** Cancel queued/scheduled work; a running non-cooperative external action may still finish. */
     fun cancel(context: Context, routineId: String) {
+        RoutineProgressStore(context).requestCancel(routineId)
         WorkManager.getInstance(context.applicationContext).cancelUniqueWork(uniqueName(routineId))
     }
 

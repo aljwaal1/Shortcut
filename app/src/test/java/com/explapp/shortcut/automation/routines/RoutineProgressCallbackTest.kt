@@ -21,6 +21,27 @@ class RoutineProgressCallbackTest {
         assertEquals(true, records.all { it.second == RoutineActionStatus.SUCCESS })
     }
 
+    @Test fun cooperativeCancelStopsAtNextActionBoundary() {
+        var executed = 0
+        val flow = AutomationRoutine(
+            name = "Cancel", trigger = RoutineTrigger(RoutineTriggerType.MANUAL),
+            actions = listOf(
+                RoutineAction(RoutineActionType.WAIT, "100"),
+                RoutineAction(RoutineActionType.WAIT, "100"),
+                RoutineAction(RoutineActionType.WAIT, "100"),
+            ),
+        )
+        val result = RoutineExecutor(
+            RoutineActionRunner { action ->
+                executed++
+                RoutineActionResult.success(action)
+            },
+            shouldContinue = { executed < 1 },
+        ).execute(flow)
+        assertEquals(1, executed)
+        assertEquals(RoutineRunStatus.FAILED, result.status)
+    }
+
     @Test fun preparedStopsAndRecordsItsIndex() {
         val records = mutableListOf<Int>()
         val r = AutomationRoutine(

@@ -11,6 +11,7 @@ class RoutineExecutor(
     private val runner: RoutineActionRunner,
     private val conditionEvaluator: RoutineConditionEvaluator = RoutineConditionEvaluator { true },
     private val onProgress: (Int, RoutineActionStatus) -> Unit = { _, _ -> },
+    private val shouldContinue: () -> Boolean = { true },
 ) {
     fun execute(
         routine: AutomationRoutine,
@@ -29,7 +30,12 @@ class RoutineExecutor(
 
         val results = mutableListOf<RoutineActionResult>()
         var index = 0
+        var cancelled = false
         while (index < routine.actions.size) {
+            if (!shouldContinue()) {
+                cancelled = true
+                break
+            }
             val group = routine.actions[index].parameters["parallelGroup"].orEmpty()
             if (group.isNotBlank()) {
                 val batch = routine.actions.drop(index).takeWhile { it.parameters["parallelGroup"] == group }
@@ -110,6 +116,7 @@ class RoutineExecutor(
         }
 
         val status = when {
+            cancelled -> RoutineRunStatus.FAILED
             results.any { it.status == RoutineActionStatus.FAILED } -> RoutineRunStatus.FAILED
             results.any { it.status == RoutineActionStatus.PREPARED } -> RoutineRunStatus.PREPARED
             else -> RoutineRunStatus.SUCCESS

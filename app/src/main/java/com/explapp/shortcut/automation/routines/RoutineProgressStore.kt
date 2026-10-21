@@ -13,12 +13,20 @@ class RoutineProgressStore(context: Context) {
     fun begin(id: String): Boolean = prefs.edit()
         .putString("$id:state", "IN_FLIGHT")
         .putInt("$id:index", -1)
+        .putBoolean("$id:cancel", false)
         .commit()
 
     fun record(id: String, index: Int, status: RoutineActionStatus): Boolean = prefs.edit()
         .putInt("$id:index", index)
         .putString("$id:last", status.name)
         .commit()
+
+    fun requestCancel(id: String): Boolean = prefs.edit()
+        .putBoolean("$id:cancel", true)
+        .putString("$id:state", "CANCEL_REQUESTED")
+        .commit()
+
+    fun isCancelled(id: String): Boolean = prefs.getBoolean("$id:cancel", false)
 
     fun finish(id: String, status: RoutineRunStatus): Boolean = prefs.edit()
         .putString("$id:state", status.name)
@@ -27,7 +35,10 @@ class RoutineProgressStore(context: Context) {
     fun snapshot(id: String): Snapshot? {
         if (!prefs.contains("$id:state")) return null
         val stored = prefs.getString("$id:state", "IN_FLIGHT").orEmpty()
-        val visible = if (stored == "IN_FLIGHT") "UNCERTAIN" else stored
+        val visible = when (stored) {
+            "IN_FLIGHT" -> "UNCERTAIN"
+            else -> stored
+        }
         return Snapshot(visible, prefs.getInt("$id:index", -1))
     }
 
