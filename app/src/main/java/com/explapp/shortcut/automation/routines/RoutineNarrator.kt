@@ -17,7 +17,7 @@ object RoutineNarrator {
         if (routine.actions.isEmpty()) {
             parts += if (ar) "لم تُضف أي خطوات بعد." else "No actions have been added yet."
         } else {
-            parts += if (ar) "ستُنفذ الخطوات التالية بالترتيب:" else "The following steps run in order:"
+            parts += if (ar) "تُنفذ الخطوات بالترتيب، باستثناء الخطوات المتجاورة التي تحمل مجموعة توازٍ واحدة:" else "Steps run in order except adjacent steps with the same parallel group:"
             routine.actions.forEachIndexed { index, action ->
                 val behavior = describeAction(action, ar)
                 val error = if (action.continueOnError) {
@@ -25,7 +25,11 @@ object RoutineNarrator {
                 } else {
                     if (ar) " عند الفشل، أوقف بقية الخطوات." else " If it fails, stop the remaining steps."
                 }
-                parts += "${index + 1}. $behavior$error"
+                val group = action.parameters["parallelGroup"].orEmpty()
+                val parallel = if (group.isNotBlank()) {
+                    if (ar) " بالتوازي ضمن المجموعة ${safe(group)}." else " In parallel group ${safe(group)}."
+                } else ""
+                parts += "${index + 1}. $behavior$parallel$error"
             }
         }
         val manual = routine.actions.any {
