@@ -33,6 +33,8 @@ object RoutineReview {
                 routine.actions.take(index).any { it.parameters["parallelGroup"] == action.parameters["parallelGroup"] } &&
                 routine.actions.getOrNull(index - 1)?.parameters?.get("parallelGroup") != action.parameters["parallelGroup"]
             ) findings += Finding(Severity.ERROR, index, "PARALLEL_GROUP_NOT_CONTIGUOUS")
+            if (action.parameters["parallelGroup"].orEmpty().length > 40
+            ) findings += Finding(Severity.ERROR, index, "PARALLEL_GROUP_NAME_TOO_LONG")
             if (action.parameters["parallelGroup"].orEmpty().isNotBlank() &&
                 routine.actions.count { it.parameters["parallelGroup"] == action.parameters["parallelGroup"] } < 2
             ) findings += Finding(Severity.ERROR, index, "PARALLEL_GROUP_NEEDS_TWO_ACTIONS")
