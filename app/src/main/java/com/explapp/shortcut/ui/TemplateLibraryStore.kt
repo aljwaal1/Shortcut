@@ -49,6 +49,11 @@ internal object TemplateLibraryFilter {
     const val FAVORITES = "favorites"
     const val RECENT = "recent"
 
+    private fun normalize(value: String): String = value.lowercase(java.util.Locale.ROOT)
+        .replace(Regex("[\\u064B-\\u065F\\u0670]"), "")
+        .replace('أ', 'ا').replace('إ', 'ا').replace('آ', 'ا')
+        .replace('ى', 'ي').replace('ـ', ' ')
+
     fun select(
         templates: List<TemplateDescriptor>,
         query: String,
@@ -56,16 +61,15 @@ internal object TemplateLibraryFilter {
         favorites: Set<String>,
         recent: List<String>,
     ): List<TemplateDescriptor> {
-        val terms = query.trim().split(Regex("\\s+")).filter(String::isNotBlank)
+        val terms = normalize(query).trim().split(Regex("\\s+")).filter(String::isNotBlank)
         val filtered = templates.filter { template ->
+            val searchable = normalize("${template.title} ${template.description} ${template.searchTerms}")
             (category == ALL || when (category) {
                 FAVORITES -> template.id in favorites
                 RECENT -> template.id in recent
                 else -> template.category == category
             }) && terms.all { term ->
-                template.title.contains(term, ignoreCase = true) ||
-                template.description.contains(term, ignoreCase = true) ||
-                template.searchTerms.contains(term, ignoreCase = true)
+                searchable.contains(term)
             }
         }
         return if (category == RECENT) {
