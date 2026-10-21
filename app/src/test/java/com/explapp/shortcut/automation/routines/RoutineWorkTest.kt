@@ -45,10 +45,14 @@ class RoutineWorkTest {
             trigger = once.trigger.copy(repeat = RoutineRepeat.DAILY, repeatValue = ""),
         )
 
-        assertEquals(true, RoutineWork.shouldDisableAfterAttempt(once))
-        assertEquals(false, RoutineWork.shouldDisableAfterAttempt(daily))
-        assertEquals(false, RoutineWork.shouldDisableAfterAttempt(once, dispatchSucceeded = false))
-        assertEquals(true, RoutineWork.shouldDisableAfterAttempt(once, dispatchSucceeded = true))
+        fun outcome(status: RoutineRunStatus) = RoutineRunResult(
+            once.id, once.name, status, emptyList(), 100L, 200L,
+        )
+        assertEquals(true, RoutineWork.shouldDisableAfterAttempt(once, outcome(RoutineRunStatus.SUCCESS)))
+        assertEquals(false, RoutineWork.shouldDisableAfterAttempt(daily, outcome(RoutineRunStatus.SUCCESS)))
+        assertEquals(false, RoutineWork.shouldDisableAfterAttempt(once, null))
+        assertEquals(false, RoutineWork.shouldDisableAfterAttempt(once, outcome(RoutineRunStatus.FAILED)))
+        assertEquals(false, RoutineWork.shouldDisableAfterAttempt(once, outcome(RoutineRunStatus.PREPARED)))
     }
 }
 
