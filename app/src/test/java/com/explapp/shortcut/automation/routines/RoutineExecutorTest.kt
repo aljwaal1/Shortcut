@@ -5,6 +5,42 @@ import org.junit.Test
 
 class RoutineExecutorTest {
     @Test
+    fun parallelActionsCompleteBeforeNextSequentialAction() {
+        val completed = java.util.concurrent.atomic.AtomicInteger(0)
+        val runner = RoutineActionRunner { action ->
+            if (action.parameters["parallelGroup"] == "a") {
+                Thread.sleep(30)
+                completed.incrementAndGet()
+            } else {
+                assertEquals(2, completed.get())
+            }
+            RoutineActionResult.success(action)
+        }
+        val flow = AutomationRoutine(
+            name = "Mixed",
+            trigger = RoutineTrigger(RoutineTriggerType.MANUAL),
+            actions = listOf(
+                RoutineAction(RoutineActionType.SHOW_NOTIFICATION, "A", parameters = mapOf("parallelGroup" to "a")),
+                RoutineAction(RoutineActionType.SHOW_NOTIFICATION, "B", parameters = mapOf("parallelGroup" to "a")),
+                RoutineAction(RoutineActionType.SHOW_NOTIFICATION, "C"),
+            ),
+        )
+        assertEquals(RoutineRunStatus.SUCCESS, RoutineExecutor(runner).execute(flow).status)
+        assertEquals(2, completed.get())
+    }
+
+    @Test
+    fun unsafeParallelActionFailsReview() {
+        val flow = AutomationRoutine(
+            name = "Unsafe",
+            trigger = RoutineTrigger(RoutineTriggerType.MANUAL),
+            actions = listOf(RoutineAction(RoutineActionType.STOP_SHORTCUT, "",
+                parameters = mapOf("parallelGroup" to "a"))),
+        )
+        assertEquals(false, RoutineReview.inspect(flow).canRun)
+    }
+
+    @Test
     fun preparedResultStopsLaterActionsUntilPendingWorkFinishes() {
         val seen = mutableListOf<RoutineActionType>()
         val runner = object : RoutineActionRunner {
