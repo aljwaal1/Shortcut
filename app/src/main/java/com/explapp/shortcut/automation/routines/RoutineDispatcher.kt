@@ -48,6 +48,12 @@ class RoutineDispatcher(private val context: Context) {
         return try {
             val progress = RoutineProgressStore(context)
             val resumeIndex = if (resumeSafeWaits) progress.safeResumeIndex(routine) else null
+            if (resumeSafeWaits && resumeIndex == null) {
+                return RoutineRunResult(
+                    routine.id, routine.name, RoutineRunStatus.FAILED,
+                    emptyList(), startedAt, System.currentTimeMillis(),
+                )
+            }
             if (!resumeSafeWaits) progress.begin(routine.id)
             val result = runCatching {
                 RoutineExecutor(
