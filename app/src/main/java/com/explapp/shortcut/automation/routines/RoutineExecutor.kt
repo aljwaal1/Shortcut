@@ -32,6 +32,8 @@ class RoutineExecutor(
             val group = routine.actions[index].parameters["parallelGroup"].orEmpty()
             if (group.isNotBlank()) {
                 val batch = routine.actions.drop(index).takeWhile { it.parameters["parallelGroup"] == group }
+                // Only independent WAIT and SHOW_NOTIFICATION actions are admitted by RoutineReview.
+                // The Android runner keeps mutable variables and must not be shared for concurrent mutations.
                 val pool = Executors.newFixedThreadPool(batch.size.coerceAtMost(4))
                 val outcomes = try {
                     val jobs = batch.map { item ->
