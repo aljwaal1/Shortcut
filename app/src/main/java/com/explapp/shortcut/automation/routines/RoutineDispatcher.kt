@@ -30,7 +30,7 @@ class RoutineDispatcher(private val context: Context) {
         .filter { RoutineTriggerMatcher.matches(it, event) }
         .map { execute(it, userInitiated = false) }
 
-    fun execute(routine: AutomationRoutine, userInitiated: Boolean): RoutineRunResult {
+    fun execute(routine: AutomationRoutine, userInitiated: Boolean, resumeSafeWaits: Boolean = false): RoutineRunResult {
         val startedAt = System.currentTimeMillis()
         if (!runningRoutineIds.add(routine.id)) {
             val finishedAt = System.currentTimeMillis()
@@ -47,13 +47,15 @@ class RoutineDispatcher(private val context: Context) {
 
         return try {
             val progress = RoutineProgressStore(context)
-            progress.begin(routine.id)
+            val resumeIndex = if (resumeSafeWaits) progress.safeResumeIndex(routine) else null
+            if (!resumeSafeWaits) progress.begin(routine.id)
             val result = runCatching {
                 RoutineExecutor(
                     AndroidRoutineActionRunner(context, userInitiated, routine.id, routine.name),
                     AndroidRoutineConditionEvaluator(context),
                     onProgress = { index, status -> progress.record(routine.id, index, status) },
                     shouldContinue = { !progress.isCancelled(routine.id) },
+                    startIndex = resumeIndex ?: 0,
                 ).execute(routine, startedAtMs = startedAt)
             }.getOrElse { _ ->
                 RoutineRunResult(

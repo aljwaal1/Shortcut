@@ -21,6 +21,21 @@ class RoutineProgressStore(context: Context) {
         .putString("$id:last", status.name)
         .commit()
 
+    /**
+     * A safe resume is allowed only when every previously completed action is
+     * a local WAIT. Any user-facing or network side effect requires manual review.
+     */
+    fun safeResumeIndex(routine: AutomationRoutine): Int? {
+        val state = snapshot(routine.id) ?: return null
+        if (state.status != "UNCERTAIN") return null
+        val index = state.lastCompletedActionIndex
+        if (index < 0) return 0
+        if (index >= routine.actions.size) return null
+        if (prefs.getString("${routine.id}:last", "") != RoutineActionStatus.SUCCESS.name) return null
+        if (routine.actions.take(index + 1).any { it.type != RoutineActionType.WAIT }) return null
+        return index + 1
+    }
+
     fun requestCancel(id: String): Boolean = prefs.edit()
         .putBoolean("$id:cancel", true)
         .putString("$id:state", "CANCEL_REQUESTED")

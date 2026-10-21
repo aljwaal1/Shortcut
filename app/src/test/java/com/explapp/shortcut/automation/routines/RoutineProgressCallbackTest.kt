@@ -42,6 +42,27 @@ class RoutineProgressCallbackTest {
         assertEquals(RoutineRunStatus.FAILED, result.status)
     }
 
+    @Test fun explicitStartIndexDoesNotReplayEarlierSteps() {
+        val seen = mutableListOf<String>()
+        val flow = AutomationRoutine(
+            name = "Safe resume",
+            trigger = RoutineTrigger(RoutineTriggerType.MANUAL),
+            actions = listOf(
+                RoutineAction(RoutineActionType.WAIT, "100"),
+                RoutineAction(RoutineActionType.WAIT, "200"),
+            ),
+        )
+        val result = RoutineExecutor(
+            RoutineActionRunner { a ->
+                seen += a.value
+                RoutineActionResult.success(a)
+            },
+            startIndex = 1,
+        ).execute(flow)
+        assertEquals(listOf("200"), seen)
+        assertEquals(RoutineRunStatus.SUCCESS, result.status)
+    }
+
     @Test fun preparedStopsAndRecordsItsIndex() {
         val records = mutableListOf<Int>()
         val r = AutomationRoutine(

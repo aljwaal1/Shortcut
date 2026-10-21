@@ -12,6 +12,7 @@ class RoutineExecutor(
     private val conditionEvaluator: RoutineConditionEvaluator = RoutineConditionEvaluator { true },
     private val onProgress: (Int, RoutineActionStatus) -> Unit = { _, _ -> },
     private val shouldContinue: () -> Boolean = { true },
+    private val startIndex: Int = 0,
 ) {
     fun execute(
         routine: AutomationRoutine,
@@ -29,7 +30,8 @@ class RoutineExecutor(
         }
 
         val results = mutableListOf<RoutineActionResult>()
-        var index = 0
+        // Only callers that have proven earlier actions safe may use a nonzero start index.
+        var index = startIndex.coerceIn(0, routine.actions.size)
         var cancelled = false
         while (index < routine.actions.size) {
             if (!shouldContinue()) {
