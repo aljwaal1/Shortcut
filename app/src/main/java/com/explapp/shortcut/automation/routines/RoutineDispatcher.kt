@@ -57,7 +57,7 @@ class RoutineDispatcher(private val context: Context) {
             if (!resumeSafeWaits) {
                 // A scheduled dispatch must not erase an uncertain checkpoint from a
                 // previous process crash: that could replay an external side effect.
-                if (!userInitiated && progress.snapshot(routine.id)?.status == "UNCERTAIN") {
+                if (progress.snapshot(routine.id)?.status == "UNCERTAIN") {
                     return RoutineRunResult(
                         routine.id, routine.name, RoutineRunStatus.FAILED,
                         emptyList(), startedAt, System.currentTimeMillis(),
