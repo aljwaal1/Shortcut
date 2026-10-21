@@ -10,6 +10,7 @@ fun interface RoutineConditionEvaluator {
 class RoutineExecutor(
     private val runner: RoutineActionRunner,
     private val conditionEvaluator: RoutineConditionEvaluator = RoutineConditionEvaluator { true },
+    private val onProgress: (Int, RoutineActionStatus) -> Unit = { _, _ -> },
 ) {
     fun execute(
         routine: AutomationRoutine,
@@ -49,6 +50,7 @@ class RoutineExecutor(
                     pool.shutdown()
                 }
                 results.addAll(outcomes)
+                outcomes.forEachIndexed { offset, outcome -> onProgress(index + offset, outcome.status) }
                 if (outcomes.any { it.status == RoutineActionStatus.PREPARED } ||
                     outcomes.indices.any { i -> outcomes[i].status == RoutineActionStatus.FAILED && !batch[i].continueOnError }
                 ) break
@@ -88,6 +90,7 @@ class RoutineExecutor(
 
             val result = RoutineRetryPolicy.run(action, runner)
             results += result
+            onProgress(index, result.status)
             if (screenshotTelegramHandoff && result.status == RoutineActionStatus.SUCCESS) {
                 // Capturing and delivering happen asynchronously; completion is not proof of sending.
                 results += RoutineActionResult.prepared(
