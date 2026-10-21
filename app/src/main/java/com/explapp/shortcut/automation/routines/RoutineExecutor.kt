@@ -38,8 +38,7 @@ class RoutineExecutor(
                 val outcomes = try {
                     val jobs = batch.map { item ->
                         pool.submit(Callable {
-                            runCatching { runner.run(item) }
-                                .getOrElse { RoutineActionResult.failure(item, it.message ?: it.javaClass.simpleName) }
+                            RoutineRetryPolicy.run(item, runner)
                         })
                     }
                     jobs.mapIndexed { i, job ->
@@ -87,8 +86,7 @@ class RoutineExecutor(
                 screenshotTelegramHandoff = true
             }
 
-            val result = runCatching { runner.run(action) }
-                .getOrElse { RoutineActionResult.failure(action, it.message ?: it.javaClass.simpleName) }
+            val result = RoutineRetryPolicy.run(action, runner)
             results += result
             if (screenshotTelegramHandoff && result.status == RoutineActionStatus.SUCCESS) {
                 // Capturing and delivering happen asynchronously; completion is not proof of sending.

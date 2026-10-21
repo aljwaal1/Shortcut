@@ -25,11 +25,15 @@ object RoutineNarrator {
                 } else {
                     if (ar) " عند الفشل، أوقف بقية الخطوات." else " If it fails, stop the remaining steps."
                 }
+                val retry = RoutineRetryPolicy.count(action)
+                val retryText = if (retry > 0) {
+                    if (ar) " عند فشل الانتظار، أعد المحاولة حتى $retry مرات." else " Retry a failed wait up to $retry times."
+                } else ""
                 val group = action.parameters["parallelGroup"].orEmpty()
                 val parallel = if (group.isNotBlank()) {
                     if (ar) " بالتوازي ضمن المجموعة ${safe(group)}." else " In parallel group ${safe(group)}."
                 } else ""
-                parts += "${index + 1}. $behavior$parallel$error"
+                parts += "${index + 1}. $behavior$parallel$retryText$error"
             }
         }
         val manual = routine.actions.any {

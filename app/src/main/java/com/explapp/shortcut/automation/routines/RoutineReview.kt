@@ -38,6 +38,7 @@ object RoutineReview {
             if (action.parameters["parallelGroup"].orEmpty().isNotBlank() &&
                 routine.actions.count { it.parameters["parallelGroup"] == action.parameters["parallelGroup"] } < 2
             ) findings += Finding(Severity.ERROR, index, "PARALLEL_GROUP_NEEDS_TWO_ACTIONS")
+            if (!RoutineRetryPolicy.valid(action)) findings += Finding(Severity.ERROR, index, "INVALID_RETRY_POLICY")
             if (!action.isValid()) findings += Finding(Severity.ERROR, index, "INVALID_ACTION")
             if (action.type == RoutineActionType.CUSTOM_SCRIPT) {
                 findings += Finding(Severity.WARNING, index, "SCRIPT_REQUIRES_REVIEW")
