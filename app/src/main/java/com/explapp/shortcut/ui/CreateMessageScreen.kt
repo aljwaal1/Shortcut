@@ -213,6 +213,34 @@ fun CreateMessageScreen(
                 Text(if (ar) "الوضع القياسي: عند الموعد يظهر إشعار. اضغط عليه لفتح المحادثة والنص جاهز. لا نسجل الرسالة كمرسلة تلقائيًا." else "Standard mode: a notification appears at the scheduled time. Tap it to open the chat with the text prepared. Shortcut does not claim it was auto-sent.", modifier = Modifier.padding(15.dp), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
         }
+        item {
+            val destination = recipient.trim().ifBlank {
+                if (ar) "المستلم الذي ستحدده" else "the recipient you select"
+            }
+            val clock = if (parsedHour in 0..23 && parsedMinute in 0..59) {
+                "%02d:%02d".format(parsedHour, parsedMinute)
+            } else if (ar) "وقت صالح تحدده" else "a valid time you select"
+            val frequency = when (repeat) {
+                RepeatOption.ONCE -> if (ar) "مرة واحدة" else "once"
+                RepeatOption.DAILY -> if (ar) "يوميًا" else "daily"
+                RepeatOption.WEEKDAYS -> if (ar) "في أيام العمل" else "on weekdays"
+                RepeatOption.WEEKLY -> if (ar) "أسبوعيًا" else "weekly"
+            }
+            val service = if (platform == MessagePlatform.TELEGRAM) "Telegram" else "WhatsApp"
+            val explanation = if (ar) {
+                "عند الساعة $clock، $frequency، سيعرض Shortcut إشعارًا لتجهيز رسالة عبر $service إلى $destination. عند الضغط على الإشعار ستفتح المحادثة والنص جاهز، ولن تُرسل الرسالة تلقائيًا."
+            } else {
+                "At $clock, $frequency, Shortcut will show a notification to prepare a $service message for $destination. Tapping the notification opens the chat with the text prepared; the message will not be sent automatically."
+            }
+            Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                Text(
+                    if (ar) "ماذا ستفعل هذه الأتمتة؟" else "What will this automation do?",
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold,
+                )
+                Text(explanation, style = MaterialTheme.typography.bodyMedium)
+            }
+        }
         if (permissionError) {
             item {
                 Text(
