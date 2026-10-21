@@ -66,9 +66,22 @@ class TemplateLibrarySearchRegressionTest {
         ).map { it.id })
     }
 
+    @Test fun allToolPresetsArePresentInCatalog() {
+        val available = com.explapp.shortcut.tools.ToolCatalog.all().map { it.id }.toSet()
+        assertEquals(22, TemplateToolPresets.entries.size)
+        assertTrue(TemplateToolPresets.entries.all { it.tool in available })
+    }
+
+    @Test fun presetCategoriesAreDiscoverable() {
+        assertTrue(TemplateToolPresets.entries.any { it.category == "automation" })
+        assertTrue(TemplateToolPresets.entries.any { it.category == "pdf" })
+        assertTrue(TemplateToolPresets.entries.any { it.category == "images" })
+        assertTrue(TemplateToolPresets.entries.any { it.category == "files" })
+    }
+
     @Test fun presetsHaveUniqueIdsAndCategories() {
         assertEquals(TemplateToolPresets.entries.size, TemplateToolPresets.entries.map { it.id }.toSet().size)
-        assertTrue(TemplateToolPresets.entries.all { it.id.isNotBlank() && it.category in setOf("pdf", "images", "files", "quick") })
+        assertTrue(TemplateToolPresets.entries.all { it.id.isNotBlank() && it.category in setOf("pdf", "images", "files", "quick", "automation") })
     }
 
     @Test fun presetsHaveBilingualLabels() {
