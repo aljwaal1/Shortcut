@@ -2216,14 +2216,10 @@ private fun RoutineBuilderScreen(
                         ar,
                     )
 
-                    val parallelAllowed = actionType !in setOf(
-                        RoutineActionType.OPEN_APP_SCREENSHOT,
-                        RoutineActionType.TAKE_SCREENSHOT,
-                        RoutineActionType.STOP_SHORTCUT,
-                        RoutineActionType.PREPARE_WHATSAPP,
-                        RoutineActionType.PREPARE_TELEGRAM,
-                        RoutineActionType.SHARE_FILE,
-                        RoutineActionType.SHARE_TEXT,
+                    // These actions are independent of the runner's mutable variable state.
+                    val parallelAllowed = actionType in setOf(
+                        RoutineActionType.WAIT,
+                        RoutineActionType.SHOW_NOTIFICATION,
                     )
                     if (parallelAllowed) {
                         OutlinedTextField(
