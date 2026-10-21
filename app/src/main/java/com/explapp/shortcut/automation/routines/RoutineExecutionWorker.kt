@@ -57,7 +57,7 @@ class RoutineExecutionWorker(
         val execution = runCatching {
             RoutineDispatcher(applicationContext).execute(routine, userInitiated = false)
         }
-        if (RoutineWork.shouldDisableAfterAttempt(routine)) {
+        if (RoutineWork.shouldDisableAfterAttempt(routine) && execution.isSuccess) {
             runCatching {
                 store.upsert(routine.copy(isEnabled = false, updatedAtMs = System.currentTimeMillis()))
             }
