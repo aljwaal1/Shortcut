@@ -66,6 +66,8 @@ class RoutineExecutionWorker(
         }
         // Do not retry completed user actions: network sends may already have succeeded.
         // Unexpected infrastructure failures still surface as a failed worker.
+        // Infrastructure failures may follow an already completed external action.
+        // Never request a blind WorkManager retry for the entire routine.
         if (execution.isFailure) Result.failure() else Result.success()
     }
 
@@ -82,9 +84,9 @@ class RoutineExecutionWorker(
 object RoutineWork {
     fun enqueue(context: Context, routineId: String) {
         if (routineId.isBlank()) return
-        val needsNetwork = RoutineStore(context.applicationContext).load()
-            .firstOrNull { it.id == routineId }
-            ?.let(::requiresNetwork) == true
+        val routine = RoutineStore(context.applicationContext).load()
+            .firstOrNull { it.id == routineId && it.isEnabled && it.isValid() } ?: return
+        val needsNetwork = requiresNetwork(routine)
         val request = OneTimeWorkRequestBuilder<RoutineExecutionWorker>()
             .setConstraints(
                 Constraints.Builder()
