@@ -4,6 +4,8 @@ import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.content.Context
 import android.os.Build
+import com.explapp.shortcut.execution.TaskExecutionReporter
+import com.explapp.shortcut.execution.TaskExecutionResult
 import androidx.core.app.NotificationCompat
 import androidx.work.Constraints
 import androidx.work.NetworkType
@@ -53,11 +55,30 @@ class RoutineExecutionWorker(
             .firstOrNull { it.id == routineId && it.isEnabled && it.isValid() }
             ?: return@withContext Result.success()
 
+        val reporter = TaskExecutionReporter(applicationContext)
+        reporter.report(
+            TaskExecutionResult.prepared(
+                routine.name + " / WORKER",
+                System.currentTimeMillis(),
+                details = listOf("EVENT = WORKER_STARTED", "ROUTINE_ID = ${routine.id}", "RUN_SOURCE = SCHEDULED"),
+            ), notifyUser = false,
+        )
+
         // RoutineDispatcher records the actual routine result in execution history.
         // The Worker itself succeeds even when a user-defined action fails; retrying
         // the whole routine could duplicate actions that already completed.
         val execution = runCatching {
             RoutineDispatcher(applicationContext).execute(routine, userInitiated = false)
+        }
+        if (execution.isFailure) {
+            reporter.report(
+                TaskExecutionResult.failure(
+                    routine.name + " / WORKER",
+                    execution.exceptionOrNull()?.message ?: "Worker infrastructure exception",
+                    System.currentTimeMillis(),
+                    details = listOf("EVENT = WORKER_EXCEPTION", "ROUTINE_ID = ${routine.id}", "RUN_SOURCE = SCHEDULED"),
+                ), notifyUser = false,
+            )
         }
         val persistedState = RoutineProgressStore(applicationContext).snapshot(routine.id)?.status
         if (persistedState == RoutineRunStatus.SUCCESS.name &&
@@ -105,10 +126,25 @@ object RoutineWork {
             .addTag(TAG)
             .build()
 
-        WorkManager.getInstance(context.applicationContext).enqueueUniqueWork(
-            uniqueName(routineId),
-            ExistingWorkPolicy.KEEP,
-            request,
+        val enqueueResult = runCatching {
+            WorkManager.getInstance(context.applicationContext).enqueueUniqueWork(
+                uniqueName(routineId),
+                ExistingWorkPolicy.KEEP,
+                request,
+            )
+        }
+        TaskExecutionReporter(context.applicationContext).report(
+            if (enqueueResult.isSuccess) TaskExecutionResult.prepared(
+                routine.name + " / QUEUE", System.currentTimeMillis(),
+                details = listOf("EVENT = WORK_ENQUEUE_REQUESTED", "ROUTINE_ID = ${routine.id}",
+                    "REQUEST_ID = ${request.id}", "RUN_SOURCE = SCHEDULED",
+                    "NOTE = WorkManager accepted enqueue request, not proof of execution"),
+            ) else TaskExecutionResult.failure(
+                routine.name + " / QUEUE",
+                enqueueResult.exceptionOrNull()?.message ?: "Could not enqueue WorkManager request",
+                System.currentTimeMillis(),
+                details = listOf("EVENT = WORK_ENQUEUE_FAILED", "ROUTINE_ID = ${routine.id}", "RUN_SOURCE = SCHEDULED"),
+            ), notifyUser = false,
         )
     }
 
