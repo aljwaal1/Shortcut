@@ -178,7 +178,9 @@ class PersistentScreenCaptureService : Service() {
                 cropped.recycle()
                 file
             }.onSuccess { file ->
-                captureInFlight = false
+                // Keep this routine in flight while Telegram sends the image.
+                // Otherwise a second alarm could overwrite pending recipient,
+                // routine ID and result metadata before the first send finishes.
                 val saved = runCatching {
                     val output = ToolOutputStore(this).create(
                         ScreenshotStamp.fileName(),
@@ -547,6 +549,7 @@ class PersistentScreenCaptureService : Service() {
     }
 
     private fun notifyResult(saved: Boolean, sent: Boolean, reason: String? = null) {
+        captureInFlight = false
         if (pendingFloatingCapture) {
             pendingFloatingCapture = false
             runCatching {
