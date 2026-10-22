@@ -146,6 +146,7 @@ fun ExecutionStatusCard(
     val accent = when {
         result == null -> MaterialTheme.colorScheme.primary
         success -> Color(0xFF1B9C68)
+        result?.status == TaskExecutionStatus.PREPARED -> MaterialTheme.colorScheme.tertiary
         else -> MaterialTheme.colorScheme.error
     }
     val dark = isSystemInDarkTheme()
@@ -167,6 +168,7 @@ fun ExecutionStatusCard(
                         imageVector = when {
                             result == null -> Icons.Default.Info
                             success -> Icons.Default.CheckCircle
+                            result.status == TaskExecutionStatus.PREPARED -> Icons.Default.Info
                             else -> Icons.Default.Error
                         },
                         contentDescription = null,
@@ -179,6 +181,7 @@ fun ExecutionStatusCard(
                     text = when {
                         result == null -> if (isArabic) "لا توجد عمليات حديثة" else "No recent activity"
                         success -> if (isArabic) "تم التنفيذ بنجاح" else "Completed successfully"
+                        result.status == TaskExecutionStatus.PREPARED -> if (isArabic) "قيد الإكمال" else "In progress"
                         else -> if (isArabic) "فشل التنفيذ" else "Execution failed"
                     },
                     style = MaterialTheme.typography.titleMedium,
