@@ -112,7 +112,9 @@ class RoutineDispatcher(private val context: Context) {
                     "ROUTINE_ID = ${routine.id}",
                 ) + result.toTaskExecutionResult().details,
             )
-            TaskExecutionReporter(context).report(historyResult)
+            // Reporting is diagnostic only: a history storage failure must not
+            // turn an already executed external action into a retryable crash.
+            runCatching { TaskExecutionReporter(context).report(historyResult) }
             result
         } finally {
             runningRoutineIds.remove(routine.id)
