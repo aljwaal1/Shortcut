@@ -12,6 +12,7 @@ import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatDelegate
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
@@ -26,6 +27,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Add
@@ -480,38 +482,45 @@ private fun HomeNavCard(
     ElevatedCard(
         onClick = onClick,
         modifier = modifier,
-        colors = CardDefaults.elevatedCardColors(containerColor = accent.copy(alpha = 0.09f)),
+        shape = RoundedCornerShape(18.dp),
+        colors = CardDefaults.elevatedCardColors(containerColor = MaterialTheme.colorScheme.surface),
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
+        elevation = CardDefaults.elevatedCardElevation(defaultElevation = 2.dp),
     ) {
         Row(
-            modifier = Modifier.fillMaxWidth().padding(horizontal = 14.dp, vertical = 12.dp),
+            modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 17.dp),
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(14.dp),
+            horizontalArrangement = Arrangement.spacedBy(16.dp),
         ) {
-            Surface(
-                shape = CircleShape,
-                color = accent.copy(alpha = 0.16f),
-            ) {
+            Surface(shape = RoundedCornerShape(14.dp), color = accent.copy(alpha = 0.14f)) {
                 Icon(
                     imageVector = icon,
                     contentDescription = null,
                     tint = accent,
-                    modifier = Modifier.padding(9.dp).size(24.dp),
+                    modifier = Modifier.padding(12.dp).size(26.dp),
                 )
             }
-            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
+            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(5.dp)) {
                 Text(
                     title,
-                    style = MaterialTheme.typography.titleSmall,
-                    fontWeight = FontWeight.ExtraBold,
-                    maxLines = 1,
+                    style = MaterialTheme.typography.titleMedium,
+                    color = MaterialTheme.colorScheme.onSurface,
+                    fontWeight = FontWeight.Bold,
+                    maxLines = 2,
                 )
                 Text(
                     subtitle,
-                    style = MaterialTheme.typography.bodySmall,
+                    style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    maxLines = 2,
+                    maxLines = 3,
                 )
             }
+            Icon(
+                Icons.AutoMirrored.Filled.ArrowBack,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.size(18.dp),
+            )
         }
     }
 }
@@ -560,6 +569,24 @@ private fun HomeScreen(
                 activeCount = shortcuts.size + messages.size + advancedRoutines.count { it.isEnabled },
                 onOpenTools = onOpenTools,
             )
+        }
+        item {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                TextButton(onClick = { setAppLocale("ar") }) {
+                    Icon(Icons.Default.Language, contentDescription = null)
+                    Text(" العربية")
+                }
+                TextButton(onClick = { setAppLocale("en") }) { Text("English") }
+                Spacer(Modifier.weight(1f))
+                TextButton(onClick = onOpenSettings) {
+                    Icon(Icons.Default.Settings, contentDescription = null)
+                    Text(if (ar) " الإعدادات" else " Settings")
+                }
+            }
         }
         item {
             SectionLabel(
@@ -1146,10 +1173,10 @@ private fun SettingsScreen(padding: PaddingValues, onOpenPermissions: () -> Unit
                         AccentIcon(Icons.Default.Language, MaterialTheme.colorScheme.primary)
                         Text(stringResource(R.string.language), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
                     }
-                    Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                        TextButton(onClick = { setAppLocale("ar") }) { Text("العربية") }
+                        TextButton(onClick = { setAppLocale("en") }) { Text("English") }
                         TextButton(onClick = { setAppLocale("") }) { Text(stringResource(R.string.language_system)) }
-                        TextButton(onClick = { setAppLocale("ar") }) { Text(stringResource(R.string.language_arabic)) }
-                        TextButton(onClick = { setAppLocale("en") }) { Text(stringResource(R.string.language_english)) }
                     }
                 }
             }
