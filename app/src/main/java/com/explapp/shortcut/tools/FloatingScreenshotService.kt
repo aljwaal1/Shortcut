@@ -24,18 +24,27 @@ class FloatingScreenshotService : Service() {
         getSharedPreferences(PREFS, MODE_PRIVATE).edit().putString(KEY_MODE, "off").remove(KEY_EXPIRES_AT).apply()
         stopSelf()
     }
-    private val safetyRestore = Runnable { bubble?.visibility = android.view.View.VISIBLE }
+    private val safetyRestore = Runnable {
+        bubble?.visibility = android.view.View.VISIBLE
+        chooserOpening = false
+    }
+    private var chooserOpening = false
 
     override fun onBind(intent: Intent?): IBinder? = null
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         if (intent?.action == ACTION_SHOW_BUBBLE) {
+            if (bubble == null || !Settings.canDrawOverlays(this)) {
+                stopSelf(startId)
+                return START_NOT_STICKY
+            }
             main.removeCallbacks(safetyRestore)
             bubble?.visibility = android.view.View.VISIBLE
+            chooserOpening = false
             return START_STICKY
         }
         if (intent?.action == ACTION_OFF) {
-            getSharedPreferences(PREFS, MODE_PRIVATE).edit().putString(KEY_MODE, "off").apply()
+            getSharedPreferences(PREFS, MODE_PRIVATE).edit().putString(KEY_MODE, "off").remove(KEY_EXPIRES_AT).apply()
             stopSelf()
             return START_NOT_STICKY
         }
@@ -102,6 +111,7 @@ class FloatingScreenshotService : Service() {
         var startY = 0
         var downX = 0f
         var downY = 0f
+        view.contentDescription = if (resources.configuration.locales[0].language == "ar") "زر لقطة شاشة: اضغط لاختيار الحفظ أو المشاركة" else "Screenshot button: tap to choose save or share"
         view.setOnTouchListener { _, event ->
             when (event.actionMasked) {
                 MotionEvent.ACTION_DOWN -> {
@@ -116,8 +126,9 @@ class FloatingScreenshotService : Service() {
                     true
                 }
                 MotionEvent.ACTION_UP -> {
-                    if (kotlin.math.abs(event.rawX - downX) < 12 * density &&
+                    if (!chooserOpening && kotlin.math.abs(event.rawX - downX) < 12 * density &&
                         kotlin.math.abs(event.rawY - downY) < 12 * density) {
+                        chooserOpening = true
                         // Keep the overlay out of the captured frame; the capture activity restores it.
                         view.visibility = android.view.View.INVISIBLE
                         main.removeCallbacks(safetyRestore)
@@ -131,6 +142,7 @@ class FloatingScreenshotService : Service() {
                             runCatching { startActivity(launch) }.onFailure {
                                 main.removeCallbacks(safetyRestore)
                                 view.visibility = android.view.View.VISIBLE
+                                chooserOpening = false
                             }
                         }, 200L)
                     }
