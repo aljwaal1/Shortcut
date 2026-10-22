@@ -10,7 +10,7 @@ data class CropRect(
 object ImageCropMath {
     fun centerCrop(width: Int, height: Int, targetRatio: Float): CropRect {
         require(width > 0 && height > 0)
-        require(targetRatio > 0f)
+        require(targetRatio.isFinite() && targetRatio > 0f)
         val sourceRatio = width.toFloat() / height.toFloat()
         return if (sourceRatio > targetRatio) {
             val cropWidth = (height * targetRatio).toInt().coerceIn(1, width)
