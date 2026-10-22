@@ -71,6 +71,7 @@ class RoutineDispatcher(private val context: Context) {
                 }
             }
             var checkpointWriteFailed = false
+            var executorCrashed = false
             val result = runCatching {
                 RoutineExecutor(
                     AndroidRoutineActionRunner(context, userInitiated, routine.id, routine.name),
@@ -85,6 +86,7 @@ class RoutineDispatcher(private val context: Context) {
                     startIndex = resumeIndex ?: 0,
                 ).execute(routine, startedAtMs = startedAt)
             }.getOrElse { _ ->
+                executorCrashed = true
                 RoutineRunResult(
                     routineId = routine.id,
                     routineName = routine.name,
@@ -97,11 +99,13 @@ class RoutineDispatcher(private val context: Context) {
             // Preserve IN_FLIGHT after a checkpoint write failure: the last action
             // may already have produced an external effect before persistence failed.
             // Marking it FAILED would incorrectly allow a fresh replay.
-            if (!checkpointWriteFailed && !progress.finish(routine.id, result.status)) {
+            if (!checkpointWriteFailed && !executorCrashed && !progress.finish(routine.id, result.status)) {
                 // Leave the persisted IN_FLIGHT state intact when the final status
                 // cannot be committed. Never imply durable completion.
                 checkpointWriteFailed = true
             }
+            // An unexpected executor crash can occur after an irreversible action.
+            // Keep the durable checkpoint uncertain rather than authorizing replay.
             val historyResult = result.toTaskExecutionResult().copy(
                 details = listOf(
                     "RUN_SOURCE = " + if (userInitiated) "MANUAL" else "SCHEDULED",
