@@ -46,7 +46,7 @@ internal object TelegramTdlibSession : TelegramPersonalClient {
         currentApiId = apiId
         currentApiHash = apiHash
         return runCatching {
-            System.loadLibrary("tdjson")
+            // org.drinkless.tdlib.Client loads its paired tdjni JNI library.
             client = Client.create({ update ->
                 when (update) {
                     is TdApi.UpdateAuthorizationState -> onAuthorizationUpdate(update.authorizationState)
