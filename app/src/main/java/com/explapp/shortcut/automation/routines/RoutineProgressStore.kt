@@ -48,8 +48,11 @@ class RoutineProgressStore(context: Context) {
         if (index < 0) return null
         if (index >= routine.actions.size) return null
         if (prefs.getString("${routine.id}:last", "") != RoutineActionStatus.SUCCESS.name) return null
-        if (routine.actions.take(index + 1).any { it.type != RoutineActionType.WAIT }) return null
-        return index + 1
+        // Resume only if the *entire* routine is a side-effect-free wait sequence.
+        // Otherwise a crash could have occurred during the next external action,
+        // after the last WAIT was durably recorded.
+        if (routine.actions.any { it.type != RoutineActionType.WAIT }) return null
+        return (index + 1).takeIf { it < routine.actions.size }
     }
 
     fun requestCancel(id: String): Boolean = prefs.edit()
