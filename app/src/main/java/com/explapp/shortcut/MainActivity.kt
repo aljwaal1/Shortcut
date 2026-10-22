@@ -1,6 +1,9 @@
 package com.explapp.shortcut
 
 import android.os.Bundle
+import android.content.Intent
+import android.provider.Settings
+import com.explapp.shortcut.tools.FloatingScreenshotService
 import androidx.activity.compose.setContent
 import androidx.appcompat.app.AppCompatActivity
 import androidx.appcompat.app.AppCompatDelegate
@@ -19,6 +22,17 @@ import com.explapp.shortcut.ui.ShortcutApp
 import com.explapp.shortcut.ui.ShortcutTheme
 
 class MainActivity : AppCompatActivity() {
+    override fun onResume() {
+        super.onResume()
+        val prefs = getSharedPreferences(FloatingScreenshotService.PREFS, MODE_PRIVATE)
+        val mode = prefs.getString(FloatingScreenshotService.KEY_MODE, "off")
+        if (Settings.canDrawOverlays(this) && mode in setOf("always", "temporary")) {
+            // Only resume when the app is visibly opened; Android restricts background starts.
+            runCatching {
+                startService(Intent(this, FloatingScreenshotService::class.java))
+            }
+        }
+    }
     override fun onCreate(savedInstanceState: Bundle?) {
         val themeMode = getSharedPreferences("shortcut_preferences", MODE_PRIVATE)
             .getInt("theme_mode", AppCompatDelegate.MODE_NIGHT_FOLLOW_SYSTEM)
