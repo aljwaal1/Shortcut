@@ -394,6 +394,18 @@ class AndroidRoutineActionRunner(
 
             val reactivate = Intent(context, ScreenCaptureActivity::class.java)
                 .putExtra(ScreenCaptureActivity.EXTRA_PERSISTENT_START_ONLY, true)
+                .putExtra(ScreenCaptureActivity.EXTRA_PERSISTENT_RESUME_CAPTURE, true)
+                .putExtra(ScreenCaptureActivity.EXTRA_LAUNCH_PACKAGE, action.value)
+                .putExtra(ScreenCaptureActivity.EXTRA_CAPTURE_DELAY_MS, delayMs)
+                .putExtra(ScreenCaptureActivity.EXTRA_TELEGRAM_BOT_TOKEN, action.parameters["telegramBotToken"].orEmpty())
+                .putExtra(ScreenCaptureActivity.EXTRA_TELEGRAM_CHAT_ID, action.parameters["telegramChatId"].orEmpty())
+                .putExtra(ScreenCaptureActivity.EXTRA_TELEGRAM_PERSONAL_USERNAME, action.parameters["telegramPersonalUsername"].orEmpty())
+                .putExtra(ScreenCaptureActivity.EXTRA_TELEGRAM_CAPTION, resolve(action.parameters["telegramCaption"].orEmpty()))
+                .putExtra(ScreenCaptureActivity.EXTRA_NORMAL_TELEGRAM_SHARE, action.parameters["normalTelegramShare"].toBoolean())
+                .putExtra(ScreenCaptureActivity.EXTRA_SHARE_ANY_APP, action.parameters["shareAnyApp"]?.toBooleanStrictOrNull() ?: false)
+                .putExtra(ScreenCaptureActivity.EXTRA_STAMP_DATE_TIME, action.parameters["stampDateTime"].toBoolean())
+                .putExtra(ScreenCaptureActivity.EXTRA_ROUTINE_ID, routineId)
+                .putExtra(ScreenCaptureActivity.EXTRA_ROUTINE_NAME, routineName)
                 .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
             return if (userInitiated) {
                 runCatching {
