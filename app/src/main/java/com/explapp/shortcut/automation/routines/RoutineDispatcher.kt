@@ -70,12 +70,16 @@ class RoutineDispatcher(private val context: Context) {
                     )
                 }
             }
+            var checkpointWriteFailed = false
             val result = runCatching {
                 RoutineExecutor(
                     AndroidRoutineActionRunner(context, userInitiated, routine.id, routine.name),
                     AndroidRoutineConditionEvaluator(context),
                     onProgress = { index, status ->
-                        check(progress.record(routine.id, index, status)) { "Unable to persist automation progress" }
+                        if (!progress.record(routine.id, index, status)) {
+                            checkpointWriteFailed = true
+                            error("Unable to persist automation progress")
+                        }
                     },
                     shouldContinue = { !progress.isCancelled(routine.id) },
                     startIndex = resumeIndex ?: 0,
@@ -90,7 +94,12 @@ class RoutineDispatcher(private val context: Context) {
                     finishedAtMs = System.currentTimeMillis(),
                 )
             }
-            progress.finish(routine.id, result.status)
+            // Preserve IN_FLIGHT after a checkpoint write failure: the last action
+            // may already have produced an external effect before persistence failed.
+            // Marking it FAILED would incorrectly allow a fresh replay.
+            if (!checkpointWriteFailed) {
+                progress.finish(routine.id, result.status)
+            }
             val historyResult = result.toTaskExecutionResult().copy(
                 details = listOf(
                     "RUN_SOURCE = " + if (userInitiated) "MANUAL" else "SCHEDULED",
