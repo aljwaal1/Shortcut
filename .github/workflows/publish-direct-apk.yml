@@ -20,18 +20,18 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           mkdir -p dist
-          gh run download 39788992071 --repo "${{ github.repository }}" --name shortcut-debug-apk --dir dist
+          gh run download 39840166699 --repo "${{ github.repository }}" --name shortcut-debug-apk --dir dist
           test -s dist/app-debug.apk
           unzip -t dist/app-debug.apk >/dev/null
-          mv dist/app-debug.apk dist/Shortcut-1864-TDLib.apk
+          mv dist/app-debug.apk dist/Shortcut-1868-TDLib.apk
 
       - name: Publish APK as prerelease for direct browser downloads
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          gh release create "shortcut-1864-preview" dist/Shortcut-1864-TDLib.apk \
+          gh release create "shortcut-1868-preview" dist/Shortcut-1868-TDLib.apk \
             --repo "${{ github.repository }}" \
-            --title "Shortcut Android APK Build 1864 (preview)" \
-            --notes "Verified Android CI build #1864. Debug-signed preview. Personal Telegram TDLib functionality requires on-device testing." \
-            --target de7621b9bc0407052182daf2966d6338eba2cd86 \
+            --title "Shortcut Android APK Build 1868 (preview)" \
+            --notes "Verified Android CI build #1868. Debug-signed preview. Personal Telegram TDLib functionality requires on-device testing." \
+            --target 52bb090a41457e4b7187955eb96bc40225078cb0 \
             --prerelease
