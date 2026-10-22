@@ -37,6 +37,8 @@ object NextRunCalculator {
         weeklyDayIso: Int?,
         oneShotEpochDay: Long?,
     ): ZonedDateTime? {
+        if (hour !in 0..23 || minute !in 0..59) return null
+        if (repeat == RepeatOption.WEEKLY && weeklyDayIso != null && weeklyDayIso !in 1..7) return null
         val todayAtTime = now
             .withHour(hour)
             .withMinute(minute)
