@@ -70,7 +70,7 @@ class RoutineProgressStore(context: Context) {
         if (!prefs.contains("$id:state")) return null
         val stored = prefs.getString("$id:state", "IN_FLIGHT").orEmpty()
         val visible = when (stored) {
-            "IN_FLIGHT", "PREPARED" -> "UNCERTAIN"
+            "IN_FLIGHT", "PREPARED", "CANCEL_REQUESTED" -> "UNCERTAIN"
             else -> stored
         }
         return Snapshot(visible, prefs.getInt("$id:index", -1))
