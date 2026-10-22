@@ -20,8 +20,8 @@ class RoutineExecutorTest {
             name = "Mixed",
             trigger = RoutineTrigger(RoutineTriggerType.MANUAL),
             actions = listOf(
-                RoutineAction(RoutineActionType.WAIT, "30", parameters = mapOf("parallelGroup" to "a")),
-                RoutineAction(RoutineActionType.WAIT, "30", parameters = mapOf("parallelGroup" to "a")),
+                RoutineAction(RoutineActionType.WAIT, "100", parameters = mapOf("parallelGroup" to "a")),
+                RoutineAction(RoutineActionType.WAIT, "100", parameters = mapOf("parallelGroup" to "a")),
                 RoutineAction(RoutineActionType.SHOW_NOTIFICATION, "C"),
             ),
         )
