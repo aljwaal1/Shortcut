@@ -97,8 +97,10 @@ class RoutineDispatcher(private val context: Context) {
             // Preserve IN_FLIGHT after a checkpoint write failure: the last action
             // may already have produced an external effect before persistence failed.
             // Marking it FAILED would incorrectly allow a fresh replay.
-            if (!checkpointWriteFailed) {
-                progress.finish(routine.id, result.status)
+            if (!checkpointWriteFailed && !progress.finish(routine.id, result.status)) {
+                // Leave the persisted IN_FLIGHT state intact when the final status
+                // cannot be committed. Never imply durable completion.
+                checkpointWriteFailed = true
             }
             val historyResult = result.toTaskExecutionResult().copy(
                 details = listOf(
