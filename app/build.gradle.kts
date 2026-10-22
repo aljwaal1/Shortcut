@@ -58,6 +58,8 @@ dependencies {
     implementation("com.tom-roush:pdfbox-android:2.0.27.0")
     implementation("com.squareup:gifencoder:0.10.1")
     implementation("org.mozilla:rhino:1.7.15")
+    // TDLib Java/JNI and four Android ABIs, pinned to a published Maven Central AAR.
+    implementation("io.github.tdlib-android:core:0.1.1")
 
     testImplementation("junit:junit:4.13.2")
     androidTestImplementation("androidx.test.ext:junit:1.2.1")
