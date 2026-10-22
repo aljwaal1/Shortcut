@@ -62,6 +62,7 @@ class ScreenCaptureActivity : AppCompatActivity() {
     private var normalTelegramShare: Boolean = false
     private var shareAnyApp: Boolean = false
     private var galleryOnly: Boolean = false
+    private var floatingQuickCapture = false
     private var persistentStartOnly: Boolean = false
     private var stampDateTime: Boolean = false
     private var stampName: String = ""
@@ -93,6 +94,13 @@ class ScreenCaptureActivity : AppCompatActivity() {
 
     private val consent = registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
         val data = result.data
+        if (floatingQuickCapture) {
+            // Keep the overlay hidden until the capture delay and frame acquisition complete.
+            android.os.Handler(android.os.Looper.getMainLooper()).postDelayed({
+                runCatching { startService(Intent(this, FloatingScreenshotService::class.java)
+                    .setAction(FloatingScreenshotService.ACTION_SHOW_BUBBLE)) }
+            }, if (result.resultCode == Activity.RESULT_OK && data != null) captureDelayMs + 5_000L else 0L)
+        }
         if (result.resultCode != Activity.RESULT_OK || data == null) {
             reportRoutineScreenshot(
                 success = false,
@@ -157,6 +165,7 @@ class ScreenCaptureActivity : AppCompatActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        floatingQuickCapture = intent.getBooleanExtra(EXTRA_FLOATING_QUICK_CAPTURE, false)
         runOcr = intent.getBooleanExtra(EXTRA_OCR, false)
         launchPackage = intent.getStringExtra(EXTRA_LAUNCH_PACKAGE)?.takeIf { it.isNotBlank() }
         captureDelayMs = intent.getLongExtra(EXTRA_CAPTURE_DELAY_MS, DEFAULT_CAPTURE_DELAY_MS)
@@ -178,7 +187,11 @@ class ScreenCaptureActivity : AppCompatActivity() {
             IntentFilter(ScreenCaptureService.ACTION_COMPLETE),
             ContextCompat.RECEIVER_NOT_EXPORTED,
         )
-        showCaptureInstructions()
+        if (floatingQuickCapture) {
+            galleryOnly = true
+            captureDelayMs = 1_500L
+            launchConsent()
+        } else showCaptureInstructions()
     }
 
     private fun showCaptureInstructions() {
@@ -566,6 +579,7 @@ class ScreenCaptureActivity : AppCompatActivity() {
         const val EXTRA_STAMP_NAME = "stamp_name"
         const val EXTRA_ROUTINE_ID = "routine_id"
         const val EXTRA_ROUTINE_NAME = "routine_name"
+        const val EXTRA_FLOATING_QUICK_CAPTURE = "floatingQuickCapture"
         private const val DEFAULT_CAPTURE_DELAY_MS = 3_000L
         private const val OCR_CHANNEL = "screen_ocr"
     }
