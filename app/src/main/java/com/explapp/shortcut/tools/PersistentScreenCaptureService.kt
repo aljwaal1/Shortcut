@@ -27,6 +27,8 @@ import com.explapp.shortcut.automation.routines.TelegramBotSender
 import com.explapp.shortcut.automation.routines.TelegramTdlibSession
 import com.explapp.shortcut.automation.routines.TelegramPersonalDeliveryCoordinator
 import com.explapp.shortcut.automation.routines.PendingCaptureNotification
+import com.explapp.shortcut.automation.routines.RoutineProgressStore
+import com.explapp.shortcut.automation.routines.RoutineRunStatus
 import com.explapp.shortcut.automation.routines.PersonalPhotoRequest
 import com.explapp.shortcut.automation.routines.PersonalDeliveryResult
 import com.explapp.shortcut.execution.TaskExecutionReporter
@@ -595,6 +597,15 @@ class PersistentScreenCaptureService : Service() {
                 else -> TaskExecutionResult.success(taskName, started, details = details)
             }
             TaskExecutionReporter(applicationContext).report(result, notifyUser = false)
+            // The asynchronous capture is the terminal action of the simple
+            // screenshot routine. Resolve PREPARED only after the real result,
+            // not when Android accepted the service launch. Never mark a
+            // user-share chooser complete before the user sends it.
+            if (pendingRoutineId.isNotBlank() && !userSharePending) {
+                val finalStatus = if (result.status == com.explapp.shortcut.execution.TaskExecutionStatus.SUCCESS)
+                    RoutineRunStatus.SUCCESS else RoutineRunStatus.FAILED
+                RoutineProgressStore(applicationContext).finish(pendingRoutineId, finalStatus)
+            }
             // The original queued capture reached a terminal result; remove
             // its persistent Retry notification, not other routines' notices.
             PendingCaptureNotification.clear(applicationContext, pendingRoutineId)
