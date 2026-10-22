@@ -59,7 +59,10 @@ class RoutineExecutionWorker(
         val execution = runCatching {
             RoutineDispatcher(applicationContext).execute(routine, userInitiated = false)
         }
-        if (RoutineWork.shouldDisableAfterAttempt(routine, execution.getOrNull())) {
+        val persistedState = RoutineProgressStore(applicationContext).snapshot(routine.id)?.status
+        if (persistedState == RoutineRunStatus.SUCCESS.name &&
+            RoutineWork.shouldDisableAfterAttempt(routine, execution.getOrNull())
+        ) {
             runCatching {
                 store.upsert(routine.copy(isEnabled = false, updatedAtMs = System.currentTimeMillis()))
             }
