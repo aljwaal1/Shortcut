@@ -108,16 +108,20 @@ class RoutineDispatcher(private val context: Context) {
             // CANCEL_REQUESTED for review instead of overwriting it with SUCCESS.
             // An unexpected executor crash can occur after an irreversible action.
             // Keep the durable checkpoint uncertain rather than authorizing replay.
-            val historyResult = result.toTaskExecutionResult().copy(
+            val durableResult = if (checkpointWriteFailed || executorCrashed || progress.isCancelled(routine.id)) {
+                result.copy(status = RoutineRunStatus.FAILED)
+            } else result
+            val historyResult = durableResult.toTaskExecutionResult().copy(
                 details = listOf(
                     "RUN_SOURCE = " + if (userInitiated) "MANUAL" else "SCHEDULED",
                     "ROUTINE_ID = ${routine.id}",
-                ) + result.toTaskExecutionResult().details,
+                    "CHECKPOINT_STATE = ${progress.snapshot(routine.id)?.status ?: "UNKNOWN"}",
+                ) + durableResult.toTaskExecutionResult().details,
             )
             // Reporting is diagnostic only: a history storage failure must not
             // turn an already executed external action into a retryable crash.
             runCatching { TaskExecutionReporter(context).report(historyResult) }
-            result
+            durableResult
         } finally {
             runningRoutineIds.remove(routine.id)
         }
