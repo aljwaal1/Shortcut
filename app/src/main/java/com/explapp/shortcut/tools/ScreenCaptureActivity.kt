@@ -213,7 +213,8 @@ class ScreenCaptureActivity : AppCompatActivity() {
                 galleryOnly = selected == 0
                 shareAnyApp = selected == 1
                 normalTelegramShare = selected == 2
-                stampDateTime = false
+                // All floating-button destinations receive the same timestamped image.
+                stampDateTime = true
                 captureDelayMs = 1_500L
                 if (PersistentScreenCaptureService.isSessionActive(this)) {
                     val capture = Intent(this, PersistentScreenCaptureService::class.java)
@@ -222,6 +223,7 @@ class ScreenCaptureActivity : AppCompatActivity() {
                         .putExtra(PersistentScreenCaptureService.EXTRA_CAPTURE_DELAY_MS, 1_000L)
                         .putExtra(PersistentScreenCaptureService.EXTRA_SHARE_ANY_APP, shareAnyApp)
                         .putExtra(PersistentScreenCaptureService.EXTRA_NORMAL_TELEGRAM_SHARE, normalTelegramShare)
+                        .putExtra(PersistentScreenCaptureService.EXTRA_STAMP_DATE_TIME, stampDateTime)
                     runCatching { startService(capture) }
                         .onFailure {
                             Toast.makeText(this, local("Could not start capture", "تعذر بدء التصوير"), Toast.LENGTH_LONG).show()
