@@ -14,6 +14,7 @@ class RoutineProgressStore(context: Context) {
     fun begin(id: String): Boolean = prefs.edit()
         .putString("$id:state", "IN_FLIGHT")
         .putInt("$id:index", -1)
+        .remove("$id:last")
         .putBoolean("$id:cancel", false)
         .commit()
 
@@ -46,7 +47,8 @@ class RoutineProgressStore(context: Context) {
         if (state.status != "UNCERTAIN") return null
         if (prefs.getString("${routine.id}:fingerprint", null) != fingerprint(routine)) return null
         val index = state.lastCompletedActionIndex
-        if (index < 0) return 0
+        // No persisted completed action does not prove the first action never ran.
+        if (index < 0) return null
         if (index >= routine.actions.size) return null
         if (prefs.getString("${routine.id}:last", "") != RoutineActionStatus.SUCCESS.name) return null
         if (routine.actions.take(index + 1).any { it.type != RoutineActionType.WAIT }) return null
@@ -68,7 +70,7 @@ class RoutineProgressStore(context: Context) {
         if (!prefs.contains("$id:state")) return null
         val stored = prefs.getString("$id:state", "IN_FLIGHT").orEmpty()
         val visible = when (stored) {
-            "IN_FLIGHT" -> "UNCERTAIN"
+            "IN_FLIGHT", "PREPARED" -> "UNCERTAIN"
             else -> stored
         }
         return Snapshot(visible, prefs.getInt("$id:index", -1))
