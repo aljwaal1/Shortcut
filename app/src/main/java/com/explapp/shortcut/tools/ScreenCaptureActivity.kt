@@ -222,12 +222,13 @@ class ScreenCaptureActivity : AppCompatActivity() {
                         .putExtra(PersistentScreenCaptureService.EXTRA_SHARE_ANY_APP, shareAnyApp)
                         .putExtra(PersistentScreenCaptureService.EXTRA_NORMAL_TELEGRAM_SHARE, normalTelegramShare)
                         .putExtra(PersistentScreenCaptureService.EXTRA_STAMP_DATE_TIME, stampDateTime)
+                        .putExtra(PersistentScreenCaptureService.EXTRA_FLOATING_CAPTURE, true)
                     runCatching { startService(capture) }
                         .onFailure {
+                            restoreFloatingButton()
                             Toast.makeText(this, local("Could not start capture", "تعذر بدء التصوير"), Toast.LENGTH_LONG).show()
                         }
-                    // Persistent service owns frame acquisition; restore after its result.
-                    restoreFloatingButton(5_000L)
+                    // The persistent service restores the overlay after the actual result.
                     finish()
                 } else {
                     launchConsent()
