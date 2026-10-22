@@ -17,6 +17,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Build
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Error
+import androidx.compose.material.icons.filled.Info
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CardDefaults
@@ -163,7 +164,11 @@ fun ExecutionStatusCard(
             Surface(shape = CircleShape, color = accent.copy(alpha = 0.16f), modifier = Modifier.size(46.dp)) {
                 Box(contentAlignment = Alignment.Center) {
                     Icon(
-                        imageVector = if (result != null && !success) Icons.Default.Error else Icons.Default.CheckCircle,
+                        imageVector = when {
+                            result == null -> Icons.Default.Info
+                            success -> Icons.Default.CheckCircle
+                            else -> Icons.Default.Error
+                        },
                         contentDescription = null,
                         tint = accent,
                     )
