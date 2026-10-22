@@ -44,6 +44,7 @@ class PersistentScreenCaptureService : Service() {
     private var pendingNormalTelegramShare = false
     private var pendingShareAnyApp = false
     private var pendingStampDateTime = false
+    private var pendingFloatingCapture = false
     private var pendingRoutineId = ""
     private var pendingRoutineName = ""
     private var pendingRoutineStartedAtMs = 0L
@@ -246,6 +247,7 @@ class PersistentScreenCaptureService : Service() {
         pendingNormalTelegramShare = intent.getBooleanExtra(EXTRA_NORMAL_TELEGRAM_SHARE, false)
         pendingShareAnyApp = intent.getBooleanExtra(EXTRA_SHARE_ANY_APP, false)
         pendingStampDateTime = intent.getBooleanExtra(EXTRA_STAMP_DATE_TIME, false)
+        pendingFloatingCapture = intent.getBooleanExtra(EXTRA_FLOATING_CAPTURE, false)
         pendingRoutineId = intent.getStringExtra(EXTRA_ROUTINE_ID).orEmpty()
         pendingRoutineName = intent.getStringExtra(EXTRA_ROUTINE_NAME).orEmpty()
         pendingRoutineStartedAtMs = System.currentTimeMillis()
@@ -501,6 +503,13 @@ class PersistentScreenCaptureService : Service() {
     }
 
     private fun notifyResult(saved: Boolean, sent: Boolean, reason: String? = null) {
+        if (pendingFloatingCapture) {
+            pendingFloatingCapture = false
+            runCatching {
+                startService(Intent(this, FloatingScreenshotService::class.java)
+                    .setAction(FloatingScreenshotService.ACTION_SHOW_BUBBLE))
+            }
+        }
         val cleanReason = reason?.trim().orEmpty()
         if (pendingRoutineName.isNotBlank()) {
             val details = buildList {
@@ -611,6 +620,7 @@ class PersistentScreenCaptureService : Service() {
         const val EXTRA_NORMAL_TELEGRAM_SHARE = "normalTelegramShare"
         const val EXTRA_SHARE_ANY_APP = "shareAnyApp"
         const val EXTRA_STAMP_DATE_TIME = "stampDateTime"
+        const val EXTRA_FLOATING_CAPTURE = "floatingCapture"
         const val EXTRA_ROUTINE_ID = "routineId"
         const val EXTRA_ROUTINE_NAME = "routineName"
 
