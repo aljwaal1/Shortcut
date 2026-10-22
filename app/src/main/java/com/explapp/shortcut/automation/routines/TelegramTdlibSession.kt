@@ -29,6 +29,13 @@ internal object TelegramTdlibSession : TelegramPersonalClient {
     private val rejected = ConcurrentHashMap<Long, String>()
 
     fun status(): String = authState?.javaClass?.simpleName ?: "Not connected"
+
+    /** Initialize only from an explicitly opted-in, Keystore-encrypted session. */
+    fun reconnect(context: Context): Boolean {
+        if (client != null) return true
+        val (id, hash) = TelegramPersonalCredentialVault.load(context) ?: return false
+        return open(context, id, hash)
+    }
     fun lastError(): String? = sendError
 
     @Synchronized
@@ -54,6 +61,7 @@ internal object TelegramTdlibSession : TelegramPersonalClient {
                     else -> Unit
                 }
             }, null, null)
+            TelegramPersonalCredentialVault.save(context.applicationContext, apiId, apiHash)
             true
         }.getOrElse {
             sendError = "TDLib initialization failed: ${it.javaClass.simpleName}"
@@ -89,7 +97,10 @@ internal object TelegramTdlibSession : TelegramPersonalClient {
     fun providePhone(phone: String) = submit(TdApi.SetAuthenticationPhoneNumber(phone.trim(), null))
     fun provideCode(code: String) = submit(TdApi.CheckAuthenticationCode(code.trim()))
     fun providePassword(password: String) = submit(TdApi.CheckAuthenticationPassword(password))
-    fun logout() = submit(TdApi.LogOut())
+    fun logout(): Boolean {
+        appContext?.let { TelegramPersonalCredentialVault.clear(it) }
+        return submit(TdApi.LogOut())
+    }
 
     private fun submit(request: TdApi.Function<*>): Boolean {
         val c = client ?: return false
