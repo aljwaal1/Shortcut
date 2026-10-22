@@ -8,7 +8,6 @@ import android.os.Build
 import android.os.Handler
 import android.os.IBinder
 import android.os.Looper
-import android.os.SystemClock
 import android.provider.Settings
 import android.view.Gravity
 import android.view.MotionEvent
@@ -21,9 +20,8 @@ class FloatingScreenshotService : Service() {
     private val main = Handler(Looper.getMainLooper())
     private lateinit var windows: WindowManager
     private var bubble: TextView? = null
-    private var expiresAt = 0L
     private val expiry = Runnable {
-        getSharedPreferences(PREFS, MODE_PRIVATE).edit().putString(KEY_MODE, "off").apply()
+        getSharedPreferences(PREFS, MODE_PRIVATE).edit().putString(KEY_MODE, "off").remove(KEY_EXPIRES_AT).apply()
         stopSelf()
     }
     private val safetyRestore = Runnable { bubble?.visibility = android.view.View.VISIBLE }
@@ -55,10 +53,21 @@ class FloatingScreenshotService : Service() {
         getSharedPreferences(PREFS, MODE_PRIVATE).edit().putString(KEY_MODE, mode).apply()
         main.removeCallbacks(expiry)
         if (mode == "temporary") {
-            val duration = intent?.getLongExtra(EXTRA_DURATION_MS, 300_000L)?.coerceIn(10_000L, 86_400_000L) ?: 300_000L
-            expiresAt = SystemClock.elapsedRealtime() + duration
-            main.postDelayed(expiry, duration)
-        } else expiresAt = 0L
+            val saved = getSharedPreferences(PREFS, MODE_PRIVATE).getLong(KEY_EXPIRES_AT, 0L)
+            val remaining = if (intent?.hasExtra(EXTRA_DURATION_MS) == true) {
+                val duration = intent.getLongExtra(EXTRA_DURATION_MS, 300_000L).coerceIn(10_000L, 86_400_000L)
+                val expires = System.currentTimeMillis() + duration
+                getSharedPreferences(PREFS, MODE_PRIVATE).edit().putLong(KEY_EXPIRES_AT, expires).apply()
+                duration
+            } else (saved - System.currentTimeMillis()).coerceAtLeast(0L)
+            if (remaining == 0L) {
+                expiry.run()
+                return START_NOT_STICKY
+            }
+            main.postDelayed(expiry, remaining)
+        } else {
+            getSharedPreferences(PREFS, MODE_PRIVATE).edit().remove(KEY_EXPIRES_AT).apply()
+        }
         if (bubble == null) createBubble()
         return START_STICKY
     }
@@ -161,5 +170,6 @@ class FloatingScreenshotService : Service() {
         const val EXTRA_DURATION_MS = "durationMs"
         const val PREFS = "floating_screenshot"
         const val KEY_MODE = "mode"
+        const val KEY_EXPIRES_AT = "expiresAtWallMs"
     }
 }
