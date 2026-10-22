@@ -270,6 +270,29 @@ private fun MyAutomationsScreen(onBack: () -> Unit, initialMode: String = "") {
                 ElevatedCard(Modifier.fillMaxWidth()) {
                     Column(Modifier.fillMaxWidth().padding(14.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                         Text(
+                            if (ar) "تيليجرام الشخصي — تسجيل الدخول" else "Personal Telegram — account login",
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.Bold,
+                        )
+                        Text(
+                            if (ar) "اتصل بحسابك الشخصي عبر TDLib بشكل منفصل عن البوت. الإرسال التلقائي للصور لا يزال قيد الدمج، ولا تعتبر مشاركة تيليجرام الحالية إرسالًا تلقائيًا."
+                            else "Authorize your personal user account with TDLib, separately from the bot. Automatic photo delivery is still being integrated; normal sharing is not automatic sending.",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                        Button(
+                            onClick = { context.startActivity(Intent(context, TelegramPersonalSetupActivity::class.java)) },
+                            modifier = Modifier.fillMaxWidth(),
+                        ) {
+                            Text(if (ar) "إعداد الحساب الشخصي (TDLib)" else "Set up personal account (TDLib)")
+                        }
+                    }
+                }
+            }
+            item {
+                ElevatedCard(Modifier.fillMaxWidth()) {
+                    Column(Modifier.fillMaxWidth().padding(14.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Text(
                             if (ar) "2. لقطة شاشة ومشاركتها في محادثة تيليجرام عادية"
                             else "2. Screenshot and share to a normal Telegram chat",
                             style = MaterialTheme.typography.titleMedium,
