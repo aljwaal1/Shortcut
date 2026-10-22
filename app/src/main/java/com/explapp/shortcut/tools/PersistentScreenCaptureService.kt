@@ -147,8 +147,24 @@ class PersistentScreenCaptureService : Service() {
 
                 val sample = sampleCenterGrid(cropped)
                 val likelyBlank = ScreenFrameReadiness.isLikelyBlank(sample)
-                if (likelyBlank && SystemClock.uptimeMillis() < blankFrameRetryUntilMs) {
+                val likelyWashedOut = ScreenFrameReadiness.isLikelyWashedOut(sample)
+                if (likelyBlank || likelyWashedOut) {
                     cropped.recycle()
+                    // Do not send a visibly empty/washed-out launch-transition
+                    // frame to Telegram or count its successful file write as a
+                    // successful screenshot. Keep waiting for a usable frame.
+                    if (SystemClock.uptimeMillis() >= blankFrameRetryUntilMs) {
+                        captureRequested = false
+                        captureInFlight = false
+                        notifyResult(
+                            saved = false,
+                            sent = false,
+                            reason = local(
+                                "Screen remained blank or washed out after app launch; screenshot not sent.",
+                                "بقيت شاشة التطبيق فارغة أو باهتة بعد الفتح؛ لم تُرسل لقطة غير واضحة.",
+                            ),
+                        )
+                    }
                     return@setOnImageAvailableListener
                 }
 
