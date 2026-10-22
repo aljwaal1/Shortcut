@@ -155,7 +155,10 @@ internal object TelegramTdlibSession : TelegramPersonalClient {
         // rather than InputFile for InputMessagePhoto, so use the supported document
         // transport to avoid an invalid photo object or a falsely successful send.
         val photo = TdApi.InputMessageDocument().apply {
-            this.document = TdApi.InputFileLocal(file.absolutePath)
+            this.document = TdApi.InputDocument().apply {
+                this.document = TdApi.InputFileLocal(file.absolutePath)
+                this.disableContentTypeDetection = false
+            }
             this.caption = TdApi.FormattedText(caption.take(1024), emptyArray())
         }
         val request = TdApi.SendMessage().apply {
