@@ -410,7 +410,53 @@ private fun MyAutomationsScreen(onBack: () -> Unit, initialMode: String = "") {
                             Switch(checked = routine.isEnabled, onCheckedChange = { enabled -> upsert(routine.copy(isEnabled = enabled)) })
                         }
                         Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                            TextButton(onClick = { RoutineDispatcher(context).executeAsync(routine, userInitiated = true) }) { Text(if (ar) "تشغيل" else "Run") }
+                            TextButton(onClick = {
+                                val checkpoint = RoutineProgressStore(context).snapshot(routine.id)
+                                if (checkpoint?.status == "UNCERTAIN") {
+                                    android.app.AlertDialog.Builder(context)
+                                        .setTitle(if (ar) "هذه المهمة معلقة من محاولة سابقة" else "Previous attempt has an uncertain result")
+                                        .setMessage(
+                                            if (ar) "لا يمكن التأكد من اكتمال الإرسال السابق. محاولة جديدة قد تكرر إرسال الصورة. هل تريد بدء تشغيل جديد بعد مراجعة المستلم؟"
+                                            else "The previous send may have completed. Starting again could send a duplicate screenshot. Start a new attempt after verifying the recipient?"
+                                        )
+                                        .setNegativeButton(if (ar) "إلغاء" else "Cancel", null)
+                                        .setPositiveButton(if (ar) "بدء محاولة جديدة" else "Start new attempt") { _, _ ->
+                                            // Only explicit user confirmation clears the uncertain
+                                            // checkpoint. Never replay an external send automatically.
+                                            if (RoutineProgressStore(context).finish(routine.id, com.explapp.shortcut.automation.routines.RoutineRunStatus.FAILED)) {
+                                                Toast.makeText(context, if (ar) "بدأت محاولة جديدة: ${routine.name}" else "Starting new attempt: ${routine.name}", Toast.LENGTH_LONG).show()
+                                                RoutineDispatcher(context).executeAsync(routine, userInitiated = true) { result ->
+                                                    (context as? android.app.Activity)?.runOnUiThread {
+                                                        Toast.makeText(
+                                                            context,
+                                                            (if (ar) "حالة التشغيل الأولية: " else "Initial execution: ") + result.status.name +
+                                                                (if (result.status == com.explapp.shortcut.automation.routines.RoutineRunStatus.PREPARED) {
+                                                                    if (ar) " — بانتظار نتيجة التصوير أو الموافقة" else " — waiting for capture or approval"
+                                                                } else ""),
+                                                            Toast.LENGTH_LONG,
+                                                        ).show()
+                                                    }
+                                                }
+                                            } else {
+                                                Toast.makeText(context, if (ar) "تعذر إعادة ضبط حالة المهمة" else "Could not reset task state", Toast.LENGTH_LONG).show()
+                                            }
+                                        }.show()
+                                } else {
+                                    Toast.makeText(context, if (ar) "بدأ طلب التشغيل: ${routine.name}" else "Run requested: ${routine.name}", Toast.LENGTH_SHORT).show()
+                                    RoutineDispatcher(context).executeAsync(routine, userInitiated = true) { result ->
+                                        (context as? android.app.Activity)?.runOnUiThread {
+                                            Toast.makeText(
+                                                context,
+                                                (if (ar) "حالة التشغيل الأولية: " else "Initial execution: ") + result.status.name +
+                                                    (if (result.status == com.explapp.shortcut.automation.routines.RoutineRunStatus.PREPARED) {
+                                                        if (ar) " — بانتظار إكمال التصوير أو الصلاحية" else " — awaiting capture or permission"
+                                                    } else ""),
+                                                Toast.LENGTH_LONG,
+                                            ).show()
+                                        }
+                                    }
+                                }
+                            }) { Text(if (ar) "تشغيل" else "Run") }
                             TextButton(onClick = {
                                 RoutineWork.cancel(context, routine.id)
                                 Toast.makeText(context, if (ar) "أُلغي العمل المجدول؛ قد يكتمل الإجراء الجاري" else "Queued work cancelled; current action may finish", Toast.LENGTH_LONG).show()
