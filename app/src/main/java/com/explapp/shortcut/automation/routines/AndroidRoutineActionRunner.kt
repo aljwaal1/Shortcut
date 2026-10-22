@@ -413,6 +413,7 @@ class AndroidRoutineActionRunner(
                     RoutineActionResult.prepared(action, local("Start the persistent capture session", "شغّل جلسة تصوير الشاشة المستمرة"))
                 }.getOrElse { RoutineActionResult.failure(action, it.message ?: it.javaClass.simpleName) }
             } else if (
+                PendingCaptureNotification.show(context, routineId, routineName, reactivate) ||
                 showNotification(
                     title = local("Screen-capture session needs approval", "جلسة تصوير الشاشة تحتاج موافقة"),
                     text = local("Tap once to reactivate persistent capture.", "اضغط مرة واحدة لإعادة تفعيل جلسة التصوير المستمرة."),
