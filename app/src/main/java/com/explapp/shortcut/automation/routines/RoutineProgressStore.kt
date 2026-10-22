@@ -11,14 +11,11 @@ import java.security.MessageDigest
 class RoutineProgressStore(context: Context) {
     private val prefs = context.applicationContext.getSharedPreferences("routine_progress_v1", Context.MODE_PRIVATE)
 
-    fun begin(id: String): Boolean = prefs.edit()
-        .putString("$id:state", "IN_FLIGHT")
-        .putInt("$id:index", -1)
-        .remove("$id:last")
-        .putBoolean("$id:cancel", false)
-        .commit()
-
-    fun bindRoutine(routine: AutomationRoutine): Boolean = prefs.edit()
+    fun begin(routine: AutomationRoutine): Boolean = prefs.edit()
+        .putString("${routine.id}:state", "IN_FLIGHT")
+        .putInt("${routine.id}:index", -1)
+        .remove("${routine.id}:last")
+        .putBoolean("${routine.id}:cancel", false)
         .putString("${routine.id}:fingerprint", fingerprint(routine))
         .commit()
 
