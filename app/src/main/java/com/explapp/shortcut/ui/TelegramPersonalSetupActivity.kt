@@ -70,6 +70,25 @@ class TelegramPersonalSetupActivity : AppCompatActivity() {
             hash.text.clear()
             refresh(ar)
         }
+        val recipient = field(if (ar) "معرّف المستلم: @username" else "Recipient username: @username")
+        button(if (ar) "التحقق من المستلم" else "Verify recipient") {
+            val username = com.explapp.shortcut.automation.routines.TelegramPersonalDeliveryPolicy
+                .normalizeUsername(recipient.text.toString())
+            if (username == null) {
+                status.text = if (ar) "المعرّف غير صالح. مثال: @username" else "Invalid username. Example: @username"
+            } else {
+                Thread {
+                    val chatId = TelegramTdlibSession.resolvePrivateRecipient(username)
+                    runOnUiThread {
+                        status.text = if (chatId != null) {
+                            if (ar) "تم العثور على حساب شخصي: $username" else "Verified private account: $username"
+                        } else {
+                            if (ar) "تعذر التحقق. سجّل الدخول أولًا أو تأكد من المعرف." else "Could not verify. Log in first or check username."
+                        }
+                    }
+                }.start()
+            }
+        }
         val phone = field(if (ar) "رقم الهاتف الدولي: +46..." else "Phone with country code: +46...")
         button(if (ar) "إرسال رقم الهاتف" else "Submit phone") {
             TelegramTdlibSession.providePhone(phone.text.toString())
