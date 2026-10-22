@@ -106,9 +106,14 @@ class TaskExecutionReporter(private val context: Context) {
             packageInfo?.versionCode?.toLong() ?: 0L
         }
         val generatedAt = timeFormat.format(Date(nowMs))
-        val successCount = records.count { it.status == TaskExecutionStatus.SUCCESS }
-        val preparedCount = records.count { it.status == TaskExecutionStatus.PREPARED }
-        val failureCount = records.count { it.status == TaskExecutionStatus.FAILURE }
+        // Alarm/queue/worker lifecycle entries document progress but must not
+        // inflate actual automation success/failure totals.
+        val lifecycleEvents = records.filter { it.taskName.endsWith(" / ALARM") ||
+            it.taskName.endsWith(" / QUEUE") || it.taskName.endsWith(" / WORKER") }
+        val actionRecords = records - lifecycleEvents.toSet()
+        val successCount = actionRecords.count { it.status == TaskExecutionStatus.SUCCESS }
+        val preparedCount = actionRecords.count { it.status == TaskExecutionStatus.PREPARED }
+        val failureCount = actionRecords.count { it.status == TaskExecutionStatus.FAILURE }
         val crash = CrashLogStore(context).last()?.takeIf {
             Instant.ofEpochMilli(it.timestampMs).atZone(zone).toLocalDate() == targetDate
         }
@@ -122,7 +127,8 @@ class TaskExecutionReporter(private val context: Context) {
             appendLine("Device: ${Build.MANUFACTURER} ${Build.MODEL}")
             appendLine("TimeZone: $zone")
             appendLine("------------------------------------")
-            appendLine("Total: ${records.size}")
+            appendLine("Total execution results: ${actionRecords.size}")
+            appendLine("Lifecycle events (alarm/queue/worker): ${lifecycleEvents.size}")
             appendLine("SUCCESS: $successCount")
             appendLine("PREPARED: $preparedCount")
             appendLine("FAILURE: $failureCount")
@@ -130,7 +136,7 @@ class TaskExecutionReporter(private val context: Context) {
 
             if (records.isNotEmpty()) {
                 appendLine("===== AUTOMATION SUMMARY =====")
-                records
+                actionRecords
                     .groupBy { it.taskName.substringBefore(" / SCREENSHOT") }
                     .toSortedMap()
                     .forEach { (name, automationRecords) ->
