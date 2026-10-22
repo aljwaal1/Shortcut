@@ -3,6 +3,29 @@ package com.explapp.shortcut.tools
 import kotlin.math.roundToInt
 
 object ScreenFrameReadiness {
+    /**
+     * Screens captured during app launch can be almost white while the system
+     * status bar and overlays remain sharp. Only reject very pale frames with
+     * almost no dark content; never alter image colors or brightness.
+     */
+    fun isLikelyWashedOut(sampledArgb: IntArray): Boolean {
+        if (sampledArgb.size < 20) return false
+        var pale = 0
+        var dark = 0
+        var totalLuma = 0.0
+        sampledArgb.forEach { color ->
+            val r = (color shr 16) and 255
+            val g = (color shr 8) and 255
+            val b = color and 255
+            val luma = r * 0.2126 + g * 0.7152 + b * 0.0722
+            totalLuma += luma
+            if (luma >= 235 && minOf(r, g, b) >= 215) pale++
+            if (luma < 105) dark++
+        }
+        val count = sampledArgb.size.toDouble()
+        return pale / count >= 0.72 && dark / count <= 0.025 && totalLuma / count >= 229
+    }
+
     fun isLikelyBlank(sampledArgb: IntArray): Boolean {
         if (sampledArgb.isEmpty()) return false
 
