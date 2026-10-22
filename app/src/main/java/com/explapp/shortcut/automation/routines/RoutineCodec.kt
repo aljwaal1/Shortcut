@@ -20,11 +20,9 @@ object RoutineCodec {
         buildJsonArray { routines.forEach { add(it.toJson()) } },
     )
 
-    fun decode(raw: String): List<AutomationRoutine> = runCatching {
-        json.parseToJsonElement(raw).jsonArray.mapNotNull { element ->
-            runCatching { element.jsonObject.toRoutine() }.getOrNull()
-        }
-    }.getOrDefault(emptyList())
+    /** Never silently drop an automation: a subsequent save would erase it permanently. */
+    fun decode(raw: String): List<AutomationRoutine> =
+        json.parseToJsonElement(raw).jsonArray.map { element -> element.jsonObject.toRoutine() }
 
     private fun AutomationRoutine.toJson(): JsonObject = buildJsonObject {
         put("id", id)
