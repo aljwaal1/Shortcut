@@ -456,6 +456,7 @@ private fun DailyScreenshotTelegramWizard(
 
     var shortcutName by remember { mutableStateOf("") }
     var time by remember { mutableStateOf("") }
+    var manualPersonal by remember { mutableStateOf(false) }
     var repeat by remember { mutableStateOf(RoutineRepeat.DAILY) }
     var repeatValue by remember { mutableStateOf("") }
     var appPackage by remember { mutableStateOf("") }
@@ -537,7 +538,7 @@ private fun DailyScreenshotTelegramWizard(
         RoutineRepeat.MONTHLY -> repeatValue.toIntOrNull() in 1..31
         RoutineRepeat.YEARLY -> runCatching { java.time.MonthDay.parse("--" + repeatValue) }.isSuccess
     }
-    val canSave = time.isNotBlank() && appPackage.isNotBlank() && repeatValid &&
+    val canSave = (!manualPersonal && time.isNotBlank() && repeatValid || usePersonal && manualPersonal) && appPackage.isNotBlank() &&
         (!useBot || (botToken.isNotBlank() && chatId.isNotBlank())) &&
         (!usePersonal || (personalConsent && TelegramPersonalDeliveryPolicy.normalizeUsername(personalUsername) != null))
 
@@ -594,6 +595,29 @@ private fun DailyScreenshotTelegramWizard(
             )
         }
 
+        if (usePersonal) {
+            item {
+                Text(if (ar) "طريقة التشغيل" else "Run mode", fontWeight = FontWeight.Bold)
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    FilterChip(
+                        selected = manualPersonal,
+                        onClick = { manualPersonal = true },
+                        label = { Text(if (ar) "تشغيل يدوي" else "Run manually") },
+                    )
+                    FilterChip(
+                        selected = !manualPersonal,
+                        onClick = { manualPersonal = false },
+                        label = { Text(if (ar) "تشغيل مجدول" else "Scheduled") },
+                    )
+                }
+                if (manualPersonal) ClearHint(
+                    if (ar) "لا تحتاج إلى وقت أو تكرار. احفظ المهمة ثم اضغط تشغيل متى تريد. سيتم توثيق المحاولة في سجل Debug."
+                    else "No time or repeat needed. Save and tap Run whenever you like. Execution will be recorded in Debug.",
+                    ar,
+                )
+            }
+        }
+        if (!manualPersonal) {
         item {
             Text(if (ar) "1. الوقت" else "1. Time", fontWeight = FontWeight.Bold)
             val now = Calendar.getInstance()
@@ -757,6 +781,7 @@ private fun DailyScreenshotTelegramWizard(
             }
         }
 
+        }
         item {
             Text(if (ar) "3. التطبيق" else "3. App", fontWeight = FontWeight.Bold)
             Button(
@@ -1037,9 +1062,9 @@ private fun DailyScreenshotTelegramWizard(
         item {
             if (!canSave) {
                 val missing = buildList {
-                    if (time.isBlank()) add(if (ar) "الوقت" else "time")
+                    if (!manualPersonal && time.isBlank()) add(if (ar) "الوقت" else "time")
                     if (appPackage.isBlank()) add(if (ar) "التطبيق" else "app")
-                    if (!repeatValid) add(if (ar) "التكرار أو التاريخ" else "repeat/date")
+                    if (!manualPersonal && !repeatValid) add(if (ar) "التكرار أو التاريخ" else "repeat/date")
                     if (usePersonal) {
                         if (TelegramPersonalDeliveryPolicy.normalizeUsername(personalUsername) == null) add("@username")
                         if (!personalConsent) add(if (ar) "الموافقة على الإرسال" else "sending consent")
@@ -1067,7 +1092,9 @@ private fun DailyScreenshotTelegramWizard(
                     onClick = {
                         val routine = AutomationRoutine(
                             name = shortcutName.ifBlank {
-                                if (useBot) {
+                                if (usePersonal && manualPersonal) {
+                                    if (ar) "تيليجرام الشخصي — تشغيل يدوي" else "Personal Telegram — manual"
+                                } else if (useBot) {
                                     if (ar) "لقطة مجدولة إلى تيليجرام بواسطة البوت" else "Scheduled screenshot to Telegram bot"
                                 } else {
                                     if (usePersonal) {
@@ -1078,8 +1105,8 @@ private fun DailyScreenshotTelegramWizard(
                                 }
                             },
                             trigger = RoutineTrigger(
-                                type = RoutineTriggerType.TIME,
-                                value = time,
+                                type = if (manualPersonal) RoutineTriggerType.MANUAL else RoutineTriggerType.TIME,
+                                value = if (manualPersonal) "" else time,
                                 repeat = repeat,
                                 repeatValue = repeatValue,
                             ),
