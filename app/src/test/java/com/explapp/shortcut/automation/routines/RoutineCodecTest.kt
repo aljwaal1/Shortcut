@@ -2,6 +2,7 @@ package com.explapp.shortcut.automation.routines
 
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotEquals
+import org.junit.Assert.fail
 import org.junit.Test
 
 class RoutineCodecTest {
@@ -49,6 +50,23 @@ class RoutineCodecTest {
         val decoded = RoutineCodec.decode(legacy).single()
         assertEquals(RoutineRepeat.DAILY, decoded.trigger.repeat)
         assertEquals("", decoded.trigger.repeatValue)
+    }
+
+    @Test
+    fun corruptedCollectionMustNotSilentlyDiscardValidRoutines() {
+        val good = AutomationRoutine(
+            id = "good", name = "Keep me",
+            trigger = RoutineTrigger(RoutineTriggerType.MANUAL),
+            actions = listOf(RoutineAction(RoutineActionType.SHOW_NOTIFICATION, "Hi")),
+        )
+        val encoded = RoutineCodec.encode(listOf(good))
+        val malformed = encoded.dropLast(1) + """,{"id":"bad","name":"Bad","trigger":{"type":"UNKNOWN"},"actions":[]}]"""
+        try {
+            RoutineCodec.decode(malformed)
+            fail("A malformed routine must not be silently removed from saved data")
+        } catch (_: IllegalArgumentException) {
+            // Preserve the original persisted collection until repaired explicitly.
+        }
     }
 
     @Test
