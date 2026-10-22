@@ -199,6 +199,12 @@ class RoutineAlarmReceiver : BroadcastReceiver() {
             try {
                 val routine = RoutineStore(context).load()
                     .firstOrNull { it.id == id && it.isEnabled && it.isValid() } ?: return@worker
+                com.explapp.shortcut.execution.TaskExecutionReporter(context).report(
+                    com.explapp.shortcut.execution.TaskExecutionResult.prepared(
+                        routine.name + " / ALARM", System.currentTimeMillis(),
+                        details = listOf("EVENT = SCHEDULE_ALARM_FIRED", "ROUTINE_ID = ${routine.id}", "RUN_SOURCE = SCHEDULED"),
+                    ), notifyUser = false,
+                )
                 RoutineWork.enqueue(context, routine.id)
                 runCatching { RoutineScheduler(context).schedule(routine) }
             } finally {
