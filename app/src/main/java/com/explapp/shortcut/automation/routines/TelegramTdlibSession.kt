@@ -113,6 +113,21 @@ internal object TelegramTdlibSession : TelegramPersonalClient {
 
     override fun isAuthorized() = authState is TdApi.AuthorizationStateReady
 
+    /** Allow an encrypted, previously authorized session time to reconnect on a worker thread. */
+    fun waitForAuthorization(timeoutMs: Long = 12_000L): Boolean {
+        val deadline = android.os.SystemClock.elapsedRealtime() + timeoutMs
+        while (!isAuthorized() && android.os.SystemClock.elapsedRealtime() < deadline) {
+            val state = authState
+            if (state is TdApi.AuthorizationStateWaitPhoneNumber ||
+                state is TdApi.AuthorizationStateWaitCode ||
+                state is TdApi.AuthorizationStateWaitPassword ||
+                state is TdApi.AuthorizationStateWaitEmailAddress ||
+                state is TdApi.AuthorizationStateWaitEmailCode) return false
+            Thread.sleep(200)
+        }
+        return isAuthorized()
+    }
+
     private fun ask(request: TdApi.Function<*>, timeoutSeconds: Long = 20): TdApi.Object? {
         val c = client ?: return null
         val latch = CountDownLatch(1)
