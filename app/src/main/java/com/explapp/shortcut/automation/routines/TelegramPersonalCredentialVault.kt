@@ -45,7 +45,7 @@ internal object TelegramPersonalCredentialVault {
 
     fun load(context: Context): Pair<Int, String>? = runCatching {
         val pref = context.getSharedPreferences(PREF, Context.MODE_PRIVATE)
-        val iv = Base64.decode(pref.getString(KEY_IV, null) ?: return null, Base64.NO_WRAP)
+        val iv = Base64.decode(pref.getString(KEY_IV, null) ?: return@runCatching null, Base64.NO_WRAP)
         val data = Base64.decode(pref.getString(KEY_DATA, null) ?: return null, Base64.NO_WRAP)
         val cipher = Cipher.getInstance("AES/GCM/NoPadding").apply {
             init(Cipher.DECRYPT_MODE, secret(), GCMParameterSpec(128, iv))
