@@ -34,8 +34,9 @@ class RoutineStore(context: Context) {
                                 if (secrets.put(secretKey, value)) {
                                     updated[key] = value
                                 } else {
-                                    // Never keep a credential in plaintext when secure storage is unavailable.
-                                    updated.remove(key)
+                                    // A failed migration must never silently discard a bot token.
+                                    // Keep the original persisted data intact for a later retry.
+                                    error("Could not migrate automation credential into secure storage")
                                 }
                                 migrated = true
                             }
