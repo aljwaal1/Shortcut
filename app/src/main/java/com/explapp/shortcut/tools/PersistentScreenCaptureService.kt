@@ -26,6 +26,7 @@ import android.net.Uri
 import com.explapp.shortcut.automation.routines.TelegramBotSender
 import com.explapp.shortcut.automation.routines.TelegramTdlibSession
 import com.explapp.shortcut.automation.routines.TelegramPersonalDeliveryCoordinator
+import com.explapp.shortcut.automation.routines.PendingCaptureNotification
 import com.explapp.shortcut.automation.routines.PersonalPhotoRequest
 import com.explapp.shortcut.automation.routines.PersonalDeliveryResult
 import com.explapp.shortcut.execution.TaskExecutionReporter
@@ -594,6 +595,9 @@ class PersistentScreenCaptureService : Service() {
                 else -> TaskExecutionResult.success(taskName, started, details = details)
             }
             TaskExecutionReporter(applicationContext).report(result, notifyUser = false)
+            // The original queued capture reached a terminal result; remove
+            // its persistent Retry notification, not other routines' notices.
+            PendingCaptureNotification.clear(applicationContext, pendingRoutineId)
             pendingRoutineId = ""
             pendingRoutineName = ""
             pendingRoutineStartedAtMs = 0L
