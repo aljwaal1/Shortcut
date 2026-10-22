@@ -546,6 +546,11 @@ class PersistentScreenCaptureService : Service() {
                 if (pendingToken.isNotBlank() || pendingChatId.isNotBlank()) {
                     add("TELEGRAM_SEND = " + if (sent) "SUCCESS" else "FAILURE")
                 }
+                if (pendingPersonalUsername.isNotBlank()) {
+                    add("TELEGRAM_PERSONAL_SEND = " + if (sent) "SUCCESS" else "FAILURE")
+                    add("TELEGRAM_PERSONAL_RECIPIENT = @" + pendingPersonalUsername.trim().removePrefix("@"))
+                }
+                if (cleanReason.isNotBlank()) add("DeliveryReason = $cleanReason")
                 if (pendingNormalTelegramShare) add("TELEGRAM_SHARE = PREPARED")
                 if (pendingShareAnyApp) add("SHARE_ANY_APP = PREPARED")
                 add("DateTimeStamp = $pendingStampDateTime")
@@ -554,6 +559,7 @@ class PersistentScreenCaptureService : Service() {
             val taskName = "$pendingRoutineName / SCREENSHOT"
             val started = pendingRoutineStartedAtMs.takeIf { it > 0L } ?: System.currentTimeMillis()
             val botDeliveryRequested = pendingToken.isNotBlank() || pendingChatId.isNotBlank()
+            val personalDeliveryRequested = pendingPersonalUsername.isNotBlank()
             val userSharePending = pendingNormalTelegramShare || pendingShareAnyApp
             val result = when {
                 !saved -> TaskExecutionResult.failure(
@@ -562,7 +568,7 @@ class PersistentScreenCaptureService : Service() {
                     started,
                     details = details,
                 )
-                botDeliveryRequested && !sent -> TaskExecutionResult.failure(
+                (botDeliveryRequested || personalDeliveryRequested) && !sent -> TaskExecutionResult.failure(
                     taskName,
                     cleanReason.ifBlank { "Telegram delivery failed" },
                     started,
