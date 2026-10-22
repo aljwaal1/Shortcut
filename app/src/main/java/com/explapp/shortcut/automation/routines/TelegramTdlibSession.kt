@@ -151,8 +151,11 @@ internal object TelegramTdlibSession : TelegramPersonalClient {
         if (!isAuthorized()) return PersonalDeliveryResult.NeedsLogin
         if (!file.isFile || file.length() <= 0L) return PersonalDeliveryResult.Failed("Missing photo")
         // TDLib's initial Message result can still be pending: do not label it delivered.
-        val photo = TdApi.InputMessagePhoto().apply {
-            this.photo = TdApi.InputFileLocal(file.absolutePath)
+        // Send screenshot as a Telegram image file. This TDLib build expects InputPhoto
+        // rather than InputFile for InputMessagePhoto, so use the supported document
+        // transport to avoid an invalid photo object or a falsely successful send.
+        val photo = TdApi.InputMessageDocument().apply {
+            this.document = TdApi.InputFileLocal(file.absolutePath)
             this.caption = TdApi.FormattedText(caption.take(1024), emptyArray())
         }
         val request = TdApi.SendMessage().apply {
