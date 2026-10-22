@@ -71,7 +71,11 @@ class RoutineExecutionWorker(
         // Unexpected infrastructure failures still surface as a failed worker.
         // Infrastructure failures may follow an already completed external action.
         // Never request a blind WorkManager retry for the entire routine.
-        if (execution.isFailure) Result.failure() else Result.success()
+        if (execution.isFailure || execution.getOrNull()?.status == RoutineRunStatus.FAILED) {
+            Result.failure()
+        } else {
+            Result.success()
+        }
     }
 
     private fun local(en: String, ar: String): String =
