@@ -120,8 +120,8 @@ class FloatingScreenshotService : Service() {
                     true
                 }
                 MotionEvent.ACTION_MOVE -> {
-                    params.x = (startX + (event.rawX - downX).toInt()).coerceIn(0, resources.displayMetrics.widthPixels - view.width)
-                    params.y = (startY + (event.rawY - downY).toInt()).coerceIn(0, resources.displayMetrics.heightPixels - view.height)
+                    params.x = (startX + (event.rawX - downX).toInt()).coerceIn(0, (resources.displayMetrics.widthPixels - view.width).coerceAtLeast(0))
+                    params.y = (startY + (event.rawY - downY).toInt()).coerceIn(0, (resources.displayMetrics.heightPixels - view.height).coerceAtLeast(0))
                     runCatching { windows.updateViewLayout(view, params) }
                     true
                 }
