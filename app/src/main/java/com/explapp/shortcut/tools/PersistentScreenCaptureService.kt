@@ -267,6 +267,7 @@ class PersistentScreenCaptureService : Service() {
         pendingToken = intent.getStringExtra(EXTRA_TELEGRAM_BOT_TOKEN).orEmpty()
         pendingChatId = intent.getStringExtra(EXTRA_TELEGRAM_CHAT_ID).orEmpty()
         pendingPersonalUsername = intent.getStringExtra(EXTRA_TELEGRAM_PERSONAL_USERNAME).orEmpty()
+        if (pendingPersonalUsername.isNotBlank()) TelegramTdlibSession.reconnect(applicationContext)
         pendingCaption = intent.getStringExtra(EXTRA_TELEGRAM_CAPTION).orEmpty()
         pendingNormalTelegramShare = intent.getBooleanExtra(EXTRA_NORMAL_TELEGRAM_SHARE, false)
         pendingShareAnyApp = intent.getBooleanExtra(EXTRA_SHARE_ANY_APP, false)
