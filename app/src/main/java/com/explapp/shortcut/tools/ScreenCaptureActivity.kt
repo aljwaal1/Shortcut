@@ -84,22 +84,20 @@ class ScreenCaptureActivity : AppCompatActivity() {
                     ),
                 )
                 Toast.makeText(this@ScreenCaptureActivity, local("Could not capture screenshot", "تعذر التقاط الشاشة"), Toast.LENGTH_LONG).show()
+                if (floatingQuickCapture) restoreFloatingButton()
                 finish()
                 return
             }
             val file = File(path)
+            if (floatingQuickCapture) restoreFloatingButton()
             if (runOcr) ocr(file) else saveScreenshot(file)
         }
     }
 
     private val consent = registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
         val data = result.data
-        if (floatingQuickCapture) {
-            // Keep the overlay hidden until the capture delay and frame acquisition complete.
-            android.os.Handler(android.os.Looper.getMainLooper()).postDelayed({
-                runCatching { startService(Intent(this, FloatingScreenshotService::class.java)
-                    .setAction(FloatingScreenshotService.ACTION_SHOW_BUBBLE)) }
-            }, if (result.resultCode == Activity.RESULT_OK && data != null) captureDelayMs + 5_000L else 0L)
+        if (floatingQuickCapture && (result.resultCode != Activity.RESULT_OK || data == null)) {
+            restoreFloatingButton()
         }
         if (result.resultCode != Activity.RESULT_OK || data == null) {
             reportRoutineScreenshot(
@@ -228,6 +226,7 @@ class ScreenCaptureActivity : AppCompatActivity() {
                         .onFailure {
                             Toast.makeText(this, local("Could not start capture", "تعذر بدء التصوير"), Toast.LENGTH_LONG).show()
                         }
+                    // Persistent service owns frame acquisition; restore after its result.
                     restoreFloatingButton(5_000L)
                     finish()
                 } else {
