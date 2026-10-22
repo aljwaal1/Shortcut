@@ -188,10 +188,59 @@ class ScreenCaptureActivity : AppCompatActivity() {
             ContextCompat.RECEIVER_NOT_EXPORTED,
         )
         if (floatingQuickCapture) {
-            galleryOnly = true
-            captureDelayMs = 1_500L
-            launchConsent()
+            showFloatingCaptureChoices()
         } else showCaptureInstructions()
+    }
+
+    private fun restoreFloatingButton(delayMs: Long = 0L) {
+        android.os.Handler(android.os.Looper.getMainLooper()).postDelayed({
+            runCatching {
+                startService(Intent(this, FloatingScreenshotService::class.java)
+                    .setAction(FloatingScreenshotService.ACTION_SHOW_BUBBLE))
+            }
+        }, delayMs)
+    }
+
+    private fun showFloatingCaptureChoices() {
+        val options = arrayOf(
+            local("Save to gallery", "حفظ في المعرض"),
+            local("Share with an app", "مشاركة مع تطبيق"),
+            local("Share in Telegram", "مشاركة عبر تيليجرام"),
+        )
+        AlertDialog.Builder(this)
+            .setTitle(local("Screenshot: choose an action", "لقطة شاشة: اختر الإجراء"))
+            .setItems(options) { _, selected ->
+                galleryOnly = selected == 0
+                shareAnyApp = selected == 1
+                normalTelegramShare = selected == 2
+                stampDateTime = false
+                captureDelayMs = 1_500L
+                if (PersistentScreenCaptureService.isSessionActive(this)) {
+                    val capture = Intent(this, PersistentScreenCaptureService::class.java)
+                        .setAction(PersistentScreenCaptureService.ACTION_CAPTURE)
+                        .putExtra(PersistentScreenCaptureService.EXTRA_SKIP_APP_LAUNCH, true)
+                        .putExtra(PersistentScreenCaptureService.EXTRA_CAPTURE_DELAY_MS, 1_000L)
+                        .putExtra(PersistentScreenCaptureService.EXTRA_SHARE_ANY_APP, shareAnyApp)
+                        .putExtra(PersistentScreenCaptureService.EXTRA_NORMAL_TELEGRAM_SHARE, normalTelegramShare)
+                    runCatching { startService(capture) }
+                        .onFailure {
+                            Toast.makeText(this, local("Could not start capture", "تعذر بدء التصوير"), Toast.LENGTH_LONG).show()
+                        }
+                    restoreFloatingButton(5_000L)
+                    finish()
+                } else {
+                    launchConsent()
+                }
+            }
+            .setNegativeButton(local("Cancel", "إلغاء")) { _, _ ->
+                restoreFloatingButton()
+                finish()
+            }
+            .setOnCancelListener {
+                restoreFloatingButton()
+                finish()
+            }
+            .show()
     }
 
     private fun showCaptureInstructions() {
