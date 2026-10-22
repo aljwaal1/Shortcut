@@ -22,12 +22,9 @@ object RoutineReview {
         }
         if (routine.id.isBlank()) findings += Finding(Severity.ERROR, null, "ID_REQUIRED")
         if (!routine.isEnabled) findings += Finding(Severity.WARNING, null, "ROUTINE_DISABLED")
-        routine.actions.forEachIndexed { index, action ->
+        // Parallel checkpoints are persisted only after the group finishes.\n        // A notification is an external side effect and could be duplicated after a crash.\n        routine.actions.forEachIndexed { index, action ->
             if (action.parameters["parallelGroup"].orEmpty().isNotBlank() &&
-                action.type !in setOf(
-                    RoutineActionType.WAIT,
-                    RoutineActionType.SHOW_NOTIFICATION,
-                )
+                action.type != RoutineActionType.WAIT
             ) findings += Finding(Severity.ERROR, index, "ACTION_UNSAFE_FOR_PARALLEL")
             if (action.parameters["parallelGroup"].orEmpty().isNotBlank() &&
                 routine.actions.take(index).any { it.parameters["parallelGroup"] == action.parameters["parallelGroup"] } &&
