@@ -22,11 +22,20 @@ class FloatingScreenshotService : Service() {
     private lateinit var windows: WindowManager
     private var bubble: TextView? = null
     private var expiresAt = 0L
-    private val expiry = Runnable { stopSelf() }
+    private val expiry = Runnable {
+        getSharedPreferences(PREFS, MODE_PRIVATE).edit().putString(KEY_MODE, "off").apply()
+        stopSelf()
+    }
+    private val safetyRestore = Runnable { bubble?.visibility = android.view.View.VISIBLE }
 
     override fun onBind(intent: Intent?): IBinder? = null
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
+        if (intent?.action == ACTION_SHOW_BUBBLE) {
+            main.removeCallbacks(safetyRestore)
+            bubble?.visibility = android.view.View.VISIBLE
+            return START_STICKY
+        }
         if (intent?.action == ACTION_OFF) {
             getSharedPreferences(PREFS, MODE_PRIVATE).edit().putString(KEY_MODE, "off").apply()
             stopSelf()
@@ -100,14 +109,19 @@ class FloatingScreenshotService : Service() {
                 MotionEvent.ACTION_UP -> {
                     if (kotlin.math.abs(event.rawX - downX) < 12 * density &&
                         kotlin.math.abs(event.rawY - downY) < 12 * density) {
-                        // Hide before opening the consent screen so the button cannot appear in the capture.
+                        // Keep the overlay out of the captured frame; the capture activity restores it.
                         view.visibility = android.view.View.INVISIBLE
+                        main.removeCallbacks(safetyRestore)
+                        main.postDelayed(safetyRestore, 90_000L)
                         main.postDelayed({
                             val launch = Intent(this, ScreenCaptureActivity::class.java)
+                                .putExtra(ScreenCaptureActivity.EXTRA_FLOATING_QUICK_CAPTURE, true)
                                 .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-                            runCatching { startActivity(launch) }
-                            view.visibility = android.view.View.VISIBLE
-                        }, 350L)
+                            runCatching { startActivity(launch) }.onFailure {
+                                main.removeCallbacks(safetyRestore)
+                                view.visibility = android.view.View.VISIBLE
+                            }
+                        }, 200L)
                     }
                     true
                 }
@@ -120,12 +134,14 @@ class FloatingScreenshotService : Service() {
 
     override fun onDestroy() {
         main.removeCallbacks(expiry)
+        main.removeCallbacks(safetyRestore)
         bubble?.let { runCatching { windows.removeView(it) } }
         bubble = null
         super.onDestroy()
     }
 
     companion object {
+        const val ACTION_SHOW_BUBBLE = "com.explapp.shortcut.FLOATING_SCREENSHOT_SHOW"
         const val ACTION_OFF = "com.explapp.shortcut.FLOATING_SCREENSHOT_OFF"
         const val EXTRA_MODE = "mode"
         const val EXTRA_DURATION_MS = "durationMs"
