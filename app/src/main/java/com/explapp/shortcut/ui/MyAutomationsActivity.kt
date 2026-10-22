@@ -84,6 +84,8 @@ import com.explapp.shortcut.automation.routines.RoutineTemplateCatalog
 import com.explapp.shortcut.automation.routines.RoutineTrigger
 import com.explapp.shortcut.automation.routines.RoutineTriggerType
 import com.explapp.shortcut.automation.routines.TelegramBotSender
+import com.explapp.shortcut.automation.routines.TelegramTdlibSession
+import com.explapp.shortcut.automation.routines.TelegramPersonalDeliveryPolicy
 import com.explapp.shortcut.data.InstalledAppRepository
 import com.explapp.shortcut.execution.TaskExecutionReporter
 import com.explapp.shortcut.tools.NfcSetupActivity
@@ -120,6 +122,7 @@ private fun MyAutomationsScreen(onBack: () -> Unit, initialMode: String = "") {
     var showSimpleScreenshot by remember(initialMode) { mutableStateOf(initialMode == MyAutomationsActivity.MODE_SCREENSHOT) }
     var showDailyScreenshotTelegram by remember { mutableStateOf(false) }
     var showDailyScreenshotTelegramChat by remember { mutableStateOf(false) }
+    var showDailyScreenshotPersonal by remember { mutableStateOf(false) }
     var lastDeleted by remember { mutableStateOf<AutomationRoutine?>(null) }
 
     fun persist(items: List<AutomationRoutine>): Boolean {
@@ -181,6 +184,16 @@ private fun MyAutomationsScreen(onBack: () -> Unit, initialMode: String = "") {
             onSave = { routine ->
                 upsert(routine)
                 showDailyScreenshotTelegram = false
+            },
+        )
+
+        showDailyScreenshotPersonal -> DailyScreenshotTelegramWizard(
+            useBot = false,
+            usePersonal = true,
+            onCancel = { showDailyScreenshotPersonal = false },
+            onSave = { routine ->
+                upsert(routine)
+                showDailyScreenshotPersonal = false
             },
         )
 
@@ -275,11 +288,17 @@ private fun MyAutomationsScreen(onBack: () -> Unit, initialMode: String = "") {
                             fontWeight = FontWeight.Bold,
                         )
                         Text(
-                            if (ar) "اتصل بحسابك الشخصي عبر TDLib بشكل منفصل عن البوت. الإرسال التلقائي للصور لا يزال قيد الدمج، ولا تعتبر مشاركة تيليجرام الحالية إرسالًا تلقائيًا."
-                            else "Authorize your personal user account with TDLib, separately from the bot. Automatic photo delivery is still being integrated; normal sharing is not automatic sending.",
+                            if (ar) "اتصل بحسابك الشخصي عبر TDLib، ثم أضف معرف المستلم @username وحدد وقت التصوير. يتطلب التشغيل جلسة تسجيل دخول نشطة وموافقة صريحة."
+                            else "Authorize your TDLib user account, then choose a @username recipient and screenshot schedule. A live user session and explicit consent are required.",
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
+                        Button(
+                            onClick = { showDailyScreenshotPersonal = true },
+                            modifier = Modifier.fillMaxWidth(),
+                        ) {
+                            Text(if (ar) "جدولة الإرسال من حسابي إلى @username" else "Schedule account-to-username sending")
+                        }
                         Button(
                             onClick = { context.startActivity(Intent(context, TelegramPersonalSetupActivity::class.java)) },
                             modifier = Modifier.fillMaxWidth(),
@@ -421,6 +440,7 @@ private fun MyAutomationsScreen(onBack: () -> Unit, initialMode: String = "") {
 @Composable
 private fun DailyScreenshotTelegramWizard(
     useBot: Boolean,
+    usePersonal: Boolean = false,
     onCancel: () -> Unit,
     onSave: (AutomationRoutine) -> Unit,
 ) {
@@ -436,6 +456,9 @@ private fun DailyScreenshotTelegramWizard(
     var delayMs by remember { mutableStateOf("3000") }
     var botToken by remember { mutableStateOf("") }
     var chatId by remember { mutableStateOf("") }
+    var personalUsername by remember { mutableStateOf("") }
+    var personalConsent by remember { mutableStateOf(false) }
+    var personalRecipientVerified by remember { mutableStateOf(false) }
     var destinationStatus by remember { mutableStateOf<String?>(null) }
     var caption by remember { mutableStateOf("") }
     var keepCaptureSession by remember { mutableStateOf(true) }
@@ -509,7 +532,8 @@ private fun DailyScreenshotTelegramWizard(
         RoutineRepeat.YEARLY -> runCatching { java.time.MonthDay.parse("--" + repeatValue) }.isSuccess
     }
     val canSave = time.isNotBlank() && appPackage.isNotBlank() && repeatValid &&
-        (!useBot || (botToken.isNotBlank() && chatId.isNotBlank()))
+        (!useBot || (botToken.isNotBlank() && chatId.isNotBlank())) &&
+        (!usePersonal || (personalConsent && personalRecipientVerified && TelegramTdlibSession.isAuthorized()))
 
     LazyColumn(
         Modifier.fillMaxSize().navigationBarsPadding(),
@@ -521,6 +545,9 @@ private fun DailyScreenshotTelegramWizard(
                 if (useBot) {
                     if (ar) "فتح تطبيق يوميًا وإرسال لقطة الشاشة بواسطة بوت تيليجرام"
                     else "Open an app daily and send the screenshot with a Telegram bot"
+                } else if (usePersonal) {
+                    if (ar) "فتح التطبيق وإرسال الصورة تلقائيًا من حساب تيليجرام الشخصي"
+                    else "Open app and auto-send photo from personal Telegram account"
                 } else {
                     if (ar) "فتح تطبيق يوميًا ومشاركة لقطة الشاشة في محادثة تيليجرام عادية"
                     else "Open an app daily and share the screenshot to a normal Telegram chat"
@@ -532,6 +559,9 @@ private fun DailyScreenshotTelegramWizard(
                 if (useBot) {
                     if (ar) "المسار: الوقت المحدد ← فتح التطبيق ← التقاط الصورة ← العثور على المستخدم من اسمه ← الإرسال بواسطة البوت."
                     else "Flow: scheduled time → open app → capture screenshot → resolve the username → send with the bot."
+                } else if (usePersonal) {
+                    if (ar) "الوقت المحدد ← فتح التطبيق ← التقاط الصورة ← التحقق من حساب المستلم ← الإرسال من حسابك عبر TDLib. الإرسال لا يُعد ناجحًا دون تأكيد تيليجرام."
+                    else "Schedule → open app → capture → verify private recipient → send via your TDLib account. Success requires Telegram confirmation."
                 } else {
                     if (ar) "المسار: الوقت المحدد ← فتح التطبيق ← التقاط الصورة ← فتح تيليجرام بالصورة مباشرة إن سمح النظام، وإلا يظهر إشعار «فتح تيليجرام» ← اختيار المحادثة وتأكيد الإرسال."
                     else "Flow: scheduled time → open app → capture screenshot → open Telegram with the image when Android allows it; otherwise show an Open Telegram notification → choose the chat and confirm sending."
@@ -894,6 +924,66 @@ private fun DailyScreenshotTelegramWizard(
             }
     
     
+        } else if (usePersonal) {
+            item {
+                Text(if (ar) "5. الإرسال من حسابك الشخصي" else "5. Send from your personal account", fontWeight = FontWeight.Bold)
+                Text(
+                    if (ar) "حالة تسجيل الدخول: ${TelegramTdlibSession.status()}"
+                    else "Telegram login: ${TelegramTdlibSession.status()}",
+                    style = MaterialTheme.typography.bodySmall,
+                )
+                Button(
+                    onClick = { context.startActivity(Intent(context, TelegramPersonalSetupActivity::class.java)) },
+                    modifier = Modifier.fillMaxWidth(),
+                ) { Text(if (ar) "تسجيل الدخول / إدارة TDLib" else "Login / manage TDLib") }
+                OutlinedTextField(
+                    value = personalUsername,
+                    onValueChange = { personalUsername = it; personalRecipientVerified = false },
+                    label = { Text(if (ar) "معرف الشخص المستلم" else "Recipient username") },
+                    placeholder = { Text("@username") },
+                    modifier = Modifier.fillMaxWidth(),
+                )
+                Button(
+                    onClick = {
+                        val normalized = TelegramPersonalDeliveryPolicy.normalizeUsername(personalUsername)
+                        if (normalized == null) {
+                            destinationStatus = if (ar) "المعرّف غير صالح" else "Invalid username"
+                        } else {
+                            Thread {
+                                val found = TelegramTdlibSession.resolvePrivateRecipient(normalized) != null
+                                (context as? android.app.Activity)?.runOnUiThread {
+                                    personalRecipientVerified = found
+                                    destinationStatus = if (found) {
+                                        if (ar) "تم التحقق من الحساب الشخصي ✓" else "Private recipient verified ✓"
+                                    } else {
+                                        if (ar) "تعذر التحقق. تأكد من الاتصال والمعرف." else "Could not verify recipient; check login and username."
+                                    }
+                                }
+                            }.start()
+                        }
+                    },
+                    modifier = Modifier.fillMaxWidth(),
+                ) { Text(if (ar) "تحقق من @username" else "Verify @username") }
+                destinationStatus?.let { Text(it, style = MaterialTheme.typography.bodySmall) }
+                OutlinedTextField(
+                    value = caption,
+                    onValueChange = { caption = it },
+                    label = { Text(if (ar) "رسالة مع الصورة (اختياري)" else "Photo caption (optional)") },
+                    modifier = Modifier.fillMaxWidth(),
+                )
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Switch(checked = personalConsent, onCheckedChange = { personalConsent = it })
+                    Text(
+                        if (ar) "أوافق صراحة على الإرسال التلقائي من حسابي إلى الشخص المحدد عند الموعد."
+                        else "I explicitly authorize automatic sending from my account to this recipient at scheduled times.",
+                    )
+                }
+                ClearHint(
+                    if (ar) "يتطلب التشغيل حساب TDLib متصلًا وجلسة تصوير شاشة مستمرة. بعد إعادة تشغيل الهاتف قد تحتاج إلى إعادة الاتصال وتفعيل التصوير."
+                    else "A connected TDLib user session and active persistent capture session are required. After reboot, reconnect and reactivate capture if necessary.",
+                    ar,
+                )
+            }
         } else {
             item {
                 Text(if (ar) "3. تيليجرام" else "3. Telegram", fontWeight = FontWeight.Bold)
@@ -952,7 +1042,22 @@ private fun DailyScreenshotTelegramWizard(
                                 repeat = repeat,
                                 repeatValue = repeatValue,
                             ),
-                            actions = if (useBot) {
+                            actions = if (usePersonal) {
+                                listOf(
+                                    RoutineAction(
+                                        type = RoutineActionType.OPEN_APP_SCREENSHOT,
+                                        value = appPackage,
+                                        secondaryValue = delayMs,
+                                        parameters = mapOf(
+                                            "persistentCapture" to keepCaptureSession.toString(),
+                                            "telegramPersonalUsername" to TelegramPersonalDeliveryPolicy.normalizeUsername(personalUsername).orEmpty(),
+                                            "telegramCaption" to caption,
+                                            "shareAnyApp" to "false",
+                                            "stampDateTime" to "true",
+                                        ),
+                                    ),
+                                )
+                            } else if (useBot) {
                                 listOf(
                                     RoutineAction(
                                         type = RoutineActionType.OPEN_APP_SCREENSHOT,
