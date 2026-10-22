@@ -31,6 +31,8 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.Button
+import android.content.Intent
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -89,6 +91,15 @@ fun ToolHubScreen(
         verticalArrangement = Arrangement.spacedBy(14.dp),
     ) {
         item { ToolHubHero(isArabic = isArabic, onBack = onBack) }
+        item {
+            Button(
+                onClick = { context.startActivity(Intent(context, FloatingScreenshotSetupActivity::class.java)) },
+                modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp),
+            ) {
+                Icon(Icons.Default.Image, contentDescription = null)
+                Text(if (isArabic) "  زر لقطة شاشة العائم" else "  Floating screenshot button")
+            }
+        }
         item {
             OutlinedTextField(
                 value = query,
