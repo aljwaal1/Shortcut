@@ -147,6 +147,12 @@ private fun MyAutomationsScreen(onBack: () -> Unit, initialMode: String = "") {
         val index = next.indexOfFirst { it.id == item.id }
         if (index >= 0) next[index] = item else next += item
         if (!persist(next)) return
+        Toast.makeText(
+            context,
+            if (ar) "تم حفظ الأتمتة في القائمة. جارٍ التحقق من الجدولة."
+            else "Automation saved in the list. Checking schedule.",
+            Toast.LENGTH_LONG,
+        ).show()
 
         // Change AlarmManager entries only after durable storage succeeds.
         scheduler.cancel(item.id)
@@ -533,7 +539,7 @@ private fun DailyScreenshotTelegramWizard(
     }
     val canSave = time.isNotBlank() && appPackage.isNotBlank() && repeatValid &&
         (!useBot || (botToken.isNotBlank() && chatId.isNotBlank())) &&
-        (!usePersonal || (personalConsent && personalRecipientVerified && TelegramTdlibSession.isAuthorized()))
+        (!usePersonal || (personalConsent && TelegramPersonalDeliveryPolicy.normalizeUsername(personalUsername) != null))
 
     LazyColumn(
         Modifier.fillMaxSize().navigationBarsPadding(),
@@ -965,6 +971,13 @@ private fun DailyScreenshotTelegramWizard(
                     modifier = Modifier.fillMaxWidth(),
                 ) { Text(if (ar) "تحقق من @username" else "Verify @username") }
                 destinationStatus?.let { Text(it, style = MaterialTheme.typography.bodySmall) }
+                if (!TelegramTdlibSession.isAuthorized()) {
+                    Text(
+                        if (ar) "يمكن حفظ المهمة الآن، لكن الإرسال لن يعمل حتى تسجّل الدخول إلى حساب تيليجرام."
+                        else "You can save now, but sending requires signing in to your Telegram account.",
+                        color = MaterialTheme.colorScheme.error,
+                    )
+                }
                 OutlinedTextField(
                     value = caption,
                     onValueChange = { caption = it },
@@ -1022,6 +1035,30 @@ private fun DailyScreenshotTelegramWizard(
         }
 
         item {
+            if (!canSave) {
+                val missing = buildList {
+                    if (time.isBlank()) add(if (ar) "الوقت" else "time")
+                    if (appPackage.isBlank()) add(if (ar) "التطبيق" else "app")
+                    if (!repeatValid) add(if (ar) "التكرار أو التاريخ" else "repeat/date")
+                    if (usePersonal) {
+                        if (TelegramPersonalDeliveryPolicy.normalizeUsername(personalUsername) == null) add("@username")
+                        if (!personalConsent) add(if (ar) "الموافقة على الإرسال" else "sending consent")
+                    }
+                    if (useBot && (botToken.isBlank() || chatId.isBlank())) add(if (ar) "بيانات البوت" else "bot details")
+                }
+                Text(
+                    (if (ar) "لتمكين زر الحفظ أكمل: " else "To enable Save, complete: ") + missing.joinToString("، "),
+                    color = MaterialTheme.colorScheme.error,
+                    style = MaterialTheme.typography.bodyMedium,
+                )
+            } else {
+                Text(
+                    if (ar) "البيانات جاهزة. اضغط حفظ الأتمتة لإضافتها إلى القائمة."
+                    else "Ready. Tap Save automation to add it to your list.",
+                    color = MaterialTheme.colorScheme.primary,
+                    fontWeight = FontWeight.Bold,
+                )
+            }
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 TextButton(onClick = onCancel, modifier = Modifier.weight(1f)) {
                     Text(if (ar) "إلغاء" else "Cancel")
@@ -1033,7 +1070,11 @@ private fun DailyScreenshotTelegramWizard(
                                 if (useBot) {
                                     if (ar) "لقطة مجدولة إلى تيليجرام بواسطة البوت" else "Scheduled screenshot to Telegram bot"
                                 } else {
+                                    if (usePersonal) {
+                                    if (ar) "لقطة مجدولة من حسابي الشخصي إلى تيليجرام" else "Scheduled screenshot from my personal Telegram"
+                                } else {
                                     if (ar) "لقطة مجدولة إلى محادثة تيليجرام عادية" else "Scheduled screenshot to normal Telegram chat"
+                                }
                                 }
                             },
                             trigger = RoutineTrigger(
@@ -1087,16 +1128,11 @@ private fun DailyScreenshotTelegramWizard(
                                 )
                             },
                         )
-                        pendingRoutine = routine
+                        // The user's explicit Save must commit first: permissions and
+                        // live Telegram verification are execution prerequisites, not
+                        // reasons to silently lose the automation.
                         permissionMessage = null
-
-                        val notificationsGranted = Build.VERSION.SDK_INT < 33 ||
-                            ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) == PackageManager.PERMISSION_GRANTED
-                        if (!notificationsGranted && Build.VERSION.SDK_INT >= 33) {
-                            notificationLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
-                        } else {
-                            requestExactAlarmOrSave()
-                        }
+                        onSave(routine)
                     },
                     enabled = canSave,
                     modifier = Modifier.weight(1f),
