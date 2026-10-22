@@ -69,6 +69,7 @@ class ScreenCaptureActivity : AppCompatActivity() {
     private var galleryOnly: Boolean = false
     private var floatingQuickCapture = false
     private var persistentStartOnly: Boolean = false
+    private var persistentResumeCapture: Boolean = false
     private var stampDateTime: Boolean = false
     private var stampName: String = ""
     private var routineId: String = ""
@@ -122,9 +123,33 @@ class ScreenCaptureActivity : AppCompatActivity() {
                 .putExtra(PersistentScreenCaptureService.EXTRA_RESULT_CODE, result.resultCode)
                 .putExtra(PersistentScreenCaptureService.EXTRA_DATA, data)
             ContextCompat.startForegroundService(this, service)
+            if (persistentResumeCapture && !launchPackage.isNullOrBlank()) {
+                // This continues ONLY the explicit pending request after user
+                // grants Android's MediaProjection permission in this activity.
+                val queuedCapture = Intent(this, PersistentScreenCaptureService::class.java)
+                    .setAction(PersistentScreenCaptureService.ACTION_CAPTURE)
+                    .putExtra(PersistentScreenCaptureService.EXTRA_LAUNCH_PACKAGE, launchPackage)
+                    .putExtra(PersistentScreenCaptureService.EXTRA_CAPTURE_DELAY_MS, captureDelayMs)
+                    .putExtra(PersistentScreenCaptureService.EXTRA_TELEGRAM_BOT_TOKEN, telegramBotToken)
+                    .putExtra(PersistentScreenCaptureService.EXTRA_TELEGRAM_CHAT_ID, telegramChatId)
+                    .putExtra(PersistentScreenCaptureService.EXTRA_TELEGRAM_PERSONAL_USERNAME, telegramPersonalUsername)
+                    .putExtra(PersistentScreenCaptureService.EXTRA_TELEGRAM_CAPTION, telegramCaption)
+                    .putExtra(PersistentScreenCaptureService.EXTRA_NORMAL_TELEGRAM_SHARE, normalTelegramShare)
+                    .putExtra(PersistentScreenCaptureService.EXTRA_SHARE_ANY_APP, shareAnyApp)
+                    .putExtra(PersistentScreenCaptureService.EXTRA_STAMP_DATE_TIME, stampDateTime)
+                    .putExtra(PersistentScreenCaptureService.EXTRA_ROUTINE_ID, routineId)
+                    .putExtra(PersistentScreenCaptureService.EXTRA_ROUTINE_NAME, routineName)
+                android.os.Handler(android.os.Looper.getMainLooper()).postDelayed({
+                    runCatching { ContextCompat.startForegroundService(applicationContext, queuedCapture) }
+                }, 400L)
+            }
             Toast.makeText(
                 this,
-                local("Persistent screen-capture session started", "تم تشغيل جلسة تصوير الشاشة المستمرة"),
+                if (persistentResumeCapture) {
+                    local("Capture approved; resuming the pending automation", "تمت الموافقة؛ جارٍ استئناف الأتمتة المعلقة")
+                } else {
+                    local("Persistent screen-capture session started", "تم تشغيل جلسة تصوير الشاشة المستمرة")
+                },
                 Toast.LENGTH_LONG,
             ).show()
             finish()
@@ -182,6 +207,7 @@ class ScreenCaptureActivity : AppCompatActivity() {
         normalTelegramShare = intent.getBooleanExtra(EXTRA_NORMAL_TELEGRAM_SHARE, false)
         shareAnyApp = intent.getBooleanExtra(EXTRA_SHARE_ANY_APP, false)
         persistentStartOnly = intent.getBooleanExtra(EXTRA_PERSISTENT_START_ONLY, false)
+        persistentResumeCapture = intent.getBooleanExtra(EXTRA_PERSISTENT_RESUME_CAPTURE, false)
         stampDateTime = intent.getBooleanExtra(EXTRA_STAMP_DATE_TIME, false)
         stampName = intent.getStringExtra(EXTRA_STAMP_NAME).orEmpty()
         routineId = intent.getStringExtra(EXTRA_ROUTINE_ID).orEmpty()
@@ -653,6 +679,7 @@ class ScreenCaptureActivity : AppCompatActivity() {
         const val EXTRA_NORMAL_TELEGRAM_SHARE = "normal_telegram_share"
         const val EXTRA_SHARE_ANY_APP = "share_any_app"
         const val EXTRA_PERSISTENT_START_ONLY = "persistent_start_only"
+        const val EXTRA_PERSISTENT_RESUME_CAPTURE = "persistent_resume_capture"
         const val EXTRA_STAMP_DATE_TIME = "stamp_date_time"
         const val EXTRA_STAMP_NAME = "stamp_name"
         const val EXTRA_ROUTINE_ID = "routine_id"
