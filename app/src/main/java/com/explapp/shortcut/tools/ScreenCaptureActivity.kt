@@ -44,6 +44,10 @@ import androidx.core.app.NotificationCompat
 import androidx.core.content.ContextCompat
 import com.google.mlkit.vision.common.InputImage
 import com.explapp.shortcut.automation.routines.TelegramBotSender
+import com.explapp.shortcut.automation.routines.TelegramTdlibSession
+import com.explapp.shortcut.automation.routines.TelegramPersonalDeliveryCoordinator
+import com.explapp.shortcut.automation.routines.PersonalPhotoRequest
+import com.explapp.shortcut.automation.routines.PersonalDeliveryResult
 import com.explapp.shortcut.execution.TaskExecutionReporter
 import com.explapp.shortcut.execution.TaskExecutionResult
 import com.explapp.shortcut.execution.TaskExecutionStatus
@@ -58,6 +62,7 @@ class ScreenCaptureActivity : AppCompatActivity() {
     private var captureDelayMs: Long = DEFAULT_CAPTURE_DELAY_MS
     private var telegramBotToken: String = ""
     private var telegramChatId: String = ""
+    private var telegramPersonalUsername: String = ""
     private var telegramCaption: String = ""
     private var normalTelegramShare: Boolean = false
     private var shareAnyApp: Boolean = false
@@ -133,6 +138,7 @@ class ScreenCaptureActivity : AppCompatActivity() {
                 .putExtra(ScreenCaptureService.EXTRA_HANDLE_RESULT_IN_SERVICE, handleResultInService)
                 .putExtra(ScreenCaptureService.EXTRA_TELEGRAM_BOT_TOKEN, telegramBotToken)
                 .putExtra(ScreenCaptureService.EXTRA_TELEGRAM_CHAT_ID, telegramChatId)
+                .putExtra(ScreenCaptureService.EXTRA_TELEGRAM_PERSONAL_USERNAME, telegramPersonalUsername)
                 .putExtra(ScreenCaptureService.EXTRA_TELEGRAM_CAPTION, telegramCaption)
                 .putExtra(ScreenCaptureService.EXTRA_NORMAL_TELEGRAM_SHARE, normalTelegramShare)
                 .putExtra(ScreenCaptureService.EXTRA_SHARE_ANY_APP, shareAnyApp)
@@ -170,6 +176,7 @@ class ScreenCaptureActivity : AppCompatActivity() {
             .coerceIn(500L, 10_000L)
         telegramBotToken = intent.getStringExtra(EXTRA_TELEGRAM_BOT_TOKEN).orEmpty()
         telegramChatId = intent.getStringExtra(EXTRA_TELEGRAM_CHAT_ID).orEmpty()
+        telegramPersonalUsername = intent.getStringExtra(EXTRA_TELEGRAM_PERSONAL_USERNAME).orEmpty()
         telegramCaption = intent.getStringExtra(EXTRA_TELEGRAM_CAPTION).orEmpty()
         normalTelegramShare = intent.getBooleanExtra(EXTRA_NORMAL_TELEGRAM_SHARE, false)
         shareAnyApp = intent.getBooleanExtra(EXTRA_SHARE_ANY_APP, false)
@@ -452,7 +459,25 @@ class ScreenCaptureActivity : AppCompatActivity() {
                 "DateTimeStamp = $stampDateTime",
                 "ShareAnyApp = $shareAnyApp",
             )
-            if (telegramBotToken.isNotBlank() && telegramChatId.isNotBlank()) {
+            if (telegramPersonalUsername.isNotBlank()) {
+                Thread {
+                    val result = TelegramPersonalDeliveryCoordinator(TelegramTdlibSession).deliver(
+                        PersonalPhotoRequest(
+                            requestId = "quick-" + System.currentTimeMillis(),
+                            username = telegramPersonalUsername,
+                            file = file,
+                            caption = telegramCaption,
+                        ),
+                    )
+                    when (result) {
+                        PersonalDeliveryResult.Confirmed -> reportRoutineScreenshot(true, null, baseDetails + "PERSONAL_TELEGRAM = CONFIRMED")
+                        is PersonalDeliveryResult.Uncertain -> reportRoutineScreenshotPrepared(baseDetails + "PERSONAL_TELEGRAM = UNCERTAIN: ${result.reason}")
+                        else -> reportRoutineScreenshot(false, result.toString(), baseDetails + "PERSONAL_TELEGRAM = FAILURE")
+                    }
+                    file.delete()
+                }.start()
+                ToolResultActions.show(this, listOf(uri), ToolOutputResultPolicy.forTool(ToolId.SCREENSHOT_CAPTURE).mime)
+            } else if (telegramBotToken.isNotBlank() && telegramChatId.isNotBlank()) {
                 Thread {
                     val result = TelegramBotSender(this@ScreenCaptureActivity).sendPhoto(telegramBotToken, telegramChatId, telegramCaption, file)
                     reportRoutineScreenshot(
@@ -622,6 +647,7 @@ class ScreenCaptureActivity : AppCompatActivity() {
         const val EXTRA_CAPTURE_DELAY_MS = "capture_delay_ms"
         const val EXTRA_TELEGRAM_BOT_TOKEN = "telegram_bot_token"
         const val EXTRA_TELEGRAM_CHAT_ID = "telegram_chat_id"
+        const val EXTRA_TELEGRAM_PERSONAL_USERNAME = "telegram_personal_username"
         const val EXTRA_TELEGRAM_CAPTION = "telegram_caption"
         const val EXTRA_NORMAL_TELEGRAM_SHARE = "normal_telegram_share"
         const val EXTRA_SHARE_ANY_APP = "share_any_app"
@@ -643,6 +669,7 @@ class ScreenCaptureService : Service() {
     private var handleResultInService = false
     private var telegramBotToken = ""
     private var telegramChatId = ""
+    private var telegramPersonalUsername = ""
     private var telegramCaption = ""
     private var normalTelegramShare = false
     private var shareAnyApp = false
@@ -720,6 +747,7 @@ class ScreenCaptureService : Service() {
         handleResultInService = intent?.getBooleanExtra(EXTRA_HANDLE_RESULT_IN_SERVICE, false) == true
         telegramBotToken = intent?.getStringExtra(EXTRA_TELEGRAM_BOT_TOKEN).orEmpty()
         telegramChatId = intent?.getStringExtra(EXTRA_TELEGRAM_CHAT_ID).orEmpty()
+        telegramPersonalUsername = intent?.getStringExtra(EXTRA_TELEGRAM_PERSONAL_USERNAME).orEmpty()
         telegramCaption = intent?.getStringExtra(EXTRA_TELEGRAM_CAPTION).orEmpty()
         normalTelegramShare = intent?.getBooleanExtra(EXTRA_NORMAL_TELEGRAM_SHARE, false) == true
         shareAnyApp = intent?.getBooleanExtra(EXTRA_SHARE_ANY_APP, false) == true
@@ -1082,6 +1110,36 @@ class ScreenCaptureService : Service() {
         }
 
         when {
+            telegramPersonalUsername.isNotBlank() -> {
+                Thread {
+                    val result = TelegramPersonalDeliveryCoordinator(TelegramTdlibSession).deliver(
+                        PersonalPhotoRequest(
+                            requestId = "capture-" + System.currentTimeMillis(),
+                            username = telegramPersonalUsername,
+                            file = file,
+                            caption = telegramCaption,
+                        ),
+                    )
+                    val status = when (result) {
+                        PersonalDeliveryResult.Confirmed -> TaskExecutionStatus.SUCCESS
+                        is PersonalDeliveryResult.Uncertain -> TaskExecutionStatus.PREPARED
+                        else -> TaskExecutionStatus.FAILURE
+                    }
+                    reportAutomationScreenshot(
+                        status = status,
+                        reason = if (result == PersonalDeliveryResult.Confirmed) null else result.toString(),
+                        details = baseDetails + "PERSONAL_TELEGRAM = $status",
+                    )
+                    file.delete()
+                    showResultNotification(
+                        if (status == TaskExecutionStatus.SUCCESS) local("Personal Telegram photo sent", "تم إرسال الصورة من الحساب الشخصي")
+                        else local("Personal Telegram delivery not confirmed", "لم يتأكد الإرسال من حساب تيليجرام الشخصي"),
+                        result.toString(),
+                    )
+                    stopForeground(STOP_FOREGROUND_REMOVE)
+                    stopSelf()
+                }.start()
+            }
             telegramBotToken.isNotBlank() && telegramChatId.isNotBlank() -> {
                 Thread {
                     val sent = TelegramBotSender(this@ScreenCaptureService).sendPhoto(
@@ -1314,6 +1372,7 @@ class ScreenCaptureService : Service() {
         const val EXTRA_HANDLE_RESULT_IN_SERVICE = "handleResultInService"
         const val EXTRA_TELEGRAM_BOT_TOKEN = "telegramBotToken"
         const val EXTRA_TELEGRAM_CHAT_ID = "telegramChatId"
+        const val EXTRA_TELEGRAM_PERSONAL_USERNAME = "telegramPersonalUsername"
         const val EXTRA_TELEGRAM_CAPTION = "telegramCaption"
         const val EXTRA_NORMAL_TELEGRAM_SHARE = "normalTelegramShare"
         const val EXTRA_SHARE_ANY_APP = "shareAnyApp"
