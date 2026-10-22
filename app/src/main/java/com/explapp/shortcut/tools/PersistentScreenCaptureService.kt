@@ -24,6 +24,10 @@ import androidx.core.app.NotificationCompat
 import android.content.ClipData
 import android.net.Uri
 import com.explapp.shortcut.automation.routines.TelegramBotSender
+import com.explapp.shortcut.automation.routines.TelegramTdlibSession
+import com.explapp.shortcut.automation.routines.TelegramPersonalDeliveryCoordinator
+import com.explapp.shortcut.automation.routines.PersonalPhotoRequest
+import com.explapp.shortcut.automation.routines.PersonalDeliveryResult
 import com.explapp.shortcut.execution.TaskExecutionReporter
 import com.explapp.shortcut.execution.TaskExecutionResult
 import java.io.File
@@ -40,6 +44,7 @@ class PersistentScreenCaptureService : Service() {
     private var captureGeneration = 0L
     private var pendingToken = ""
     private var pendingChatId = ""
+    private var pendingPersonalUsername = ""
     private var pendingCaption = ""
     private var pendingNormalTelegramShare = false
     private var pendingShareAnyApp = false
@@ -173,7 +178,25 @@ class PersistentScreenCaptureService : Service() {
                 val caption = pendingCaption
                 val normalShare = pendingNormalTelegramShare
                 val shareAnyApp = pendingShareAnyApp
-                if (token.isNotBlank() && chatId.isNotBlank()) {
+                if (pendingPersonalUsername.isNotBlank()) {
+                    val username = pendingPersonalUsername
+                    Thread {
+                        val result = TelegramPersonalDeliveryCoordinator(TelegramTdlibSession).deliver(
+                            PersonalPhotoRequest(
+                                requestId = "persistent-" + System.currentTimeMillis(),
+                                username = username,
+                                file = file,
+                                caption = caption,
+                            ),
+                        )
+                        file.delete()
+                        notifyResult(
+                            saved = saved.isSuccess,
+                            sent = result == PersonalDeliveryResult.Confirmed,
+                            reason = if (result == PersonalDeliveryResult.Confirmed) null else result.toString(),
+                        )
+                    }.start()
+                } else if (token.isNotBlank() && chatId.isNotBlank()) {
                     Thread {
                         val sent = TelegramBotSender(this@PersistentScreenCaptureService).sendPhoto(token, chatId, caption, file)
                         file.delete()
@@ -243,6 +266,7 @@ class PersistentScreenCaptureService : Service() {
 
         pendingToken = intent.getStringExtra(EXTRA_TELEGRAM_BOT_TOKEN).orEmpty()
         pendingChatId = intent.getStringExtra(EXTRA_TELEGRAM_CHAT_ID).orEmpty()
+        pendingPersonalUsername = intent.getStringExtra(EXTRA_TELEGRAM_PERSONAL_USERNAME).orEmpty()
         pendingCaption = intent.getStringExtra(EXTRA_TELEGRAM_CAPTION).orEmpty()
         pendingNormalTelegramShare = intent.getBooleanExtra(EXTRA_NORMAL_TELEGRAM_SHARE, false)
         pendingShareAnyApp = intent.getBooleanExtra(EXTRA_SHARE_ANY_APP, false)
@@ -616,6 +640,7 @@ class PersistentScreenCaptureService : Service() {
         const val EXTRA_SKIP_APP_LAUNCH = "skipAppLaunch"
         const val EXTRA_TELEGRAM_BOT_TOKEN = "telegramBotToken"
         const val EXTRA_TELEGRAM_CHAT_ID = "telegramChatId"
+        const val EXTRA_TELEGRAM_PERSONAL_USERNAME = "telegramPersonalUsername"
         const val EXTRA_TELEGRAM_CAPTION = "telegramCaption"
         const val EXTRA_NORMAL_TELEGRAM_SHARE = "normalTelegramShare"
         const val EXTRA_SHARE_ANY_APP = "shareAnyApp"
