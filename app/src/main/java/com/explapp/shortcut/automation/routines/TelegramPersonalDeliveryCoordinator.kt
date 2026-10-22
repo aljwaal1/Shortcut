@@ -21,6 +21,9 @@ internal class TelegramPersonalDeliveryCoordinator(
         }
         val username = TelegramPersonalDeliveryPolicy.normalizeUsername(request.username)
             ?: return PersonalDeliveryResult.Failed("Invalid Telegram username")
+        if (!client.isAuthorized() && client === TelegramTdlibSession) {
+            TelegramTdlibSession.waitForAuthorization()
+        }
         if (!client.isAuthorized()) return PersonalDeliveryResult.NeedsLogin
         if (!inFlight.add(request.requestId)) return PersonalDeliveryResult.Uncertain(
             "Delivery with this request ID is already in progress"
