@@ -123,26 +123,14 @@ class FloatingScreenshotService : Service() {
                         main.removeCallbacks(safetyRestore)
                         main.postDelayed(safetyRestore, 90_000L)
                         main.postDelayed({
-                            if (PersistentScreenCaptureService.isSessionActive(this)) {
-                                // Reuse an already approved projection instead of requesting consent again.
-                                val capture = Intent(this, PersistentScreenCaptureService::class.java)
-                                    .setAction(PersistentScreenCaptureService.ACTION_CAPTURE)
-                                    .putExtra(PersistentScreenCaptureService.EXTRA_SKIP_APP_LAUNCH, true)
-                                    .putExtra(PersistentScreenCaptureService.EXTRA_CAPTURE_DELAY_MS, 800L)
-                                runCatching { startService(capture) }
-                                    .onFailure { view.visibility = android.view.View.VISIBLE }
-                                main.postDelayed({
-                                    main.removeCallbacks(safetyRestore)
-                                    view.visibility = android.view.View.VISIBLE
-                                }, 5_000L)
-                            } else {
-                                val launch = Intent(this, ScreenCaptureActivity::class.java)
-                                    .putExtra(ScreenCaptureActivity.EXTRA_FLOATING_QUICK_CAPTURE, true)
-                                    .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-                                runCatching { startActivity(launch) }.onFailure {
-                                    main.removeCallbacks(safetyRestore)
-                                    view.visibility = android.view.View.VISIBLE
-                                }
+                            // A floating-button tap opens a concise three-choice dialog.
+                            // The activity reuses an authorized projection where available.
+                            val launch = Intent(this, ScreenCaptureActivity::class.java)
+                                .putExtra(ScreenCaptureActivity.EXTRA_FLOATING_QUICK_CAPTURE, true)
+                                .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                            runCatching { startActivity(launch) }.onFailure {
+                                main.removeCallbacks(safetyRestore)
+                                view.visibility = android.view.View.VISIBLE
                             }
                         }, 200L)
                     }
