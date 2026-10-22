@@ -10,6 +10,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.stateDescription
+import androidx.compose.ui.platform.LocalConfiguration
 
 /**
  * Makes a whole row behave as the disclosure control for the section under it.
@@ -25,8 +26,13 @@ import androidx.compose.ui.semantics.stateDescription
  */
 @Composable
 fun Modifier.expandCollapseToggle(expanded: Boolean, onToggle: () -> Unit): Modifier {
-    val stateLabel = if (expanded) "Expanded" else "Collapsed"
-    val actionLabel = if (expanded) "Collapse" else "Expand"
+    val isArabic = LocalConfiguration.current.locales[0].language == "ar"
+    val stateLabel = if (isArabic) {
+        if (expanded) "موسّع" else "مطوي"
+    } else if (expanded) "Expanded" else "Collapsed"
+    val actionLabel = if (isArabic) {
+        if (expanded) "طي" else "توسيع"
+    } else if (expanded) "Collapse" else "Expand"
     return this
         .semantics { stateDescription = stateLabel }
         .clickable(role = Role.Button, onClickLabel = actionLabel, onClick = onToggle)
