@@ -99,11 +99,13 @@ class RoutineDispatcher(private val context: Context) {
             // Preserve IN_FLIGHT after a checkpoint write failure: the last action
             // may already have produced an external effect before persistence failed.
             // Marking it FAILED would incorrectly allow a fresh replay.
-            if (!checkpointWriteFailed && !executorCrashed && !progress.finish(routine.id, result.status)) {
+            if (!checkpointWriteFailed && !executorCrashed && !progress.isCancelled(routine.id) && !progress.finish(routine.id, result.status)) {
                 // Leave the persisted IN_FLIGHT state intact when the final status
                 // cannot be committed. Never imply durable completion.
                 checkpointWriteFailed = true
             }
+            // Cancellation can race with an external action finishing. Preserve
+            // CANCEL_REQUESTED for review instead of overwriting it with SUCCESS.
             // An unexpected executor crash can occur after an irreversible action.
             // Keep the durable checkpoint uncertain rather than authorizing replay.
             val historyResult = result.toTaskExecutionResult().copy(
