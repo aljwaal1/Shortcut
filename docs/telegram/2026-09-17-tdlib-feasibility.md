@@ -1,3 +1,33 @@
+# Update — 2026-10-22: explicit personal-account delivery request
+
+The user explicitly opted in to person-to-person automatic screenshot sending by Telegram username.
+The previous PREPARED_ONLY decision remains true of currently shipped Android builds, but is no
+longer the intended final feature set. **No APK may claim personal delivery works until an
+authenticated TDLib user session and recipient-resolution/photo-send backend are linked and
+verified with an actual private Telegram chat.**
+
+Implementation prerequisites:
+1. Pin and audit the official TDLib Java/JNI distribution and Android ABI binaries (do not
+   silently import unknown native code); ensure API version and reproducible build checks.
+2. Implement TDLib authorization states, including phone, code, password, and logout; require
+   the user's own Telegram app credentials/api_id and api_hash from a trustworthy source.
+3. Encrypt on-device TDLib storage/session, never place authorization secrets in RoutineCodec,
+   logs, cloud sync, or exported backups.
+4. Resolve `@username` to a verified private chat. Confirm username and recipient before
+   activating each scheduled automation.
+5. Distinguish queued, accepted, confirmed, failed, and unknown delivery. Never blindly retry
+   UNKNOWN, which can duplicate a personal message.
+6. Explicit disclosure and informed opt-in for unattended sends, revocable by disabling
+   the routine or logging out. Do not automate taps or abuse accessibility permissions.
+7. E2E test with a real account and another consenting recipient on Android 8–16.
+8. Preserve the existing bot transport as a separate explicit choice.
+
+Existing steps: TelegramPersonalDeliveryPolicy and TelegramPersonalDeliveryCoordinator with
+unit tests. **Missing:** JNI artifacts, TDLib client adapter, authorization UI, connection
+to screenshot completion pipeline, persistent deduplication, device E2E verification.
+
+---
+
 # Telegram Auto-Send Feasibility — 2026-09-17
 
 ## Decision: PREPARED_ONLY for personal Telegram; BOT_ONLY for verifiable auto-send
