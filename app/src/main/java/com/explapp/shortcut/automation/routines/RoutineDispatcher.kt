@@ -63,7 +63,7 @@ class RoutineDispatcher(private val context: Context) {
                         emptyList(), startedAt, System.currentTimeMillis(),
                     )
                 }
-                if (!progress.begin(routine.id) || !progress.bindRoutine(routine)) {
+                if (!progress.begin(routine)) {
                     return RoutineRunResult(
                         routine.id, routine.name, RoutineRunStatus.FAILED,
                         emptyList(), startedAt, System.currentTimeMillis(),
