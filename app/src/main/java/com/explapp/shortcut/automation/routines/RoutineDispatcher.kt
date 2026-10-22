@@ -58,6 +58,24 @@ class RoutineDispatcher(private val context: Context) {
                 // A scheduled dispatch must not erase an uncertain checkpoint from a
                 // previous process crash: that could replay an external side effect.
                 if (progress.snapshot(routine.id)?.status == "UNCERTAIN") {
+                    // A previous asynchronous capture/send may already have reached
+                    // Telegram. Do not silently replay a potentially irreversible
+                    // action. Make the blocked scheduled attempt visible in Debug.
+                    runCatching {
+                        TaskExecutionReporter(context).report(
+                            com.explapp.shortcut.execution.TaskExecutionResult.failure(
+                                routine.name,
+                                "Previous execution is UNCERTAIN; manual review required before another send",
+                                startedAt,
+                                details = listOf(
+                                    "EVENT = BLOCKED_UNCERTAIN_CHECKPOINT",
+                                    "RUN_SOURCE = " + if (userInitiated) "MANUAL" else "SCHEDULED",
+                                    "ROUTINE_ID = ${routine.id}",
+                                    "ACTION = Open the routine and explicitly confirm a new attempt",
+                                ),
+                            ),
+                        )
+                    }
                     return RoutineRunResult(
                         routine.id, routine.name, RoutineRunStatus.FAILED,
                         emptyList(), startedAt, System.currentTimeMillis(),
