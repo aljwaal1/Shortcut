@@ -76,19 +76,16 @@ object RoutineCodec {
                 }.getOrDefault(RoutineRepeat.DAILY),
                 repeatValue = triggerJson["repeatValue"]?.jsonPrimitive?.content.orEmpty(),
             ),
-            conditions = this["conditions"]?.jsonArray?.mapNotNull { item ->
-                runCatching {
-                    val condition = item.jsonObject
+            conditions = this["conditions"]?.jsonArray?.map { item ->
+                val condition = item.jsonObject
                     RoutineCondition(
                         type = RoutineConditionType.valueOf(condition.getValue("type").jsonPrimitive.content),
                         value = condition["value"]?.jsonPrimitive?.content.orEmpty(),
                         secondaryValue = condition["secondaryValue"]?.jsonPrimitive?.content.orEmpty(),
                     )
-                }.getOrNull()
             }.orEmpty(),
-            actions = getValue("actions").jsonArray.mapNotNull { item ->
-                runCatching {
-                    val action = item.jsonObject
+            actions = getValue("actions").jsonArray.map { item ->
+                val action = item.jsonObject
                     RoutineAction(
                         type = RoutineActionType.valueOf(action.getValue("type").jsonPrimitive.content),
                         value = action["value"]?.jsonPrimitive?.content.orEmpty(),
@@ -96,7 +93,6 @@ object RoutineCodec {
                         continueOnError = action["continueOnError"]?.jsonPrimitive?.boolean ?: false,
                         parameters = action["parameters"]?.jsonObject?.mapValues { it.value.jsonPrimitive.content }.orEmpty(),
                     )
-                }.getOrNull()
             },
         )
     }
