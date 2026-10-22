@@ -36,6 +36,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -67,7 +68,7 @@ fun ToolHubScreen(
     val all = remember { ToolCatalog.all() }
     var favorites by remember { mutableStateOf(store.favorites()) }
     var recents by remember { mutableStateOf(store.recents()) }
-    var query by remember { mutableStateOf("") }
+    var query by rememberSaveable { mutableStateOf("") }
     val filtered = remember(all, query, isArabic) {
         val q = query.trim().lowercase(Locale.getDefault())
         if (q.isBlank()) all else all.filter { tool ->
@@ -235,7 +236,7 @@ private fun ToolHubHero(isArabic: Boolean, onBack: () -> Unit) {
         Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.Top) {
             Surface(shape = CircleShape, color = Color.White.copy(alpha = 0.16f)) {
                 IconButton(onClick = onBack) {
-                    Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = null, tint = Color.White)
+                    Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = if (isArabic) "رجوع" else "Back", tint = Color.White)
                 }
             }
             Column(
