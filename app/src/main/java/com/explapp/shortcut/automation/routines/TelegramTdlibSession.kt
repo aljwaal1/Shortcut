@@ -6,6 +6,7 @@ import org.drinkless.tdlib.Client
 import org.drinkless.tdlib.TdApi
 import java.io.File
 import java.util.Locale
+import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicReference
@@ -23,6 +24,9 @@ internal object TelegramTdlibSession : TelegramPersonalClient {
     @Volatile private var currentApiHash: String = ""
     @Volatile private var appContext: Context? = null
     @Volatile private var sendError: String? = null
+    private val delivered = ConcurrentHashMap.newKeySet<Long>()
+    private val deliveryWaiters = ConcurrentHashMap<Long, CountDownLatch>()
+    private val rejected = ConcurrentHashMap<Long, String>()
 
     fun status(): String = authState?.javaClass?.simpleName ?: "Not connected"
     fun lastError(): String? = sendError
@@ -39,6 +43,14 @@ internal object TelegramTdlibSession : TelegramPersonalClient {
             client = Client.create({ update ->
                 when (update) {
                     is TdApi.UpdateAuthorizationState -> onAuthorizationUpdate(update.authorizationState)
+                    is TdApi.UpdateMessageSendSucceeded -> {
+                        delivered.add(update.oldMessageId)
+                        deliveryWaiters[update.oldMessageId]?.countDown()
+                    }
+                    is TdApi.UpdateMessageSendFailed -> {
+                        rejected[update.oldMessageId] = "Telegram rejected outgoing photo"
+                        deliveryWaiters[update.oldMessageId]?.countDown()
+                    }
                     else -> Unit
                 }
             }, null, null)
@@ -123,7 +135,21 @@ internal object TelegramTdlibSession : TelegramPersonalClient {
         }
         return when (val result = ask(request, 30)) {
             is TdApi.Error -> PersonalDeliveryResult.Failed("Telegram: ${result.code} ${result.message}")
-            is TdApi.Message -> PersonalDeliveryResult.Uncertain("Telegram accepted message; server delivery confirmation pending")
+            is TdApi.Message -> {
+                val messageId = result.id
+                if (delivered.remove(messageId)) return PersonalDeliveryResult.Confirmed
+                rejected.remove(messageId)?.let { return PersonalDeliveryResult.Failed(it) }
+                val latch = CountDownLatch(1)
+                deliveryWaiters[messageId] = latch
+                try {
+                    if (delivered.remove(messageId)) return PersonalDeliveryResult.Confirmed
+                    rejected.remove(messageId)?.let { return PersonalDeliveryResult.Failed(it) }
+                    latch.await(25, TimeUnit.SECONDS)
+                    if (delivered.remove(messageId)) PersonalDeliveryResult.Confirmed
+                    else rejected.remove(messageId)?.let { PersonalDeliveryResult.Failed(it) }
+                        ?: PersonalDeliveryResult.Uncertain("Awaiting Telegram delivery acknowledgment")
+                } finally { deliveryWaiters.remove(messageId) }
+            }
             else -> PersonalDeliveryResult.Uncertain("Telegram response not received")
         }
     }
