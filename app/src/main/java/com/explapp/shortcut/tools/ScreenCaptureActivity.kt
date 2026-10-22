@@ -177,6 +177,7 @@ class ScreenCaptureActivity : AppCompatActivity() {
         telegramBotToken = intent.getStringExtra(EXTRA_TELEGRAM_BOT_TOKEN).orEmpty()
         telegramChatId = intent.getStringExtra(EXTRA_TELEGRAM_CHAT_ID).orEmpty()
         telegramPersonalUsername = intent.getStringExtra(EXTRA_TELEGRAM_PERSONAL_USERNAME).orEmpty()
+        if (telegramPersonalUsername.isNotBlank()) TelegramTdlibSession.reconnect(applicationContext)
         telegramCaption = intent.getStringExtra(EXTRA_TELEGRAM_CAPTION).orEmpty()
         normalTelegramShare = intent.getBooleanExtra(EXTRA_NORMAL_TELEGRAM_SHARE, false)
         shareAnyApp = intent.getBooleanExtra(EXTRA_SHARE_ANY_APP, false)
@@ -748,6 +749,7 @@ class ScreenCaptureService : Service() {
         telegramBotToken = intent?.getStringExtra(EXTRA_TELEGRAM_BOT_TOKEN).orEmpty()
         telegramChatId = intent?.getStringExtra(EXTRA_TELEGRAM_CHAT_ID).orEmpty()
         telegramPersonalUsername = intent?.getStringExtra(EXTRA_TELEGRAM_PERSONAL_USERNAME).orEmpty()
+        if (telegramPersonalUsername.isNotBlank()) TelegramTdlibSession.reconnect(applicationContext)
         telegramCaption = intent?.getStringExtra(EXTRA_TELEGRAM_CAPTION).orEmpty()
         normalTelegramShare = intent?.getBooleanExtra(EXTRA_NORMAL_TELEGRAM_SHARE, false) == true
         shareAnyApp = intent?.getBooleanExtra(EXTRA_SHARE_ANY_APP, false) == true
