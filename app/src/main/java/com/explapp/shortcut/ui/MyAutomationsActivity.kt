@@ -1874,38 +1874,35 @@ private fun RoutineBuilderScreen(
                 }
 
                 Text(if (ar) "التكرار" else "Repeat", fontWeight = FontWeight.Bold)
-                LazyRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                    items(RoutineRepeat.entries) { repeat ->
-                        FilterChip(
-                            selected = triggerRepeat == repeat,
-                            onClick = {
+                Button(
+                    onClick = {
+                        val available = RoutineRepeat.entries
+                        android.app.AlertDialog.Builder(context)
+                            .setTitle(if (ar) "اختر التكرار" else "Choose recurrence")
+                            .setSingleChoiceItems(
+                                available.map { repeatLabel(it, ar) }.toTypedArray(),
+                                available.indexOf(triggerRepeat),
+                            ) { dialog, which ->
+                                val repeat = available[which]
                                 triggerRepeat = repeat
                                 triggerRepeatValue = when (repeat) {
-                                    RoutineRepeat.ONCE -> String.format(
-                                        Locale.US,
-                                        "%04d-%02d-%02d",
-                                        now.get(Calendar.YEAR),
-                                        now.get(Calendar.MONTH) + 1,
-                                        now.get(Calendar.DAY_OF_MONTH),
-                                    )
+                                    RoutineRepeat.ONCE -> String.format(Locale.US, "%04d-%02d-%02d",
+                                        now.get(Calendar.YEAR), now.get(Calendar.MONTH) + 1, now.get(Calendar.DAY_OF_MONTH))
                                     RoutineRepeat.DAILY -> ""
                                     RoutineRepeat.WEEKLY -> {
                                         val iso = now.get(Calendar.DAY_OF_WEEK)
                                         if (iso == Calendar.SUNDAY) "7" else (iso - 1).toString()
                                     }
                                     RoutineRepeat.MONTHLY -> now.get(Calendar.DAY_OF_MONTH).toString()
-                                    RoutineRepeat.YEARLY -> String.format(
-                                        Locale.US,
-                                        "%02d-%02d",
-                                        now.get(Calendar.MONTH) + 1,
-                                        now.get(Calendar.DAY_OF_MONTH),
-                                    )
+                                    RoutineRepeat.YEARLY -> String.format(Locale.US, "%02d-%02d",
+                                        now.get(Calendar.MONTH) + 1, now.get(Calendar.DAY_OF_MONTH))
                                 }
-                            },
-                            label = { Text(repeatLabel(repeat, ar)) },
-                        )
-                    }
-                }
+                                dialog.dismiss()
+                            }
+                            .setNegativeButton(if (ar) "إلغاء" else "Cancel", null)
+                            .show()
+                    }, modifier = Modifier.fillMaxWidth(),
+                ) { Text((if (ar) "التكرار: " else "Repeat: ") + repeatLabel(triggerRepeat, ar)) }
 
                 when (triggerRepeat) {
                     RoutineRepeat.ONCE -> {
