@@ -146,6 +146,34 @@ internal object TelegramTdlibSession : TelegramPersonalClient {
     }
 
     fun providePhone(phone: String) = submit(TdApi.SetAuthenticationPhoneNumber(phone.trim(), null))
+
+    /**
+     * Change or re-enter the phone number during pending authorization.
+     * TDLib permits setAuthenticationPhoneNumber in WaitCode after the
+     * previous authentication query has finished. This does not delete
+     * any local session or credentials.
+     */
+    fun requestPhoneNumber(phone: String): Boolean {
+        val normalized = phone.trim()
+        if (!normalized.matches(Regex("^\\+[0-9]{7,15}$"))) {
+            sendError = "Enter the phone number in international format."
+            return false
+        }
+        return when (val response = ask(TdApi.SetAuthenticationPhoneNumber(normalized, null), 25)) {
+            is TdApi.Ok -> {
+                sendError = null
+                true
+            }
+            is TdApi.Error -> {
+                sendError = "Telegram: ${response.code} ${response.message}"
+                false
+            }
+            else -> {
+                sendError = "Telegram did not confirm the phone request. Check the connection before retrying."
+                false
+            }
+        }
+    }
     fun provideCode(code: String) = submit(TdApi.CheckAuthenticationCode(code.trim()))
     fun providePassword(password: String) = submit(TdApi.CheckAuthenticationPassword(password))
     fun logout(): Boolean {
