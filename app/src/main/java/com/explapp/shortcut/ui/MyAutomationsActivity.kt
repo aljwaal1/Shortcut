@@ -411,6 +411,13 @@ private fun MyAutomationsScreen(onBack: () -> Unit, initialMode: String = "") {
                         }
                         Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
                             TextButton(onClick = {
+                                // Toasts stay on top of other apps for seconds and can
+                                // contaminate screenshots. For capture routines all
+                                // progress is reported in execution history/notifications.
+                                val capturesScreen = routine.actions.any {
+                                    it.type == RoutineActionType.OPEN_APP_SCREENSHOT ||
+                                        it.type == RoutineActionType.TAKE_SCREENSHOT
+                                }
                                 val checkpoint = RoutineProgressStore(context).snapshot(routine.id)
                                 if (checkpoint?.status == "UNCERTAIN") {
                                     android.app.AlertDialog.Builder(context)
@@ -424,10 +431,12 @@ private fun MyAutomationsScreen(onBack: () -> Unit, initialMode: String = "") {
                                             // Only explicit user confirmation clears the uncertain
                                             // checkpoint. Never replay an external send automatically.
                                             if (RoutineProgressStore(context).finish(routine.id, com.explapp.shortcut.automation.routines.RoutineRunStatus.FAILED)) {
-                                                Toast.makeText(context, if (ar) "بدأت محاولة جديدة: ${routine.name}" else "Starting new attempt: ${routine.name}", Toast.LENGTH_LONG).show()
+                                                if (!capturesScreen) {
+                                                    Toast.makeText(context, if (ar) "بدأت محاولة جديدة: ${routine.name}" else "Starting new attempt: ${routine.name}", Toast.LENGTH_LONG).show()
+                                                }
                                                 RoutineDispatcher(context).executeAsync(routine, userInitiated = true) { result ->
                                                     (context as? android.app.Activity)?.runOnUiThread {
-                                                        Toast.makeText(
+                                                        if (!capturesScreen) Toast.makeText(
                                                             context,
                                                             (if (ar) "حالة التشغيل الأولية: " else "Initial execution: ") + result.status.name +
                                                                 (if (result.status == com.explapp.shortcut.automation.routines.RoutineRunStatus.PREPARED) {
@@ -442,10 +451,12 @@ private fun MyAutomationsScreen(onBack: () -> Unit, initialMode: String = "") {
                                             }
                                         }.show()
                                 } else {
-                                    Toast.makeText(context, if (ar) "بدأ طلب التشغيل: ${routine.name}" else "Run requested: ${routine.name}", Toast.LENGTH_SHORT).show()
+                                    if (!capturesScreen) {
+                                        Toast.makeText(context, if (ar) "بدأ طلب التشغيل: ${routine.name}" else "Run requested: ${routine.name}", Toast.LENGTH_SHORT).show()
+                                    }
                                     RoutineDispatcher(context).executeAsync(routine, userInitiated = true) { result ->
                                         (context as? android.app.Activity)?.runOnUiThread {
-                                            Toast.makeText(
+                                            if (!capturesScreen) Toast.makeText(
                                                 context,
                                                 (if (ar) "حالة التشغيل الأولية: " else "Initial execution: ") + result.status.name +
                                                     (if (result.status == com.explapp.shortcut.automation.routines.RoutineRunStatus.PREPARED) {
