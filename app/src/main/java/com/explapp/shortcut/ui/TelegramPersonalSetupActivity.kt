@@ -247,11 +247,13 @@ class TelegramPersonalSetupActivity : AppCompatActivity() {
         secondary.visibility = if (state == "ready" || state == "code") View.VISIBLE else View.GONE
         if (state == "code") {
             val seconds = TelegramTdlibSession.codeResendRemainingSeconds()
-            secondary.isEnabled = !busy && TelegramTdlibSession.canResendCode()
+            // Never strand the user on WaitCode: when Telegram doesn't
+            // expose a resend method, offer a direct phone re-entry instead.
+            secondary.isEnabled = !busy
             secondary.text = when {
-                seconds > 0 -> if (ar) "إعادة إرسال الرمز بعد ${seconds} ث" else "Resend code in ${seconds}s"
-                !TelegramTdlibSession.canResendCode() -> if (ar) "إعادة الإرسال غير متاحة حاليًا" else "Resend unavailable right now"
-                else -> if (ar) "إعادة إرسال رمز الدخول" else "Resend login code"
+                seconds > 0 -> if (ar) "الرمز لم يصل؟ إعادة المحاولة بعد ${seconds} ث" else "No code? Retry available in ${seconds}s"
+                TelegramTdlibSession.canResendCode() -> if (ar) "لم يصل الرمز؟ اطلب رمزًا جديدًا" else "No code? Request another code"
+                else -> if (ar) "لم يصل الرمز؟ أدخل الرقم واطلب كود جديد" else "No code? Re-enter number and request a code"
             }
         } else {
             secondary.isEnabled = !busy
@@ -290,7 +292,19 @@ class TelegramPersonalSetupActivity : AppCompatActivity() {
     }
 
     private fun resendCode() {
-        if (busy || lastPhase != "code" || !TelegramTdlibSession.canResendCode()) return
+        if (busy || lastPhase != "code") return
+        if (!TelegramTdlibSession.canResendCode()) {
+            editingPhoneWhileWaiting = true
+            message = if (TelegramTdlibSession.codeResendRemainingSeconds() > 0) {
+                if (ar) "تيليجرام لم يسمح بإعادة الإرسال بعد. تستطيع مراجعة الرقم، لكن قد يمنع طلب رمز آخر حتى انتهاء المهلة."
+                else "Telegram has not enabled resend yet. You may review your number, but Telegram may reject a new request until the cooldown ends."
+            } else {
+                if (ar) "لا توجد وسيلة إعادة إرسال متاحة. أدخل رقمك مجددًا لطلب كود جديد من تيليجرام."
+                else "No alternate resend method is available. Re-enter your number to request a new code."
+            }
+            updateScreen()
+            return
+        }
         busy = true
         message = if (ar) "جارٍ طلب رمز جديد من تيليجرام…" else "Requesting another code from Telegram…"
         updateScreen()
@@ -324,7 +338,7 @@ class TelegramPersonalSetupActivity : AppCompatActivity() {
             val ok = when (state) {
                 "api" -> TelegramTdlibSession.open(applicationContext, one.toInt(), two)
                 "phone" -> TelegramTdlibSession.requestPhoneNumber(one)
-                "code" -> TelegramTdlibSession.provideCode(one)
+                "code" -> TelegramTdlibSession.confirmAuthenticationCode(one)
                 "password" -> TelegramTdlibSession.providePassword(one)
                 "email" -> false // TDLib email authorization varies; do not fake success.
                 else -> false
