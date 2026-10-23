@@ -272,10 +272,10 @@ class ScreenVideoRecordingService : Service() {
             return START_NOT_STICKY
         }
         createChannel()
-        updateRecordingNotification()
+        val startingNotice = recordingNotification()
         try {
-            if (Build.VERSION.SDK_INT >= 29) startForeground(2217, notice, ServiceInfo.FOREGROUND_SERVICE_TYPE_MEDIA_PROJECTION)
-            else startForeground(2217, notice)
+            if (Build.VERSION.SDK_INT >= 29) startForeground(2217, startingNotice, ServiceInfo.FOREGROUND_SERVICE_TYPE_MEDIA_PROJECTION)
+            else startForeground(2217, startingNotice)
             startRecording(intent.getIntExtra(EXTRA_RESULT, Activity.RESULT_CANCELED), data)
         } catch (error: Exception) {
             notifyResult(false, error.message)
@@ -385,6 +385,11 @@ class ScreenVideoRecordingService : Service() {
     }
     private fun updateRecordingNotification() {
         createChannel()
+        getSystemService(NotificationManager::class.java).notify(2217, recordingNotification())
+    }
+
+    private fun recordingNotification(): Notification {
+        createChannel()
         val stop = PendingIntent.getService(
             this, 21, Intent(this, ScreenVideoRecordingService::class.java).setAction(ACTION_STOP),
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
@@ -405,7 +410,7 @@ class ScreenVideoRecordingService : Service() {
             .addAction(android.R.drawable.ic_menu_save,
                 local("Finish and save", "إنهاء وحفظ"), stop)
             .build()
-        getSystemService(NotificationManager::class.java).notify(2217, notice)
+        return notice
     }
 
     private fun notifyResult(saved: Boolean, detail: String?) {
