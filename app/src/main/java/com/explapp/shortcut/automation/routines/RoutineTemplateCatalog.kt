@@ -21,7 +21,7 @@ object RoutineTemplateCatalog {
 
     private val copy = mapOf(
         "Morning apps" to Copy("تطبيقات الصباح", "Morning apps", "اختر التطبيق المثبت قبل الحفظ.", "Choose an installed app before saving."),
-        "Commute maps" to Copy("خرائط الطريق", "Commute maps", "حدد الوجهة أو العنوان أولًا.", "Enter a destination or address first."),
+        "Commute maps" to Copy("فتح الخرائط", "Open maps", "يفتح تطبيق الخرائط مباشرة. الوجهة اختيارية؛ عند الجدولة قد يتطلب أندرويد النقر على إشعار لفتح التطبيق.", "Opens the maps app directly. Destination is optional; scheduled launches may require tapping an Android notification."),
         "Charging reminder" to Copy("تذكير الشحن", "Charging reminder", "إشعار محلي عند توصيل الشاحن.", "A local notification when charging begins."),
         "Low battery" to Copy("تنبيه البطارية", "Low battery", "تنبيه عند وصول البطارية إلى 20%.", "A notification at 20% battery."),
         "WhatsApp prepared message" to Copy("تجهيز رسالة واتساب", "WhatsApp prepared message", "حدد المستلم والنص؛ يتطلب الإرسال تأكيدك.", "Choose recipient and text; sending needs your confirmation."),
