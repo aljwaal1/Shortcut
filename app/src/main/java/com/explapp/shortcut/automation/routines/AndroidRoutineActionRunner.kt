@@ -508,7 +508,12 @@ class AndroidRoutineActionRunner(
         }
         return runCatching {
             context.startActivity(intent)
-            RoutineActionResult.success(action)
+            // Opening a UI does not establish that the user completed the
+            // action. GIF/PDF creation needs file selection and confirmation.
+            RoutineActionResult.prepared(action, local(
+                "Opened the requested app or tool; awaiting user completion",
+                "تم فتح التطبيق أو الأداة، وبانتظار إكمال الإجراء من المستخدم",
+            ))
         }.getOrElse { RoutineActionResult.failure(action, it.message ?: it.javaClass.simpleName) }
     }
 
