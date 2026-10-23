@@ -79,13 +79,14 @@ class TelegramPersonalSetupActivity : AppCompatActivity() {
         fieldTwo.addTextChangedListener(watcher)
         primary.setOnClickListener { act() }
         secondary.setOnClickListener {
-            if (lastPhase == "ready") {
-                TelegramTdlibSession.logout()
-                message = if (ar) "تم طلب تسجيل الخروج" else "Logout requested"
-            } else {
-                message = ""
+            when (lastPhase) {
+                "ready" -> {
+                    TelegramTdlibSession.logout()
+                    message = if (ar) "تم طلب تسجيل الخروج" else "Logout requested"
+                    updateScreen()
+                }
+                "code" -> resendCode()
             }
-            updateScreen()
         }
         // Do not request phone/code unless Telegram actually asks for them.
         if (TelegramPersonalCredentialVault.load(applicationContext) != null) {
@@ -148,7 +149,14 @@ class TelegramPersonalSetupActivity : AppCompatActivity() {
         guidance.text = when (state) {
             "api" -> if (ar) "إعداد لمرة واحدة: أدخل api_id و api_hash من my.telegram.org/apps. لن تحتاج إليهما بعد حفظ الاتصال." else "One-time setup: enter api_id and api_hash from my.telegram.org/apps."
             "phone" -> if (ar) "أدخل رقم تيليجرام بمفتاح الدولة، ثم اضغط الزر الأزرق." else "Enter your Telegram phone number with country code, then tap the blue button."
-            "code" -> if (ar) "أدخل الرمز الذي أرسله تيليجرام إلى حسابك. لا تشاركه مع أحد." else "Enter the code Telegram sent you. Never share it."
+            "code" -> {
+                val delivery = TelegramTdlibSession.currentCodeDelivery().orEmpty()
+                val next = TelegramTdlibSession.nextCodeDelivery()
+                if (ar) "أدخل رمز الدخول الذي أرسله تيليجرام. افحص محادثة Telegram الرسمية داخل حساباتك المفتوحة على الأجهزة الأخرى. وسيلة الإرسال: $delivery." +
+                    (next?.let { " الوسيلة التالية: $it." } ?: " لا تتوفر وسيلة ثانية حاليًا.")
+                else "Enter the Telegram login code. Check the official Telegram chat on your other logged-in devices. Current method: $delivery." +
+                    (next?.let { " Next method: $it." } ?: " No alternate delivery method is currently available.")
+            }
             "password" -> if (ar) "أدخل كلمة مرور التحقق بخطوتين لحسابك." else "Enter your Telegram two-step verification password."
             "ready" -> if (ar) "تم الربط. أضف @username من شاشة إعداد الأتمتة، ولا يلزم تسجيل الدخول مرة أخرى عادةً." else "Connected. Choose @username in the automation editor."
             "other_device" -> if (ar) "افتح تيليجرام على الجهاز الآخر وأكّد طلب تسجيل الدخول." else "Open Telegram on your other device and approve the login."
@@ -186,8 +194,19 @@ class TelegramPersonalSetupActivity : AppCompatActivity() {
             else -> if (ar) "بانتظار تيليجرام…" else "Waiting for Telegram…"
         }
         primary.visibility = if (state in setOf("api", "phone", "code", "password", "email")) View.VISIBLE else View.GONE
-        secondary.visibility = if (state == "ready") View.VISIBLE else View.GONE
-        secondary.text = if (ar) "تسجيل الخروج" else "Log out"
+        secondary.visibility = if (state == "ready" || state == "code") View.VISIBLE else View.GONE
+        if (state == "code") {
+            val seconds = TelegramTdlibSession.codeResendRemainingSeconds()
+            secondary.isEnabled = !busy && TelegramTdlibSession.canResendCode()
+            secondary.text = when {
+                seconds > 0 -> if (ar) "إعادة إرسال الرمز بعد ${seconds} ث" else "Resend code in ${seconds}s"
+                !TelegramTdlibSession.canResendCode() -> if (ar) "إعادة الإرسال غير متاحة حاليًا" else "Resend unavailable right now"
+                else -> if (ar) "إعادة إرسال رمز الدخول" else "Resend login code"
+            }
+        } else {
+            secondary.isEnabled = !busy
+            secondary.text = if (ar) "تسجيل الخروج" else "Log out"
+        }
         status.text = (if (ar) "الحالة: " else "Status: ") + TelegramTdlibSession.status() +
             (TelegramTdlibSession.lastError()?.let { "\n$it" } ?: "") +
             (if (message.isNotBlank()) "\n$message" else "")
@@ -218,6 +237,28 @@ class TelegramPersonalSetupActivity : AppCompatActivity() {
         } else {
             if (ar) "أكمل الإدخال لتفعيل الزر" else "Complete the field to enable the button"
         }
+    }
+
+    private fun resendCode() {
+        if (busy || lastPhase != "code" || !TelegramTdlibSession.canResendCode()) return
+        busy = true
+        message = if (ar) "جارٍ طلب رمز جديد من تيليجرام…" else "Requesting another code from Telegram…"
+        updateScreen()
+        Thread {
+            val ok = TelegramTdlibSession.resendAuthenticationCode()
+            runOnUiThread {
+                if (isFinishing || isDestroyed) return@runOnUiThread
+                busy = false
+                message = if (ok) {
+                    if (ar) "وافق تيليجرام على طلب إعادة الإرسال. تحقق من طريقة الوصول الموضحة أعلاه."
+                    else "Telegram accepted the resend request. Check the delivery method shown above."
+                } else {
+                    if (ar) "لم يؤكد تيليجرام إرسال رمز جديد. راجع رسالة الخطأ والمهلة."
+                    else "Telegram did not confirm a new code. Check the error and timeout."
+                }
+                updateScreen()
+            }
+        }.start()
     }
 
     private fun act() {
