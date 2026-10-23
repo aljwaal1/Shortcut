@@ -205,36 +205,58 @@ class ImageBatchActivity : AppCompatActivity() {
     }
 
     private fun toGif(uris: List<Uri>, cancelled: AtomicBoolean, step: (Int) -> Unit): Uri {
-        val selected = uris.take(MAX_GIF_FRAMES)
-        require(selected.isNotEmpty()) { "No images selected" }
-        val dimensions = selected.map { uri ->
-            check(!cancelled.get()) { "Cancelled" }
-            val bitmap = loadOrientedBitmap(uri, 720)
-            val size = bitmap.width to bitmap.height
-            bitmap.recycle()
-            size
+        require(uris.size >= 2) {
+            local("Select at least two images for an animated GIF", "اختر صورتين على الأقل لصنع GIF متحرك")
         }
-        val width = dimensions.maxOf { it.first }
-        val height = dimensions.maxOf { it.second }
-        val bytes = ByteArrayOutputStream()
-        val encoder = GifEncoder(bytes, width, height, 0)
-        val options = ImageOptions().apply { setDelay(350, TimeUnit.MILLISECONDS) }
-        selected.forEachIndexed { index, uri ->
+        require(uris.size <= MAX_GIF_FRAMES) {
+            local("GIF supports up to $MAX_GIF_FRAMES images. Select fewer images.",
+                "الحد الأقصى $MAX_GIF_FRAMES صورة لإنشاء GIF. اختر عددًا أقل.")
+        }
+        val dimensions = uris.map { uri ->
             check(!cancelled.get()) { "Cancelled" }
-            val frame = loadOrientedBitmap(uri, 720)
-            val normalized = if (frame.width == width && frame.height == height) frame else Bitmap.createScaledBitmap(frame, width, height, true)
-            try {
-                encoder.addImage(bitmapPixels(normalized), options)
-            } finally {
-                if (normalized !== frame) normalized.recycle()
-                frame.recycle()
+            val bitmap = loadOrientedBitmap(uri, 640)
+            try { bitmap.width to bitmap.height } finally { bitmap.recycle() }
+        }
+        // Use a consistent output size, including mixed portrait/landscape images.
+        // GIF encoders require every submitted frame to have identical dimensions.
+        val width = dimensions.maxOf { it.first }.coerceAtLeast(1)
+        val height = dimensions.maxOf { it.second }.coerceAtLeast(1)
+        require(width.toLong() * height <= 640L * 640L) { "GIF dimensions are too large" }
+        val output = ToolOutputStore(this).create(
+            "Animated_${System.currentTimeMillis()}.gif", "image/gif", true,
+        )
+        try {
+            contentResolver.openOutputStream(output, "w").use { stream ->
+                val out = requireNotNull(stream) { "Cannot open GIF output file" }
+                val encoder = GifEncoder(out, width, height, 0)
+                val options = ImageOptions().apply { setDelay(350, TimeUnit.MILLISECONDS) }
+                uris.forEachIndexed { index, uri ->
+                    check(!cancelled.get()) { "Cancelled" }
+                    val frame = loadOrientedBitmap(uri, 640)
+                    try {
+                        // Centre each image instead of stretching it and distorting the result.
+                        val canvasBitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
+                        try {
+                            canvasBitmap.eraseColor(android.graphics.Color.WHITE)
+                            val left = (width - frame.width) / 2f
+                            val top = (height - frame.height) / 2f
+                            Canvas(canvasBitmap).drawBitmap(frame, left, top, null)
+                            encoder.addImage(bitmapPixels(canvasBitmap), options)
+                        } finally { canvasBitmap.recycle() }
+                    } finally { frame.recycle() }
+                    step(index + 1)
+                }
+                check(!cancelled.get()) { "Cancelled" }
+                encoder.finishEncoding()
+                out.flush()
             }
-            step(index + 1)
+            val size = contentResolver.openFileDescriptor(output, "r")?.use { it.statSize } ?: -1L
+            require(size > 20L) { "GIF output is empty or invalid" }
+            return output
+        } catch (failure: Throwable) {
+            runCatching { contentResolver.delete(output, null, null) }
+            throw failure
         }
-        encoder.finishEncoding()
-        val output = ToolOutputStore(this).create("Animated_${System.currentTimeMillis()}.gif", "image/gif", true)
-        contentResolver.openOutputStream(output).use { out -> requireNotNull(out).write(bytes.toByteArray()) }
-        return output
     }
 
     private fun compressResize(uris: List<Uri>, cancelled: AtomicBoolean, step: (Int) -> Unit): List<Uri> {
