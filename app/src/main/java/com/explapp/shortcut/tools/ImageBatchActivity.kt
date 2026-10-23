@@ -29,8 +29,22 @@ class ImageBatchActivity : AppCompatActivity() {
     private lateinit var tool: ToolId
     private var mergeVertical = false
 
-    private val multiPicker = registerForActivityResult(ActivityResultContracts.GetMultipleContents()) { uris ->
-        if (uris.isEmpty()) finish() else confirmSelection(uris)
+    // Use Android's document browser rather than a gallery-only picker:
+    // users can search folders, select files from different providers, and
+    // grant access for the complete asynchronous encoding operation.
+    private val multiPicker = registerForActivityResult(ActivityResultContracts.OpenMultipleDocuments()) { uris ->
+        if (uris.isEmpty()) {
+            finish()
+        } else {
+            uris.forEach { uri ->
+                runCatching {
+                    contentResolver.takePersistableUriPermission(
+                        uri, Intent.FLAG_GRANT_READ_URI_PERMISSION,
+                    )
+                }
+            }
+            confirmSelection(uris)
+        }
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -43,12 +57,12 @@ class ImageBatchActivity : AppCompatActivity() {
                 .setTitle(local("Merge direction", "اتجاه الدمج"))
                 .setItems(arrayOf(local("Horizontal", "أفقي"), local("Vertical", "عمودي"))) { _, which ->
                     mergeVertical = which == 1
-                    multiPicker.launch("image/*")
+                    multiPicker.launch(arrayOf("image/*"))
                 }
                 .setNegativeButton(local("Cancel", "إلغاء")) { _, _ -> finish() }
                 .setOnCancelListener { finish() }
                 .show()
-            ToolId.IMAGES_TO_PDF, ToolId.GIF_CREATE, ToolId.IMAGE_RESIZE_COMPRESS -> multiPicker.launch("image/*")
+            ToolId.IMAGES_TO_PDF, ToolId.GIF_CREATE, ToolId.IMAGE_RESIZE_COMPRESS -> multiPicker.launch(arrayOf("image/*"))
             else -> finish()
         }
     }
@@ -62,7 +76,7 @@ class ImageBatchActivity : AppCompatActivity() {
                     "لإنشاء GIF اختر من صورتين إلى $MAX_GIF_FRAMES صورة. عدد الصور المختارة: ${uris.size}.",
                 ))
                 .setPositiveButton(local("Select images again", "إعادة اختيار الصور")) { _, _ ->
-                    multiPicker.launch("image/*")
+                    multiPicker.launch(arrayOf("image/*"))
                 }
                 .setNegativeButton(local("Cancel", "إلغاء")) { _, _ -> finish() }
                 .setOnCancelListener { finish() }
@@ -83,7 +97,7 @@ class ImageBatchActivity : AppCompatActivity() {
                 "تم اختيار ${uris.size} صورة. سيُستخدم ترتيب منتقي Android. اختر من جديد إذا لم يكن الترتيب مناسبًا. لن يتم تعديل الملفات الأصلية.",
             ))
             .setPositiveButton(action) { _, _ -> startOperation(uris) }
-            .setNeutralButton(local("Choose again", "اختيار من جديد")) { _, _ -> multiPicker.launch("image/*") }
+            .setNeutralButton(local("Choose again", "اختيار من جديد")) { _, _ -> multiPicker.launch(arrayOf("image/*")) }
             .setNegativeButton(local("Cancel", "إلغاء")) { _, _ -> finish() }
             .setOnCancelListener { finish() }
             .show()
