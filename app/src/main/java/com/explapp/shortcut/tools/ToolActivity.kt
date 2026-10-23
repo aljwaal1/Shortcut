@@ -172,6 +172,10 @@ class ToolActivity : AppCompatActivity() {
                 local("Android requires Usage Access for reliable app-open detection in the Standard build.", "يتطلب Android صلاحية الوصول إلى الاستخدام لاكتشاف فتح التطبيقات بشكل موثوق في النسخة العادية."),
                 Settings.ACTION_USAGE_ACCESS_SETTINGS,
             )
+            ToolId.SCREEN_VIDEO_RECORD -> {
+                startActivity(Intent(this, FloatingVideoSetupActivity::class.java))
+                finish()
+            }
             ToolId.MY_AUTOMATIONS -> finish()
             ToolId.MORNING_SLEEP -> systemTool(
                 local("Morning / sleep", "روتين الصباح / النوم"),
