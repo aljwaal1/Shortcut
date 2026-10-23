@@ -37,6 +37,7 @@ import android.widget.Toast
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.app.NotificationCompat
+import androidx.core.content.FileProvider
 import java.io.File
 import kotlin.math.abs
 
@@ -422,13 +423,31 @@ class ScreenVideoRecordingService : Service() {
                 else detail.orEmpty().take(120))
             .setAutoCancel(true)
         if (saved && uri != null) {
+            // File:// URIs cannot be shared across apps on Android 7-9.
+            // Export them through the app's private FileProvider instead.
+            val shareUri = if (uri.scheme == "file") {
+                runCatching {
+                    FileProvider.getUriForFile(
+                        this, "${packageName}.fileprovider",
+                        File(requireNotNull(uri.path)),
+                    )
+                }.getOrNull()
+            } else uri
+            if (shareUri == null) {
+                builder.setContentText(local(
+                    "Saved in Shortcut Movies, but file sharing is not available",
+                    "حُفظ في مجلد فيديو Shortcut، لكن المشاركة غير متاحة",
+                ))
+            } else {
             val view = Intent(Intent.ACTION_VIEW).apply {
-                setDataAndType(uri, "video/mp4")
+                setDataAndType(shareUri, "video/mp4")
+                clipData = android.content.ClipData.newRawUri("Shortcut video", shareUri)
                 addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
             }
             val share = Intent(Intent.ACTION_SEND).apply {
                 type = "video/mp4"
-                putExtra(Intent.EXTRA_STREAM, uri)
+                putExtra(Intent.EXTRA_STREAM, shareUri)
+                clipData = android.content.ClipData.newRawUri("Shortcut video", shareUri)
                 addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
             }
             val openPending = PendingIntent.getActivity(
@@ -446,6 +465,7 @@ class ScreenVideoRecordingService : Service() {
             builder.addAction(android.R.drawable.ic_menu_share,
                 local("Share", "مشاركة"), sharePending)
             builder.setContentIntent(openPending)
+            }
         }
         getSystemService(NotificationManager::class.java).notify(2218, builder.build())
         latestSavedUri = null
