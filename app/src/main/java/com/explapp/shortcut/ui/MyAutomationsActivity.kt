@@ -1685,6 +1685,7 @@ private fun RoutineBuilderScreen(
     var secondary by remember { mutableStateOf("") }
     var params by remember { mutableStateOf<Map<String, String>>(emptyMap()) }
     var continueOnError by remember { mutableStateOf(false) }
+    var showAdvancedActionOptions by remember { mutableStateOf(false) }
     var editingActionRef by remember { mutableStateOf<RoutineAction?>(null) }
     var lastRemovedAction by remember { mutableStateOf<Pair<Int, RoutineAction>?>(null) }
     var actionSearch by remember { mutableStateOf("") }
@@ -1721,6 +1722,7 @@ private fun RoutineBuilderScreen(
     }
 
     fun resetActionEditor() {
+        showAdvancedActionOptions = false
         value = ""
         secondary = ""
         params = emptyMap()
@@ -2547,6 +2549,16 @@ private fun RoutineBuilderScreen(
                         }
                     }
 
+                    TextButton(onClick = { showAdvancedActionOptions = !showAdvancedActionOptions }) {
+                        Text(
+                            if (showAdvancedActionOptions) {
+                                if (ar) "إخفاء الخيارات المتقدمة ▲" else "Hide advanced options ▲"
+                            } else {
+                                if (ar) "إظهار الخيارات المتقدمة ▼" else "Show advanced options ▼"
+                            },
+                        )
+                    }
+                    if (showAdvancedActionOptions) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Text(if (ar) "الاستمرار عند فشل الخطوة" else "Continue if this step fails", modifier = Modifier.weight(1f))
                         Switch(checked = continueOnError, onCheckedChange = { continueOnError = it })
@@ -2576,6 +2588,8 @@ private fun RoutineBuilderScreen(
                             },
                             modifier = Modifier.fillMaxWidth(),
                         )
+                    }
+
                     }
 
                     val draft = RoutineAction(actionType, value, secondary, continueOnError, params)
