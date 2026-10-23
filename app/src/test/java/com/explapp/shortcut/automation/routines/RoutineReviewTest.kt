@@ -38,6 +38,16 @@ class RoutineReviewTest {
         assertEquals(2, report.warnings.size)
     }
 
+    @Test fun shareFileAndExternalAppsWarnAboutManualCompletion() {
+        val report = RoutineReview.inspect(flow(listOf(
+            RoutineAction(RoutineActionType.SHARE_FILE, "content://example.provider/selected"),
+            RoutineAction(RoutineActionType.OPEN_MAPS, ""),
+            RoutineAction(RoutineActionType.OPEN_TOOL, "IMAGES_TO_PDF"),
+        )))
+        assertTrue(report.canRun)
+        assertEquals(3, report.warnings.count { it.code == "USER_INTERACTION_REQUIRED" })
+    }
+
     @Test fun rejectsInvalidActionWithIndex() {
         val report = RoutineReview.inspect(flow(listOf(RoutineAction(RoutineActionType.WAIT, "invalid"))))
         assertFalse(report.canRun)
