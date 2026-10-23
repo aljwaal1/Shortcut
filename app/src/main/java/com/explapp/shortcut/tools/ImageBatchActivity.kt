@@ -166,6 +166,10 @@ class ImageBatchActivity : AppCompatActivity() {
             runOnUiThread {
                 dialog.dismiss()
                 when {
+                    cancelled.get() && (failure == null || failure?.message == "Cancelled") -> {
+                        toast(local("Operation cancelled", "تم إلغاء العملية"))
+                        finish()
+                    }
                     failure != null -> showError(failure!!)
                     cancelled.get() -> {
                         toast(local("Operation cancelled", "تم إلغاء العملية"))
