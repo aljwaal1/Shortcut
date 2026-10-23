@@ -175,6 +175,30 @@ internal object TelegramTdlibSession : TelegramPersonalClient {
         }
     }
     fun provideCode(code: String) = submit(TdApi.CheckAuthenticationCode(code.trim()))
+
+    /** Server-confirmed code submission, so PHONE_CODE_INVALID is shown immediately. */
+    fun confirmAuthenticationCode(code: String): Boolean {
+        if (authState !is TdApi.AuthorizationStateWaitCode &&
+            authState !is TdApi.AuthorizationStateWaitEmailCode) {
+            sendError = "Telegram is not requesting a login code."
+            return false
+        }
+        sendError = null
+        return when (val response = ask(TdApi.CheckAuthenticationCode(code.trim()), 25)) {
+            is TdApi.Ok -> {
+                sendError = null
+                true
+            }
+            is TdApi.Error -> {
+                sendError = "Telegram: ${response.code} ${response.message}"
+                false
+            }
+            else -> {
+                sendError = "Telegram did not confirm the code. Check your connection."
+                false
+            }
+        }
+    }
     fun providePassword(password: String) = submit(TdApi.CheckAuthenticationPassword(password))
     fun logout(): Boolean {
         appContext?.let { TelegramPersonalCredentialVault.clear(it) }
