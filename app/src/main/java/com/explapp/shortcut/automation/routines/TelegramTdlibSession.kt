@@ -2,6 +2,7 @@ package com.explapp.shortcut.automation.routines
 
 import android.content.Context
 import android.os.Build
+import android.os.SystemClock
 import org.drinkless.tdlib.Client
 import org.drinkless.tdlib.TdApi
 import java.io.File
@@ -24,6 +25,7 @@ internal object TelegramTdlibSession : TelegramPersonalClient {
     @Volatile private var currentApiHash: String = ""
     @Volatile private var appContext: Context? = null
     @Volatile private var sendError: String? = null
+    @Volatile private var resendAvailableAtMs: Long = 0L
     private val delivered = ConcurrentHashMap.newKeySet<Long>()
     private val deliveryWaiters = ConcurrentHashMap<Long, CountDownLatch>()
     private val rejected = ConcurrentHashMap<Long, String>()
@@ -37,6 +39,50 @@ internal object TelegramTdlibSession : TelegramPersonalClient {
         return open(context, id, hash)
     }
     fun lastError(): String? = sendError
+
+    /** Respect Telegram's server-specified resend timeout, not a UI-only timer. */
+    fun codeResendRemainingSeconds(): Int {
+        val state = authState
+        if (state !is TdApi.AuthorizationStateWaitCode && state !is TdApi.AuthorizationStateWaitEmailCode) return 0
+        val remaining = resendAvailableAtMs - SystemClock.elapsedRealtime()
+        return if (remaining <= 0L) 0 else ((remaining + 999L) / 1000L).toInt()
+    }
+
+    fun canResendCode(): Boolean = when (val state = authState) {
+        is TdApi.AuthorizationStateWaitCode -> state.codeInfo.nextType != null && codeResendRemainingSeconds() == 0
+        is TdApi.AuthorizationStateWaitEmailCode -> codeResendRemainingSeconds() == 0
+        else -> false
+    }
+
+    fun nextCodeDelivery(): String? = (authState as? TdApi.AuthorizationStateWaitCode)
+        ?.codeInfo?.nextType?.javaClass?.simpleName?.removePrefix("AuthenticationCodeType")
+
+    fun currentCodeDelivery(): String? = (authState as? TdApi.AuthorizationStateWaitCode)
+        ?.codeInfo?.type?.javaClass?.simpleName?.removePrefix("AuthenticationCodeType")
+
+    /** Must be called off the main thread; confirms the TDLib server response. */
+    fun resendAuthenticationCode(): Boolean {
+        if (!canResendCode()) {
+            sendError = "Telegram does not allow resending yet, or no alternative method is available."
+            return false
+        }
+        // Block repeat taps while the server handles the request.
+        resendAvailableAtMs = SystemClock.elapsedRealtime() + 10_000L
+        return when (val response = ask(TdApi.ResendAuthenticationCode(), 25)) {
+            is TdApi.Ok -> {
+                sendError = null
+                true
+            }
+            is TdApi.Error -> {
+                sendError = "Telegram resend: ${response.code} ${response.message}"
+                false
+            }
+            else -> {
+                sendError = "Telegram did not confirm the resend request. Check your active Telegram devices."
+                false
+            }
+        }
+    }
 
     @Synchronized
     fun open(context: Context, apiId: Int, apiHash: String): Boolean {
@@ -71,6 +117,11 @@ internal object TelegramTdlibSession : TelegramPersonalClient {
 
     private fun onAuthorizationUpdate(state: TdApi.AuthorizationState) {
         authState = state
+        if (state is TdApi.AuthorizationStateWaitCode) {
+            resendAvailableAtMs = SystemClock.elapsedRealtime() + state.codeInfo.timeout.coerceAtLeast(0) * 1000L
+        } else if (state is TdApi.AuthorizationStateWaitEmailCode) {
+            resendAvailableAtMs = SystemClock.elapsedRealtime()
+        }
         if (state is TdApi.AuthorizationStateWaitTdlibParameters) {
             val context = appContext ?: return
             val params = TdApi.SetTdlibParameters().apply {
