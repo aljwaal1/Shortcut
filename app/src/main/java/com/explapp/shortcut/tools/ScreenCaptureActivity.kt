@@ -122,12 +122,10 @@ class ScreenCaptureActivity : AppCompatActivity() {
                 .setAction(PersistentScreenCaptureService.ACTION_START_SESSION)
                 .putExtra(PersistentScreenCaptureService.EXTRA_RESULT_CODE, result.resultCode)
                 .putExtra(PersistentScreenCaptureService.EXTRA_DATA, data)
-            ContextCompat.startForegroundService(this, service)
+            // Resume is carried by the SAME start command, eliminating the
+            // unreliable fixed 400ms race with MediaProjection initialization.
             if (persistentResumeCapture && !launchPackage.isNullOrBlank()) {
-                // This continues ONLY the explicit pending request after user
-                // grants Android's MediaProjection permission in this activity.
-                val queuedCapture = Intent(this, PersistentScreenCaptureService::class.java)
-                    .setAction(PersistentScreenCaptureService.ACTION_CAPTURE)
+                service.putExtra(PersistentScreenCaptureService.EXTRA_RESUME_AFTER_CONSENT, true)
                     .putExtra(PersistentScreenCaptureService.EXTRA_LAUNCH_PACKAGE, launchPackage)
                     .putExtra(PersistentScreenCaptureService.EXTRA_CAPTURE_DELAY_MS, captureDelayMs)
                     .putExtra(PersistentScreenCaptureService.EXTRA_TELEGRAM_BOT_TOKEN, telegramBotToken)
@@ -139,10 +137,8 @@ class ScreenCaptureActivity : AppCompatActivity() {
                     .putExtra(PersistentScreenCaptureService.EXTRA_STAMP_DATE_TIME, stampDateTime)
                     .putExtra(PersistentScreenCaptureService.EXTRA_ROUTINE_ID, routineId)
                     .putExtra(PersistentScreenCaptureService.EXTRA_ROUTINE_NAME, routineName)
-                android.os.Handler(android.os.Looper.getMainLooper()).postDelayed({
-                    runCatching { ContextCompat.startForegroundService(applicationContext, queuedCapture) }
-                }, 400L)
             }
+            ContextCompat.startForegroundService(this, service)
             Toast.makeText(
                 this,
                 if (persistentResumeCapture) {
