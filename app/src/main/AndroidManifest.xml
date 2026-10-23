@@ -46,6 +46,7 @@
         <service android:name=".tools.ScreenCaptureService" android:exported="false" android:foregroundServiceType="mediaProjection" />
         <service android:name=".tools.PersistentScreenCaptureService" android:exported="false" android:foregroundServiceType="mediaProjection" />
         <service android:name=".tools.FloatingVideoBubbleService" android:exported="false" />
+        <service android:name=".tools.VideoExplanationPointerService" android:exported="false" />
         <service android:name=".tools.ScreenVideoRecordingService" android:exported="false" android:foregroundServiceType="mediaProjection" />
         <activity android:name=".tools.FloatingVideoSetupActivity" android:exported="false" />
         <activity android:name=".tools.VideoRecordingPermissionActivity" android:exported="false" />

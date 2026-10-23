@@ -6,9 +6,11 @@ import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.PendingIntent
 import android.app.Service
+import android.Manifest
 import android.content.ContentValues
 import android.content.Context
 import android.content.Intent
+import android.content.pm.PackageManager
 import android.content.pm.ServiceInfo
 import android.graphics.Color
 import android.graphics.PixelFormat
@@ -31,6 +33,7 @@ import android.view.Gravity
 import android.view.MotionEvent
 import android.view.WindowManager
 import android.widget.Button
+import android.widget.CheckBox
 import android.widget.LinearLayout
 import android.widget.TextView
 import android.widget.Toast
@@ -59,14 +62,29 @@ class FloatingVideoSetupActivity : AppCompatActivity() {
             textSize = 22f
         })
         layout.addView(TextView(this).apply {
-            text = if (ar) "اضغط «تسجيل فيديو» ووافق على تصوير الشاشة، ثم استخدم أزرار «إيقاف مؤقت / استئناف» و«إنهاء وحفظ». بعد الحفظ ستجد «فتح» و«مشاركة» في إشعار النتيجة. يُحفظ MP4 دون صوت. موافقة أندرويد مطلوبة لكل جلسة."
-                else "Tap Record video and approve screen capture. Use Pause / Resume, then Finish and save. The saved notification has Open and Share. Video is a silent MP4. Android requires consent for each session."
+            text = if (ar) "زر التحكم لا يظهر في الفيديو. أثناء التسجيل استخدم إشعار Android للإيقاف المؤقت والاستئناف والإنهاء والحفظ. بعد النجاح يصلك إشعار لفتح MP4 أو مشاركته. التسجيل بلا صوت."
+                else "The control bubble stays out of the video. Use the Android recording notification to pause, resume, finish and save. A saved notification lets you open or share the silent MP4."
             setPadding(0, 18, 0, 18)
         })
+        val pointerOption = CheckBox(this).apply {
+            text = if (ar) "إظهار مؤشر شرح قابل للسحب داخل الفيديو" else "Show draggable presentation pointer in video"
+            isChecked = getSharedPreferences("screen_video", MODE_PRIVATE).getBoolean("pointer", false)
+        }
+        layout.addView(pointerOption)
+        fun savePointerChoice(): Boolean {
+            if (pointerOption.isChecked && !Settings.canDrawOverlays(this)) {
+                Toast.makeText(this, if (ar) "فعّل الظهور فوق التطبيقات لاستخدام المؤشر، ثم عد إلى هنا" else "Allow display over other apps for the pointer, then return", Toast.LENGTH_LONG).show()
+                startActivity(Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION, Uri.parse("package:$packageName")))
+                return false
+            }
+            getSharedPreferences("screen_video", MODE_PRIVATE).edit().putBoolean("pointer", pointerOption.isChecked).apply()
+            return true
+        }
         fun add(text: String, act: () -> Unit) {
             layout.addView(Button(this).apply { this.text = text; setOnClickListener { act() } })
         }
         add(if (ar) "تشغيل الزر العائم" else "Enable floating button") {
+            if (!savePointerChoice()) return@add
             if (!Settings.canDrawOverlays(this)) {
                 Toast.makeText(this, if (ar) "اسمح بالظهور فوق التطبيقات، ثم عد إلى هنا" else "Allow display over other apps, then return", Toast.LENGTH_LONG).show()
                 startActivity(Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION, Uri.parse("package:$packageName")))
@@ -76,6 +94,7 @@ class FloatingVideoSetupActivity : AppCompatActivity() {
             }
         }
         add(if (ar) "بدء تسجيل بدون زر عائم" else "Start recording without bubble") {
+            if (!savePointerChoice()) return@add
             startActivity(Intent(this, VideoRecordingPermissionActivity::class.java))
             finish()
         }
@@ -88,8 +107,17 @@ class FloatingVideoSetupActivity : AppCompatActivity() {
 }
 
 class VideoRecordingPermissionActivity : AppCompatActivity() {
+    private val notificationPermission = registerForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
+        if (!granted) Toast.makeText(this,
+            "Allow notifications in Android settings to see saved video and Share/Open actions",
+            Toast.LENGTH_LONG).show()
+        requestScreenConsent()
+    }
     private val consent = registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
         if (result.resultCode == Activity.RESULT_OK && result.data != null) {
+            if (FloatingVideoBubbleService.isActive) {
+                startService(Intent(this, FloatingVideoBubbleService::class.java).setAction(FloatingVideoBubbleService.ACTION_HIDE))
+            }
             val intent = Intent(this, ScreenVideoRecordingService::class.java)
                 .setAction(ScreenVideoRecordingService.ACTION_START)
                 .putExtra(ScreenVideoRecordingService.EXTRA_RESULT, result.resultCode)
@@ -97,14 +125,30 @@ class VideoRecordingPermissionActivity : AppCompatActivity() {
             try {
                 androidx.core.content.ContextCompat.startForegroundService(this, intent)
             } catch (error: Exception) {
+                restoreBubble()
                 Toast.makeText(this, error.message ?: "Cannot start recording", Toast.LENGTH_LONG).show()
             }
+        } else {
+            restoreBubble()
         }
         finish()
     }
 
+    private fun restoreBubble() {
+        if (FloatingVideoBubbleService.isActive) {
+            startService(Intent(this, FloatingVideoBubbleService::class.java).setAction(FloatingVideoBubbleService.ACTION_SHOW))
+        }
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        if (Build.VERSION.SDK_INT >= 33 &&
+            checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) {
+            notificationPermission.launch(Manifest.permission.POST_NOTIFICATIONS)
+        } else requestScreenConsent()
+    }
+
+    private fun requestScreenConsent() {
         val manager = getSystemService(MediaProjectionManager::class.java)
         val request = if (Build.VERSION.SDK_INT >= 34) {
             manager.createScreenCaptureIntent(
@@ -121,16 +165,16 @@ class FloatingVideoBubbleService : Service() {
     private var pauseButton: Button? = null
     private var stopButton: Button? = null
     private var startButton: Button? = null
+    private var hiddenForCapture = false
     private val main = Handler(Looper.getMainLooper())
     private val refresh = object : Runnable {
         override fun run() {
             bubble?.let {
                 val recording = ScreenVideoRecordingService.isRecording
-                val paused = ScreenVideoRecordingService.isPaused
-                startButton?.visibility = if (recording) android.view.View.GONE else android.view.View.VISIBLE
-                pauseButton?.visibility = if (recording) android.view.View.VISIBLE else android.view.View.GONE
-                stopButton?.visibility = if (recording) android.view.View.VISIBLE else android.view.View.GONE
-                pauseButton?.text = if (paused) local("▶ Resume", "▶ استئناف") else local("Ⅱ Pause", "Ⅱ إيقاف مؤقت")
+                // Remove ALL controls from recorded frames, including Pause and Stop.
+                // Recording remains controllable from the foreground notification.
+                it.visibility = if (VideoOverlayPolicy.showControlBubble(recording, hiddenForCapture))
+                    android.view.View.VISIBLE else android.view.View.GONE
             }
             if (bubble != null) main.postDelayed(this, 750L)
         }
@@ -144,6 +188,14 @@ class FloatingVideoBubbleService : Service() {
         if (!Settings.canDrawOverlays(this)) {
             stopSelf()
             return START_NOT_STICKY
+        }
+        if (intent?.action == ACTION_HIDE) {
+            hiddenForCapture = true
+            bubble?.visibility = android.view.View.GONE
+            return START_STICKY
+        }
+        if (intent?.action == ACTION_SHOW) {
+            hiddenForCapture = false
         }
         if (bubble == null) showBubble()
         return START_STICKY
@@ -188,7 +240,8 @@ class FloatingVideoBubbleService : Service() {
         val options = WindowManager.LayoutParams(
             WindowManager.LayoutParams.WRAP_CONTENT, WindowManager.LayoutParams.WRAP_CONTENT,
             WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY,
-            WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or WindowManager.LayoutParams.FLAG_NOT_TOUCH_MODAL,
+            WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or WindowManager.LayoutParams.FLAG_NOT_TOUCH_MODAL or
+                WindowManager.LayoutParams.FLAG_SECURE,
             PixelFormat.TRANSLUCENT
         ).apply {
             gravity = Gravity.TOP or Gravity.START
@@ -218,18 +271,97 @@ class FloatingVideoBubbleService : Service() {
         }
         wm.addView(view, options)
         bubble=view
+        isActive = true
         main.post(refresh)
     }
     override fun onDestroy() {
         main.removeCallbacks(refresh)
         bubble?.let { view -> runCatching { window?.removeView(view) } }
         bubble=null
+        isActive = false
         startButton=null
         pauseButton=null
         stopButton=null
         super.onDestroy()
     }
-    companion object { const val ACTION_DISABLE = "com.explapp.shortcut.VIDEO_BUBBLE_DISABLE" }
+    companion object {
+        const val ACTION_DISABLE = "com.explapp.shortcut.VIDEO_BUBBLE_DISABLE"
+        const val ACTION_HIDE = "com.explapp.shortcut.VIDEO_BUBBLE_HIDE"
+        const val ACTION_SHOW = "com.explapp.shortcut.VIDEO_BUBBLE_SHOW"
+        @Volatile var isActive: Boolean = false
+            private set
+    }
+}
+
+/** Optional non-secure dot: deliberately visible in the recorded video. */
+class VideoExplanationPointerService : Service() {
+    private var wm: WindowManager? = null
+    private var marker: TextView? = null
+    override fun onBind(intent: Intent?): IBinder? = null
+    override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
+        if (intent?.action == ACTION_STOP || !Settings.canDrawOverlays(this)) {
+            stopSelf()
+            return START_NOT_STICKY
+        }
+        if (marker != null) return START_NOT_STICKY
+        val manager = getSystemService(Context.WINDOW_SERVICE) as WindowManager
+        wm = manager
+        val density = resources.displayMetrics.density
+        val diameter = (52 * density).toInt()
+        val dot = TextView(this).apply {
+            text = "●"
+            textSize = 34f
+            setTextColor(Color.rgb(255, 48, 48))
+            gravity = Gravity.CENTER
+            background = GradientDrawable().apply {
+                shape = GradientDrawable.OVAL
+                setColor(Color.argb(90, 255, 255, 255))
+                setStroke((2 * density).toInt(), Color.rgb(255, 80, 80))
+            }
+        }
+        val params = WindowManager.LayoutParams(
+            diameter, diameter, WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY,
+            WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or WindowManager.LayoutParams.FLAG_NOT_TOUCH_MODAL,
+            PixelFormat.TRANSLUCENT,
+        ).apply {
+            gravity = Gravity.TOP or Gravity.START
+            x = resources.displayMetrics.widthPixels / 2
+            y = resources.displayMetrics.heightPixels / 3
+        }
+        var startX = 0
+        var startY = 0
+        var downX = 0f
+        var downY = 0f
+        dot.setOnTouchListener { _, event ->
+            when (event.actionMasked) {
+                MotionEvent.ACTION_DOWN -> {
+                    startX = params.x; startY = params.y
+                    downX = event.rawX; downY = event.rawY
+                    true
+                }
+                MotionEvent.ACTION_MOVE -> {
+                    params.x = (startX + (event.rawX - downX).toInt()).coerceIn(0,
+                        (resources.displayMetrics.widthPixels - diameter).coerceAtLeast(0))
+                    params.y = (startY + (event.rawY - downY).toInt()).coerceIn(0,
+                        (resources.displayMetrics.heightPixels - diameter).coerceAtLeast(0))
+                    runCatching { manager.updateViewLayout(dot, params) }
+                    true
+                }
+                else -> true
+            }
+        }
+        manager.addView(dot, params)
+        marker = dot
+        return START_NOT_STICKY
+    }
+
+    override fun onDestroy() {
+        marker?.let { runCatching { wm?.removeView(it) } }
+        marker = null
+        super.onDestroy()
+    }
+
+    companion object { const val ACTION_STOP = "com.explapp.shortcut.VIDEO_POINTER_STOP" }
 }
 
 class ScreenVideoRecordingService : Service() {
@@ -242,6 +374,7 @@ class ScreenVideoRecordingService : Service() {
     private var startElapsed: Long = 0L
     private val maxDuration = Runnable { stopRecording() }
     private var latestSavedUri: Uri? = null
+    private var pointerEnabled = false
 
     override fun onBind(intent: Intent?): IBinder? = null
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
@@ -258,6 +391,14 @@ class ScreenVideoRecordingService : Service() {
         if (intent?.action == ACTION_RESUME) {
             if (isRecording && isPaused && Build.VERSION.SDK_INT >= 24) {
                 runCatching { recorder?.resume(); isPaused = false; updateRecordingNotification() }
+            }
+            return START_NOT_STICKY
+        }
+        if (intent?.action == ACTION_TOGGLE_POINTER) {
+            if (isRecording) {
+                pointerEnabled = !pointerEnabled
+                updatePointer()
+                updateRecordingNotification()
             }
             return START_NOT_STICKY
         }
@@ -290,8 +431,13 @@ class ScreenVideoRecordingService : Service() {
 
     private fun createChannel() {
         if (Build.VERSION.SDK_INT >= 26) {
-            getSystemService(NotificationManager::class.java).createNotificationChannel(
+            val notifications = getSystemService(NotificationManager::class.java)
+            notifications.createNotificationChannel(
                 NotificationChannel(CHANNEL, local("Screen recordings", "تسجيلات الشاشة"), NotificationManager.IMPORTANCE_LOW)
+            )
+            notifications.createNotificationChannel(
+                NotificationChannel(RESULT_CHANNEL, local("Saved screen videos", "مقاطع الشاشة المحفوظة"),
+                    NotificationManager.IMPORTANCE_DEFAULT)
             )
         }
     }
@@ -344,9 +490,11 @@ class ScreenVideoRecordingService : Service() {
             DisplayManager.VIRTUAL_DISPLAY_FLAG_AUTO_MIRROR, media.surface, null, null
         ) ?: error("Could not create video display")
         media.start()
+        pointerEnabled = getSharedPreferences("screen_video", MODE_PRIVATE).getBoolean("pointer", false)
         startElapsed = android.os.SystemClock.elapsedRealtime()
         isRecording = true
         isPaused = false
+        updatePointer()
         updateRecordingNotification()
         main.postDelayed(maxDuration, 30 * 60 * 1000L)
     }
@@ -366,6 +514,7 @@ class ScreenVideoRecordingService : Service() {
         stopSelf()
     }
     private fun cleanup(keep: Boolean) {
+        stopPointer()
         runCatching { display?.release() }; display=null
         runCatching { projection?.stop() }; projection=null
         runCatching { recorder?.reset() }; runCatching { recorder?.release() }; recorder=null
@@ -383,6 +532,20 @@ class ScreenVideoRecordingService : Service() {
         output=null
         isRecording=false
         isPaused=false
+        if (FloatingVideoBubbleService.isActive) {
+            startService(Intent(this, FloatingVideoBubbleService::class.java)
+                .setAction(FloatingVideoBubbleService.ACTION_SHOW))
+        }
+    }
+
+    private fun updatePointer() {
+        if (VideoOverlayPolicy.showPointer(isRecording, pointerEnabled, Settings.canDrawOverlays(this))) {
+            startService(Intent(this, VideoExplanationPointerService::class.java))
+        } else stopPointer()
+    }
+
+    private fun stopPointer() {
+        stopService(Intent(this, VideoExplanationPointerService::class.java))
     }
     private fun updateRecordingNotification() {
         createChannel()
@@ -400,6 +563,10 @@ class ScreenVideoRecordingService : Service() {
             this, 22, Intent(this, ScreenVideoRecordingService::class.java).setAction(pauseAction),
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
         )
+        val pointerToggle = PendingIntent.getService(
+            this, 23, Intent(this, ScreenVideoRecordingService::class.java).setAction(ACTION_TOGGLE_POINTER),
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
+        )
         val notice = NotificationCompat.Builder(this, CHANNEL)
             .setSmallIcon(android.R.drawable.presence_video_online)
             .setContentTitle(if (isPaused) local("Screen recording paused", "تسجيل الشاشة متوقف مؤقتًا")
@@ -410,18 +577,21 @@ class ScreenVideoRecordingService : Service() {
                 local("Resume", "استئناف") else local("Pause", "إيقاف مؤقت"), toggle)
             .addAction(android.R.drawable.ic_menu_save,
                 local("Finish and save", "إنهاء وحفظ"), stop)
+            .addAction(android.R.drawable.ic_menu_edit,
+                if (pointerEnabled) local("Hide pointer", "إخفاء المؤشر") else local("Show pointer", "إظهار المؤشر"), pointerToggle)
             .build()
         return notice
     }
 
     private fun notifyResult(saved: Boolean, detail: String?) {
         val uri = latestSavedUri
-        val builder = NotificationCompat.Builder(this, CHANNEL)
+        val builder = NotificationCompat.Builder(this, RESULT_CHANNEL)
             .setSmallIcon(if (saved) android.R.drawable.stat_sys_download_done else android.R.drawable.stat_notify_error)
             .setContentTitle(if (saved) local("Video saved", "تم حفظ الفيديو") else local("Screen recording failed", "فشل تسجيل الشاشة"))
             .setContentText(if (saved) local("Open or share your MP4", "فتح أو مشاركة ملف MP4")
                 else detail.orEmpty().take(120))
             .setAutoCancel(true)
+            .setPriority(NotificationCompat.PRIORITY_DEFAULT)
         if (saved && uri != null) {
             // File:// URIs cannot be shared across apps on Android 7-9.
             // Export them through the app's private FileProvider instead.
@@ -480,9 +650,11 @@ class ScreenVideoRecordingService : Service() {
         const val ACTION_STOP = "com.explapp.shortcut.VIDEO_STOP"
         const val ACTION_PAUSE = "com.explapp.shortcut.VIDEO_PAUSE"
         const val ACTION_RESUME = "com.explapp.shortcut.VIDEO_RESUME"
+        const val ACTION_TOGGLE_POINTER = "com.explapp.shortcut.VIDEO_TOGGLE_POINTER"
         const val EXTRA_RESULT = "result"
         const val EXTRA_DATA = "consent"
         private const val CHANNEL = "shortcut_video_capture"
+        private const val RESULT_CHANNEL = "shortcut_video_results"
         @Volatile var isRecording = false
             private set
         @Volatile var isPaused = false
