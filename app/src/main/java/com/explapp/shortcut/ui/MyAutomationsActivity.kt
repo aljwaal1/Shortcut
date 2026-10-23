@@ -2513,11 +2513,12 @@ private fun RoutineBuilderScreen(
                                 onValueChange = { value = it.trim() },
                                 label = { Text(if (ar) "رابط الصفحة" else "Page URL") },
                                 placeholder = { Text("https://example.com") },
-                                supportingText = { Text(if (ar) "اكتب رابط https:// كاملًا. يُفتح الرابط في تطبيق مناسب، ولا يعني فتحه اكتمال أي خطوة خارجية." else "Enter a full https:// URL. Opening the link does not confirm external actions.") },
+                                supportingText = { Text(if (ar) "اكتب https:// للمواقع، أو رابط تطبيق عميق صالحًا مثل tg://. فتح الرابط لا يعني اكتمال عمل التطبيق الخارجي." else "Use https:// for websites or a supported deep link such as tg://. Opening does not confirm external work.") },
                                 modifier = Modifier.fillMaxWidth(),
                             )
-                            if (value.isNotBlank() && !value.startsWith("https://", true) && !value.startsWith("http://", true)) {
-                                Text(if (ar) "يجب أن يبدأ الرابط بـ https:// أو http://" else "URL must begin with https:// or http://",
+                            if (value.isNotBlank() && (!value.matches(Regex("^[a-zA-Z][a-zA-Z0-9+.-]*:.+")) ||
+                                value.startsWith("javascript:", true) || value.startsWith("file:", true))) {
+                                Text(if (ar) "أدخل رابطًا صالحًا يبدأ ببروتوكول، مثل https:// أو tg://" else "Enter a valid URL with a scheme, e.g. https:// or tg://",
                                     color = MaterialTheme.colorScheme.error)
                             }
                         }
@@ -2579,7 +2580,8 @@ private fun RoutineBuilderScreen(
 
                     val draft = RoutineAction(actionType, value, secondary, continueOnError, params)
                     val editorValid = draft.isValid() && (actionType != RoutineActionType.OPEN_URL ||
-                        value.startsWith("https://", true) || value.startsWith("http://", true))
+                        (value.matches(Regex("^[a-zA-Z][a-zA-Z0-9+.-]*:.+")) &&
+                            !value.startsWith("javascript:", true) && !value.startsWith("file:", true)))
                     if (!editorValid) {
                         Text(
                             if (ar) "أكمل الحقول المطلوبة أعلاه قبل إضافة هذه الخطوة."
