@@ -250,8 +250,15 @@ class ImageBatchActivity : AppCompatActivity() {
                 encoder.finishEncoding()
                 out.flush()
             }
-            val size = contentResolver.openFileDescriptor(output, "r")?.use { it.statSize } ?: -1L
-            require(size > 20L) { "GIF output is empty or invalid" }
+            // Some content providers report statSize=-1 even for valid files.
+            // Check the GIF signature and actual readable bytes instead.
+            val validGif = contentResolver.openInputStream(output)?.use { input ->
+                val header = ByteArray(6)
+                input.read(header) == 6 &&
+                    (String(header, Charsets.US_ASCII) == "GIF89a" ||
+                        String(header, Charsets.US_ASCII) == "GIF87a")
+            } ?: false
+            require(validGif) { "GIF output is empty or invalid" }
             return output
         } catch (failure: Throwable) {
             runCatching { contentResolver.delete(output, null, null) }
