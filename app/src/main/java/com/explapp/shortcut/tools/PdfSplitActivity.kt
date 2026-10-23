@@ -91,7 +91,7 @@ class PdfSplitActivity : AppCompatActivity() {
         }
         panel.addView(hint)
         rangeEditor = EditText(this).apply {
-            hint = "1-12, 13-30"
+            this.hint = "1-12, 13-30"
             minLines = 2
             setSingleLine(false)
         }
