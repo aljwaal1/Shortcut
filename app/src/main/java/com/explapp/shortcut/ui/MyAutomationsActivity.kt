@@ -1680,13 +1680,16 @@ private fun RoutineBuilderScreen(
     var conditionValue by remember { mutableStateOf("") }
     var conditionSecondary by remember { mutableStateOf("") }
 
-    var actionType by remember { mutableStateOf(RoutineActionType.OPEN_APP) }
-    var value by remember { mutableStateOf("") }
-    var secondary by remember { mutableStateOf("") }
-    var params by remember { mutableStateOf<Map<String, String>>(emptyMap()) }
-    var continueOnError by remember { mutableStateOf(false) }
+    // A one-action template should edit its actual configured action.
+    // Do not show an unrelated empty "Open app" form.
+    val initialStep = remember(initial?.id) { initial?.actions?.singleOrNull() }
+    var actionType by remember(initial?.id) { mutableStateOf(initialStep?.type ?: RoutineActionType.OPEN_APP) }
+    var value by remember(initial?.id) { mutableStateOf(initialStep?.value.orEmpty()) }
+    var secondary by remember(initial?.id) { mutableStateOf(initialStep?.secondaryValue.orEmpty()) }
+    var params by remember(initial?.id) { mutableStateOf<Map<String, String>>(initialStep?.parameters ?: emptyMap()) }
+    var continueOnError by remember(initial?.id) { mutableStateOf(initialStep?.continueOnError ?: false) }
     var showAdvancedActionOptions by remember { mutableStateOf(false) }
-    var editingActionRef by remember { mutableStateOf<RoutineAction?>(null) }
+    var editingActionRef by remember(initial?.id) { mutableStateOf<RoutineAction?>(initialStep) }
     var lastRemovedAction by remember { mutableStateOf<Pair<Int, RoutineAction>?>(null) }
     var actionSearch by remember { mutableStateOf("") }
     var preflightExpanded by remember { mutableStateOf(true) }
