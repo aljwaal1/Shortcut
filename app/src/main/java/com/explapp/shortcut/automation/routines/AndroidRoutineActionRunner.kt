@@ -42,8 +42,10 @@ class AndroidRoutineActionRunner(
         RoutineActionType.WAIT -> waitAction(action)
         RoutineActionType.OPEN_URL -> openExternal(action, Intent(Intent.ACTION_VIEW, Uri.parse(action.value)))
         RoutineActionType.OPEN_MAPS -> {
-            val query = Uri.encode(action.value)
-            openExternal(action, Intent(Intent.ACTION_VIEW, Uri.parse("geo:0,0?q=$query")))
+            val destination = resolve(action.value).trim()
+            val uri = if (destination.isBlank()) Uri.parse("geo:0,0")
+                else Uri.parse("geo:0,0?q=${Uri.encode(destination)}")
+            openExternal(action, Intent(Intent.ACTION_VIEW, uri))
         }
         RoutineActionType.PREPARE_WHATSAPP -> preparedMessage(action, MessagePlatform.WHATSAPP)
         RoutineActionType.PREPARE_TELEGRAM -> preparedMessage(action, MessagePlatform.TELEGRAM)
