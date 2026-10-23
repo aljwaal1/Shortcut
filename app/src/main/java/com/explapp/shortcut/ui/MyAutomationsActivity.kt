@@ -1824,18 +1824,25 @@ private fun RoutineBuilderScreen(
 
         item {
             SectionTitle(if (ar) "1. عندما" else "1. When")
-            LazyRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                items(RoutineTriggerType.entries) { type ->
-                    FilterChip(
-                        selected = triggerType == type,
-                        onClick = {
+            Button(
+                onClick = {
+                    val available = RoutineTriggerType.entries
+                    android.app.AlertDialog.Builder(context)
+                        .setTitle(if (ar) "اختر وقت أو حدث تشغيل الاختصار" else "Choose when to run")
+                        .setSingleChoiceItems(
+                            available.map { triggerTitle(it, ar) }.toTypedArray(),
+                            available.indexOf(triggerType),
+                        ) { dialog, which ->
+                            val type = available[which]
                             triggerType = type
                             if (type !in setOf(RoutineTriggerType.TIME, RoutineTriggerType.BATTERY_BELOW, RoutineTriggerType.NFC)) triggerValue = ""
-                        },
-                        label = { Text(triggerTitle(type, ar)) },
-                    )
-                }
-            }
+                            dialog.dismiss()
+                        }
+                        .setNegativeButton(if (ar) "إلغاء" else "Cancel", null)
+                        .show()
+                },
+                modifier = Modifier.fillMaxWidth(),
+            ) { Text((if (ar) "المشغّل: " else "Trigger: ") + triggerTitle(triggerType, ar)) }
             ClearHint(RoutineCatalog.triggerHint(triggerType, ar), ar)
         }
 
@@ -2036,15 +2043,25 @@ private fun RoutineBuilderScreen(
                 else "Conditions are optional. If you add more than one, all must match before the steps run. You can drag conditions later to reorder them.",
                 ar,
             )
-            LazyRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                items(RoutineConditionType.entries) { type ->
-                    FilterChip(
-                        selected = conditionType == type,
-                        onClick = { conditionType = type },
-                        label = { Text(conditionTitle(type, ar)) },
-                    )
-                }
-            }
+            Button(
+                onClick = {
+                    val available = RoutineConditionType.entries
+                    android.app.AlertDialog.Builder(context)
+                        .setTitle(if (ar) "اختر نوع الشرط" else "Choose condition")
+                        .setSingleChoiceItems(
+                            available.map { conditionTitle(it, ar) }.toTypedArray(),
+                            available.indexOf(conditionType),
+                        ) { dialog, which ->
+                            conditionType = available[which]
+                            conditionValue = ""
+                            conditionSecondary = ""
+                            dialog.dismiss()
+                        }
+                        .setNegativeButton(if (ar) "إلغاء" else "Cancel", null)
+                        .show()
+                },
+                modifier = Modifier.fillMaxWidth(),
+            ) { Text((if (ar) "نوع الشرط: " else "Condition: ") + conditionTitle(conditionType, ar)) }
             if (conditionType == RoutineConditionType.VARIABLE_EQUALS || conditionType == RoutineConditionType.VARIABLE_CONTAINS) {
                 Text(if (ar) "اختر القيمة التي تريد فحصها" else "Choose the value to check", fontWeight = FontWeight.Bold)
                 LazyRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
