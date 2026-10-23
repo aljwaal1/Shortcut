@@ -42,9 +42,20 @@ object RoutineReview {
             if (action.type == RoutineActionType.CUSTOM_SCRIPT) {
                 findings += Finding(Severity.WARNING, index, "SCRIPT_REQUIRES_REVIEW")
             }
-            if (action.type == RoutineActionType.PREPARE_TELEGRAM ||
-                action.type == RoutineActionType.PREPARE_WHATSAPP
+            if (action.type in setOf(
+                    RoutineActionType.PREPARE_TELEGRAM,
+                    RoutineActionType.PREPARE_WHATSAPP,
+                    RoutineActionType.SHARE_TEXT,
+                    RoutineActionType.SHARE_FILE,
+                    RoutineActionType.OPEN_APP,
+                    RoutineActionType.OPEN_MAPS,
+                    RoutineActionType.OPEN_URL,
+                    RoutineActionType.WEB_SEARCH,
+                    RoutineActionType.OPEN_TOOL,
+                )
             ) {
+                // Opening another app or Android's Sharesheet only prepares
+                // the user-facing action: it is not proof of completion.
                 findings += Finding(Severity.WARNING, index, "USER_INTERACTION_REQUIRED")
             }
             if (action.type == RoutineActionType.SEND_TELEGRAM_BOT &&
