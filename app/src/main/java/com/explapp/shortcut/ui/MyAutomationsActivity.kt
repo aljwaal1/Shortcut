@@ -2484,13 +2484,43 @@ private fun RoutineBuilderScreen(
                             )
                         }
 
-                        else -> OutlinedTextField(
-                            value = value,
-                            onValueChange = { value = it },
-                            label = { Text(if (ar) "القيمة" else "Value") },
-                            placeholder = { Text(actionValueHint(actionType, ar)) },
-                            modifier = Modifier.fillMaxWidth(),
-                        )
+                        RoutineActionType.OPEN_URL -> {
+                            OutlinedTextField(
+                                value = value,
+                                onValueChange = { value = it.trim() },
+                                label = { Text(if (ar) "رابط الصفحة" else "Page URL") },
+                                placeholder = { Text("https://example.com") },
+                                supportingText = { Text(if (ar) "اكتب رابط https:// كاملًا. يُفتح الرابط في تطبيق مناسب، ولا يعني فتحه اكتمال أي خطوة خارجية." else "Enter a full https:// URL. Opening the link does not confirm external actions.") },
+                                modifier = Modifier.fillMaxWidth(),
+                            )
+                            if (value.isNotBlank() && !value.startsWith("https://", true) && !value.startsWith("http://", true)) {
+                                Text(if (ar) "يجب أن يبدأ الرابط بـ https:// أو http://" else "URL must begin with https:// or http://",
+                                    color = MaterialTheme.colorScheme.error)
+                            }
+                        }
+                        RoutineActionType.OPEN_MAPS -> {
+                            OutlinedTextField(
+                                value = value,
+                                onValueChange = { value = it },
+                                label = { Text(if (ar) "المكان أو العنوان" else "Place or address") },
+                                placeholder = { Text(if (ar) "مثل: مستشفى أو شارع أو إحداثيات" else "E.g. hospital, street or coordinates") },
+                                supportingText = { Text(if (ar) "يفتح تطبيق الخرائط لعرض المكان؛ لا يبدأ التنقل تلقائيًا." else "Opens maps to show the location; navigation does not start automatically.") },
+                                modifier = Modifier.fillMaxWidth(),
+                            )
+                        }
+                        RoutineActionType.SHOW_NOTIFICATION -> {
+                            OutlinedTextField(
+                                value = value,
+                                onValueChange = { value = it },
+                                label = { Text(if (ar) "نص الإشعار الذي سيظهر" else "Notification text") },
+                                supportingText = { Text(if (ar) "يلزم السماح بإشعارات Shortcut. يُعد نجاح الخطوة نجاح عرض الإشعار، وليس قراءته." else "Shortcut notification permission is required. Success means posted, not read.") },
+                                modifier = Modifier.fillMaxWidth(),
+                            )
+                        }
+                        else -> {
+                            Text(if (ar) "لا تحتاج هذه الخطوة إلى بيانات إضافية" else "This action has no additional input",
+                                style = MaterialTheme.typography.bodyMedium)
+                        }
                     }
 
                     Row(verticalAlignment = Alignment.CenterVertically) {
@@ -2525,6 +2555,15 @@ private fun RoutineBuilderScreen(
                     }
 
                     val draft = RoutineAction(actionType, value, secondary, continueOnError, params)
+                    val editorValid = draft.isValid() && (actionType != RoutineActionType.OPEN_URL ||
+                        value.startsWith("https://", true) || value.startsWith("http://", true))
+                    if (!editorValid) {
+                        Text(
+                            if (ar) "أكمل الحقول المطلوبة أعلاه قبل إضافة هذه الخطوة."
+                            else "Complete the required fields above before adding this step.",
+                            color = MaterialTheme.colorScheme.error,
+                        )
+                    }
                     Button(
                         onClick = {
                             val editing = editingActionRef
@@ -2536,7 +2575,7 @@ private fun RoutineBuilderScreen(
                             }
                             resetActionEditor()
                         },
-                        enabled = draft.isValid(),
+                        enabled = editorValid,
                         modifier = Modifier.fillMaxWidth(),
                     ) {
                         Text(
