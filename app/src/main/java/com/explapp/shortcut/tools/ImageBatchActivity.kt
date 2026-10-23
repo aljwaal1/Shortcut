@@ -254,11 +254,33 @@ class ImageBatchActivity : AppCompatActivity() {
             // Check the GIF signature and actual readable bytes instead.
             val validGif = contentResolver.openInputStream(output)?.use { input ->
                 val header = ByteArray(6)
-                input.read(header) == 6 &&
+                var read = 0
+                while (read < header.size) {
+                    val count = input.read(header, read, header.size - read)
+                    if (count < 0) break
+                    read += count
+                }
+                val signatureOk = read == 6 &&
                     (String(header, Charsets.US_ASCII) == "GIF89a" ||
                         String(header, Charsets.US_ASCII) == "GIF87a")
+                var size = read.toLong()
+                var lastByte = -1
+                val buffer = ByteArray(8192)
+                while (true) {
+                    val n = input.read(buffer)
+                    if (n < 0) break
+                    if (n == 0) continue
+                    size += n
+                    lastByte = buffer[n - 1].toInt() and 0xff
+                }
+                // Require a complete GIF stream with the trailer byte, not
+                // just a header from a partially-written file.
+                signatureOk && size > 32L && lastByte == 0x3b
             } ?: false
-            require(validGif) { "GIF output is empty or invalid" }
+            require(validGif) {
+                local("GIF file could not be verified. Try fewer or smaller images.",
+                    "لم يكتمل إنشاء GIF بصورة صحيحة. جرّب عددًا أقل من الصور أو صورًا أصغر.")
+            }
             return output
         } catch (failure: Throwable) {
             runCatching { contentResolver.delete(output, null, null) }
