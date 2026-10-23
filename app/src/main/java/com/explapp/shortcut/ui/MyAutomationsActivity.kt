@@ -1735,6 +1735,23 @@ private fun RoutineBuilderScreen(
         }
     }
 
+    val botAttachmentPicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { selected ->
+        if (selected != null) {
+            val retained = runCatching {
+                context.contentResolver.takePersistableUriPermission(
+                    selected, Intent.FLAG_GRANT_READ_URI_PERMISSION,
+                )
+                true
+            }.getOrDefault(false)
+            params = params + ("attachment" to selected.toString())
+            Toast.makeText(context, if (retained) {
+                if (ar) "تم حفظ الملف المرفق وصلاحية الوصول" else "Attachment and permission saved"
+            } else {
+                if (ar) "تم اختيار الملف؛ قد يلزم السماح بالوصول إليه مجددًا" else "Selected; file access may need renewed permission"
+            }, Toast.LENGTH_LONG).show()
+        }
+    }
+
     fun resetActionEditor() {
         showAdvancedActionOptions = false
         value = ""
@@ -2332,13 +2349,32 @@ private fun RoutineBuilderScreen(
                                     ar,
                                 )
                             } else {
-                                OutlinedTextField(
-                                    value = params["attachment"].orEmpty(),
-                                    onValueChange = { params = params + ("attachment" to it) },
-                                    label = { Text(if (ar) "ملف اختياري" else "Optional file") },
-                                    placeholder = { Text(if (ar) "اتركه فارغًا لإرسال النص فقط" else "Leave empty to send text only") },
+                                Button(
+                                    onClick = { botAttachmentPicker.launch(arrayOf("*/*")) },
                                     modifier = Modifier.fillMaxWidth(),
-                                )
+                                ) {
+                                    Text(if (ar) "اختيار ملف لإرساله بواسطة البوت (اختياري)"
+                                        else "Choose bot attachment (optional)")
+                                }
+                                if (params["attachment"].orEmpty().isNotBlank()) {
+                                    val attachment = params["attachment"].orEmpty()
+                                    val name = runCatching {
+                                        context.contentResolver.query(
+                                            Uri.parse(attachment),
+                                            arrayOf(android.provider.OpenableColumns.DISPLAY_NAME),
+                                            null, null, null,
+                                        )?.use { cursor ->
+                                            if (cursor.moveToFirst()) cursor.getString(0) else null
+                                        }
+                                    }.getOrNull()
+                                    Text((if (ar) "الملف: " else "File: ") +
+                                        (name ?: attachment.substringAfterLast('/').take(70)))
+                                    TextButton(onClick = { params = params - "attachment" }) {
+                                        Text(if (ar) "إزالة المرفق" else "Remove attachment")
+                                    }
+                                }
+                                ClearHint(if (ar) "بدون مرفق تُرسل الرسالة النصية فقط. وإذا انتهت صلاحية الملف فستظهر رسالة خطأ واضحة عند التنفيذ."
+                                    else "Without an attachment, only text is sent. Expired file access produces an explicit error.", ar)
                             }
                         }
 
