@@ -1698,6 +1698,28 @@ private fun RoutineBuilderScreen(
     var showToolPicker by remember { mutableStateOf(false) }
     var toolPickerSearch by remember { mutableStateOf("") }
 
+    val shareFilePicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { selected ->
+        if (selected != null) {
+            val retained = runCatching {
+                context.contentResolver.takePersistableUriPermission(
+                    selected, Intent.FLAG_GRANT_READ_URI_PERMISSION,
+                )
+                true
+            }.getOrDefault(false)
+            value = selected.toString()
+            params = params + ("mime" to (context.contentResolver.getType(selected) ?: "*/*"))
+            Toast.makeText(
+                context,
+                if (retained) {
+                    if (ar) "تم اختيار الملف وسيبقى متاحًا للاختصار" else "File selected and permission saved"
+                } else {
+                    if (ar) "تم اختيار الملف، لكن قد تحتاج اختياره مجددًا لاحقًا" else "Selected; permission may need renewal later"
+                },
+                Toast.LENGTH_LONG,
+            ).show()
+        }
+    }
+
     fun resetActionEditor() {
         value = ""
         secondary = ""
@@ -2399,16 +2421,37 @@ private fun RoutineBuilderScreen(
                         }
 
                         RoutineActionType.SHARE_FILE -> {
-                            OutlinedTextField(
-                                value = value,
-                                onValueChange = { value = it },
-                                label = { Text(if (ar) "الملف المراد مشاركته" else "File to share") },
-                                placeholder = { Text(if (ar) "يمكن استخدام ملف ناتج من خطوة حفظ سابقة" else "You can use a file created by an earlier save step") },
+                            Text(if (ar) "اختر الملف الذي تريد مشاركته" else "Choose the file to share",
+                                fontWeight = FontWeight.Bold)
+                            Button(
+                                onClick = { shareFilePicker.launch(arrayOf("*/*")) },
                                 modifier = Modifier.fillMaxWidth(),
-                            )
+                            ) {
+                                Text(if (ar) "اختيار ملف من الهاتف" else "Choose file from phone")
+                            }
+                            if (value.isNotBlank()) {
+                                Text(
+                                    text = if (value == "{{lastFile}}") {
+                                        if (ar) "المصدر: ملف الخطوة السابقة" else "Source: previous step output"
+                                    } else {
+                                        val name = runCatching {
+                                            context.contentResolver.query(Uri.parse(value),
+                                                arrayOf(android.provider.OpenableColumns.DISPLAY_NAME),
+                                                null, null, null)?.use { cursor ->
+                                                if (cursor.moveToFirst()) cursor.getString(0) else null
+                                            }
+                                        }.getOrNull()
+                                        (if (ar) "الملف المحدد: " else "Selected: ") + (name ?: value.takeLast(75))
+                                    },
+                                    style = MaterialTheme.typography.bodyMedium,
+                                )
+                            }
+                            TextButton(onClick = {
+                                value = "{{lastFile}}"
+                            }) { Text(if (ar) "استخدام ملف من خطوة سابقة" else "Use a file from previous step") }
                             ClearHint(
-                                if (ar) "إذا جاءت هذه الخطوة بعد «حفظ النص كملف»، يمكنك استخدام {{lastFile}} لمشاركة الملف الناتج."
-                                else "If this comes after Save text as file, use {{lastFile}} to share the file that was created.",
+                                if (ar) "إذا أردت مشاركة ملف جديد عند كل تشغيل، اختره الآن ثم احفظ. يفتح أندرويد نافذة اختيار تطبيق المشاركة عند التنفيذ. شرط الجمعة يعني أن التشغيل اليدوي ينفذ الإجراء يوم الجمعة فقط."
+                                else "Select a file and save. Android opens its share chooser when the action runs. With the Friday condition, a manual run executes this action on Friday only.",
                                 ar,
                             )
                         }
