@@ -11,7 +11,21 @@ class RoutineDispatcher(private val context: Context) {
         onComplete: ((RoutineRunResult) -> Unit)? = null,
     ) {
         Thread {
-            val result = runCatching { execute(routine, userInitiated) }.getOrElse {
+            val result = runCatching { execute(routine, userInitiated) }.getOrElse { error ->
+                runCatching {
+                    TaskExecutionReporter(context).report(
+                        com.explapp.shortcut.execution.TaskExecutionResult.failure(
+                            routine.name,
+                            error.message ?: error.javaClass.simpleName,
+                            System.currentTimeMillis(),
+                            details = listOf(
+                                "EVENT = DISPATCH_CRASH",
+                                "RUN_SOURCE = " + if (userInitiated) "MANUAL" else "SCHEDULED",
+                                "ROUTINE_ID = ${routine.id}",
+                            ),
+                        ),
+                    )
+                }
                 RoutineRunResult(
                     routineId = routine.id,
                     routineName = routine.name,
@@ -34,6 +48,20 @@ class RoutineDispatcher(private val context: Context) {
         val startedAt = System.currentTimeMillis()
         if (!runningRoutineIds.add(routine.id)) {
             val finishedAt = System.currentTimeMillis()
+            runCatching {
+                TaskExecutionReporter(context).report(
+                    com.explapp.shortcut.execution.TaskExecutionResult.failure(
+                        routine.name,
+                        "Another run of this routine is already in progress; duplicate request rejected",
+                        startedAt,
+                        details = listOf(
+                            "EVENT = CONCURRENT_RUN_REJECTED",
+                            "RUN_SOURCE = " + if (userInitiated) "MANUAL" else "SCHEDULED",
+                            "ROUTINE_ID = ${routine.id}",
+                        ),
+                    ),
+                )
+            }
             // Duplicate dispatch is skipped; do not add a misleading PREPARED record.
             return RoutineRunResult(
                 routineId = routine.id,
