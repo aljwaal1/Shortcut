@@ -240,11 +240,24 @@ class ScreenVideoRecordingService : Service() {
     private val main = Handler(Looper.getMainLooper())
     private var startElapsed: Long = 0L
     private val maxDuration = Runnable { stopRecording() }
+    private var latestSavedUri: Uri? = null
 
     override fun onBind(intent: Intent?): IBinder? = null
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         if (intent?.action == ACTION_STOP) {
             stopRecording()
+            return START_NOT_STICKY
+        }
+        if (intent?.action == ACTION_PAUSE) {
+            if (isRecording && !isPaused && Build.VERSION.SDK_INT >= 24) {
+                runCatching { recorder?.pause(); isPaused = true; updateRecordingNotification() }
+            }
+            return START_NOT_STICKY
+        }
+        if (intent?.action == ACTION_RESUME) {
+            if (isRecording && isPaused && Build.VERSION.SDK_INT >= 24) {
+                runCatching { recorder?.resume(); isPaused = false; updateRecordingNotification() }
+            }
             return START_NOT_STICKY
         }
         if (intent?.action != ACTION_START || isRecording) return START_NOT_STICKY
@@ -259,18 +272,7 @@ class ScreenVideoRecordingService : Service() {
             return START_NOT_STICKY
         }
         createChannel()
-        val stopIntent = PendingIntent.getService(
-            this, 21,
-            Intent(this, ScreenVideoRecordingService::class.java).setAction(ACTION_STOP),
-            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
-        )
-        val notice = NotificationCompat.Builder(this, CHANNEL)
-            .setSmallIcon(android.R.drawable.presence_video_online)
-            .setContentTitle(local("Recording screen", "جارٍ تسجيل الشاشة"))
-            .setContentText(local("Tap Stop to save MP4", "اضغط إيقاف لحفظ MP4"))
-            .setOngoing(true)
-            .addAction(android.R.drawable.ic_media_pause, local("Stop and save", "إيقاف وحفظ"), stopIntent)
-            .build()
+        updateRecordingNotification()
         try {
             if (Build.VERSION.SDK_INT >= 29) startForeground(2217, notice, ServiceInfo.FOREGROUND_SERVICE_TYPE_MEDIA_PROJECTION)
             else startForeground(2217, notice)
@@ -343,12 +345,16 @@ class ScreenVideoRecordingService : Service() {
         media.start()
         startElapsed = android.os.SystemClock.elapsedRealtime()
         isRecording = true
+        isPaused = false
+        updateRecordingNotification()
         main.postDelayed(maxDuration, 30 * 60 * 1000L)
     }
     private fun stopRecording() {
         main.removeCallbacks(maxDuration)
         val hadRecording = isRecording
         isRecording = false
+        isPaused = false
+        latestSavedUri = output
         val seconds = android.os.SystemClock.elapsedRealtime() - startElapsed
         var saved = false
         if (hadRecording) {
@@ -375,15 +381,69 @@ class ScreenVideoRecordingService : Service() {
         }
         output=null
         isRecording=false
+        isPaused=false
     }
-    private fun notifyResult(saved: Boolean, detail: String?) {
+    private fun updateRecordingNotification() {
+        createChannel()
+        val stop = PendingIntent.getService(
+            this, 21, Intent(this, ScreenVideoRecordingService::class.java).setAction(ACTION_STOP),
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
+        )
+        val pauseAction = if (isPaused) ACTION_RESUME else ACTION_PAUSE
+        val toggle = PendingIntent.getService(
+            this, 22, Intent(this, ScreenVideoRecordingService::class.java).setAction(pauseAction),
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
+        )
         val notice = NotificationCompat.Builder(this, CHANNEL)
+            .setSmallIcon(android.R.drawable.presence_video_online)
+            .setContentTitle(if (isPaused) local("Screen recording paused", "تسجيل الشاشة متوقف مؤقتًا")
+                else local("Recording screen", "جارٍ تسجيل الشاشة"))
+            .setContentText(local("Use Pause / Resume / Finish and save", "إيقاف مؤقت / استئناف / إنهاء وحفظ"))
+            .setOngoing(true)
+            .addAction(android.R.drawable.ic_media_pause, if (isPaused)
+                local("Resume", "استئناف") else local("Pause", "إيقاف مؤقت"), toggle)
+            .addAction(android.R.drawable.ic_menu_save,
+                local("Finish and save", "إنهاء وحفظ"), stop)
+            .build()
+        getSystemService(NotificationManager::class.java).notify(2217, notice)
+    }
+
+    private fun notifyResult(saved: Boolean, detail: String?) {
+        val uri = latestSavedUri
+        val builder = NotificationCompat.Builder(this, CHANNEL)
             .setSmallIcon(if (saved) android.R.drawable.stat_sys_download_done else android.R.drawable.stat_notify_error)
             .setContentTitle(if (saved) local("Video saved", "تم حفظ الفيديو") else local("Screen recording failed", "فشل تسجيل الشاشة"))
-            .setContentText(if (saved) local("Find your MP4 in Movies/Shortcut", "ستجد MP4 في مجلد Movies/Shortcut")
+            .setContentText(if (saved) local("Open or share your MP4", "فتح أو مشاركة ملف MP4")
                 else detail.orEmpty().take(120))
-            .setAutoCancel(true).build()
-        getSystemService(NotificationManager::class.java).notify(2218, notice)
+            .setAutoCancel(true)
+        if (saved && uri != null) {
+            val view = Intent(Intent.ACTION_VIEW).apply {
+                setDataAndType(uri, "video/mp4")
+                addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+            }
+            val share = Intent(Intent.ACTION_SEND).apply {
+                type = "video/mp4"
+                putExtra(Intent.EXTRA_STREAM, uri)
+                addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+            }
+            val openPending = PendingIntent.getActivity(
+                this, 223, Intent.createChooser(view, local("Open video", "فتح الفيديو"))
+                    .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
+                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
+            )
+            val sharePending = PendingIntent.getActivity(
+                this, 224, Intent.createChooser(share, local("Share video", "مشاركة الفيديو"))
+                    .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
+                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
+            )
+            builder.addAction(android.R.drawable.ic_menu_view,
+                local("Open", "فتح"), openPending)
+            builder.addAction(android.R.drawable.ic_menu_share,
+                local("Share", "مشاركة"), sharePending)
+            builder.setContentIntent(openPending)
+        }
+        getSystemService(NotificationManager::class.java).notify(2218, builder.build())
+        latestSavedUri = null
     }
     override fun onDestroy() {
         main.removeCallbacks(maxDuration)
@@ -393,10 +453,14 @@ class ScreenVideoRecordingService : Service() {
     companion object {
         const val ACTION_START = "com.explapp.shortcut.VIDEO_START"
         const val ACTION_STOP = "com.explapp.shortcut.VIDEO_STOP"
+        const val ACTION_PAUSE = "com.explapp.shortcut.VIDEO_PAUSE"
+        const val ACTION_RESUME = "com.explapp.shortcut.VIDEO_RESUME"
         const val EXTRA_RESULT = "result"
         const val EXTRA_DATA = "consent"
         private const val CHANNEL = "shortcut_video_capture"
         @Volatile var isRecording = false
+            private set
+        @Volatile var isPaused = false
             private set
     }
 }
