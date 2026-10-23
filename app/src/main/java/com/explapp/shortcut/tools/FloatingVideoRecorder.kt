@@ -116,17 +116,20 @@ class VideoRecordingPermissionActivity : AppCompatActivity() {
 
 class FloatingVideoBubbleService : Service() {
     private var window: WindowManager? = null
-    private var bubble: TextView? = null
+    private var bubble: LinearLayout? = null
+    private var pauseButton: Button? = null
+    private var stopButton: Button? = null
+    private var startButton: Button? = null
     private val main = Handler(Looper.getMainLooper())
     private val refresh = object : Runnable {
         override fun run() {
-            bubble?.let { view ->
+            bubble?.let {
                 val recording = ScreenVideoRecordingService.isRecording
-                view.text = if (recording) "■ " + local("Stop video", "إيقاف الفيديو")
-                    else "● " + local("Record video", "تسجيل فيديو")
-                (view.background as? GradientDrawable)?.setColor(
-                    if (recording) Color.rgb(181, 38, 50) else Color.rgb(32, 111, 178)
-                )
+                val paused = ScreenVideoRecordingService.isPaused
+                startButton?.visibility = if (recording) android.view.View.GONE else android.view.View.VISIBLE
+                pauseButton?.visibility = if (recording) android.view.View.VISIBLE else android.view.View.GONE
+                stopButton?.visibility = if (recording) android.view.View.VISIBLE else android.view.View.GONE
+                pauseButton?.text = if (paused) local("▶ Resume", "▶ استئناف") else local("Ⅱ Pause", "Ⅱ إيقاف مؤقت")
             }
             if (bubble != null) main.postDelayed(this, 750L)
         }
@@ -151,17 +154,36 @@ class FloatingVideoBubbleService : Service() {
         val wm = getSystemService(Context.WINDOW_SERVICE) as WindowManager
         window = wm
         val d = resources.displayMetrics.density
-        val view = TextView(this).apply {
-            textSize = 13f
-            setTextColor(Color.WHITE)
-            setPadding((13*d).toInt(), (10*d).toInt(), (13*d).toInt(), (10*d).toInt())
+        val view = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding((7*d).toInt(), (7*d).toInt(), (7*d).toInt(), (7*d).toInt())
             background = GradientDrawable().apply {
-                cornerRadius = 28*d
-                setColor(Color.rgb(32,111,178))
+                cornerRadius = 16*d
+                setColor(Color.rgb(28, 46, 68))
             }
             elevation = 8*d
-            contentDescription = local("Floating screen recording: tap to start or stop", "تسجيل الشاشة العائم: اضغط للبدء أو الإيقاف")
         }
+        fun button(text: String, click: () -> Unit): Button = Button(this).apply {
+            this.text = text
+            textSize = 12f
+            setOnClickListener { click() }
+            view.addView(this)
+        }
+        startButton = button(local("● Record video", "● تسجيل فيديو")) {
+            startActivity(Intent(this, VideoRecordingPermissionActivity::class.java)
+                .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+        }
+        pauseButton = button(local("Ⅱ Pause", "Ⅱ إيقاف مؤقت")) {
+            val action = if (ScreenVideoRecordingService.isPaused)
+                ScreenVideoRecordingService.ACTION_RESUME else ScreenVideoRecordingService.ACTION_PAUSE
+            startService(Intent(this, ScreenVideoRecordingService::class.java).setAction(action))
+        }
+        stopButton = button(local("■ Stop and save", "■ إنهاء وحفظ")) {
+            startService(Intent(this, ScreenVideoRecordingService::class.java)
+                .setAction(ScreenVideoRecordingService.ACTION_STOP))
+        }
+        pauseButton?.visibility = android.view.View.GONE
+        stopButton?.visibility = android.view.View.GONE
         val options = WindowManager.LayoutParams(
             WindowManager.LayoutParams.WRAP_CONTENT, WindowManager.LayoutParams.WRAP_CONTENT,
             WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY,
@@ -176,31 +198,21 @@ class FloatingVideoBubbleService : Service() {
         var y0 = 0
         var touchX = 0f
         var touchY = 0f
+        // Drag the empty container; actual control buttons handle taps.
         view.setOnTouchListener { _, event ->
             when (event.actionMasked) {
                 MotionEvent.ACTION_DOWN -> {
-                    x0=options.x; y0=options.y; touchX=event.rawX; touchY=event.rawY
+                    x0 = options.x; y0 = options.y
+                    touchX = event.rawX; touchY = event.rawY
                     true
                 }
                 MotionEvent.ACTION_MOVE -> {
-                    options.x = (x0 + (event.rawX-touchX).toInt()).coerceAtLeast(0)
-                    options.y = (y0 + (event.rawY-touchY).toInt()).coerceAtLeast(0)
+                    options.x = (x0 + (event.rawX - touchX).toInt()).coerceAtLeast(0)
+                    options.y = (y0 + (event.rawY - touchY).toInt()).coerceAtLeast(0)
                     runCatching { wm.updateViewLayout(view, options) }
                     true
                 }
-                MotionEvent.ACTION_UP -> {
-                    if (abs(event.rawX-touchX) < 12*d && abs(event.rawY-touchY) < 12*d) {
-                        if (ScreenVideoRecordingService.isRecording) {
-                            startService(Intent(this, ScreenVideoRecordingService::class.java)
-                                .setAction(ScreenVideoRecordingService.ACTION_STOP))
-                        } else {
-                            startActivity(Intent(this, VideoRecordingPermissionActivity::class.java)
-                                .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
-                        }
-                    }
-                    true
-                }
-                else -> false
+                else -> true
             }
         }
         wm.addView(view, options)
@@ -211,6 +223,9 @@ class FloatingVideoBubbleService : Service() {
         main.removeCallbacks(refresh)
         bubble?.let { view -> runCatching { window?.removeView(view) } }
         bubble=null
+        startButton=null
+        pauseButton=null
+        stopButton=null
         super.onDestroy()
     }
     companion object { const val ACTION_DISABLE = "com.explapp.shortcut.VIDEO_BUBBLE_DISABLE" }
