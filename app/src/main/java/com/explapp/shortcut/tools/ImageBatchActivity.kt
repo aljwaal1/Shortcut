@@ -54,6 +54,21 @@ class ImageBatchActivity : AppCompatActivity() {
     }
 
     private fun confirmSelection(uris: List<Uri>) {
+        if (tool == ToolId.GIF_CREATE && uris.size !in 2..MAX_GIF_FRAMES) {
+            AlertDialog.Builder(this)
+                .setTitle(local("GIF image selection", "اختيار صور GIF"))
+                .setMessage(local(
+                    "Select between 2 and $MAX_GIF_FRAMES images to make a GIF. You selected ${uris.size}.",
+                    "لإنشاء GIF اختر من صورتين إلى $MAX_GIF_FRAMES صورة. عدد الصور المختارة: ${uris.size}.",
+                ))
+                .setPositiveButton(local("Select images again", "إعادة اختيار الصور")) { _, _ ->
+                    multiPicker.launch("image/*")
+                }
+                .setNegativeButton(local("Cancel", "إلغاء")) { _, _ -> finish() }
+                .setOnCancelListener { finish() }
+                .show()
+            return
+        }
         val action = when (tool) {
             ToolId.MERGE_IMAGES -> local("Merge", "دمج")
             ToolId.IMAGES_TO_PDF -> local("Create PDF", "إنشاء PDF")
