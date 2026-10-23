@@ -644,24 +644,35 @@ class ToolActivity : AppCompatActivity() {
 
     private fun imagesToGif(uris: List<Uri>) {
         runCatching {
-            val frames = uris.take(20).map { loadScaledBitmap(it, 720) }
-            val width = frames.maxOf { it.width }
-            val height = frames.maxOf { it.height }
-            val out = ByteArrayOutputStream()
-            val encoder = GifEncoder(out, width, height, 0)
-            val options = ImageOptions().apply { setDelay(350, TimeUnit.MILLISECONDS) }
-            frames.forEach { frame ->
-                val normalized = if (frame.width == width && frame.height == height) {
-                    frame
-                } else {
-                    Bitmap.createScaledBitmap(frame, width, height, true)
-                }
-                encoder.addImage(bitmapPixels(normalized), options)
-                if (normalized !== frame) normalized.recycle()
+            require(uris.size >= 2) {
+                local("Select at least two images to make an animated GIF",
+                    "اختر صورتين على الأقل لإنشاء GIF متحرك")
             }
-            encoder.finishEncoding()
-            frames.forEach(Bitmap::recycle)
-            saveBytes(out.toByteArray(), "Animated_${System.currentTimeMillis()}.gif", "image/gif")
+            // Cap size and number of frames to reduce memory pressure on phones.
+            val frames = mutableListOf<Bitmap>()
+            try {
+                uris.take(12).forEach { uri -> frames += loadScaledBitmap(uri, 480) }
+                val width = frames.maxOf { it.width }
+                val height = frames.maxOf { it.height }
+                val out = ByteArrayOutputStream()
+                val encoder = GifEncoder(out, width, height, 0)
+                val options = ImageOptions().apply { setDelay(350, TimeUnit.MILLISECONDS) }
+                frames.forEach { frame ->
+                    val normalized = if (frame.width == width && frame.height == height) frame
+                        else Bitmap.createScaledBitmap(frame, width, height, true)
+                    try {
+                        encoder.addImage(bitmapPixels(normalized), options)
+                    } finally {
+                        if (normalized !== frame) normalized.recycle()
+                    }
+                }
+                encoder.finishEncoding()
+                val bytes = out.toByteArray()
+                require(bytes.isNotEmpty()) { "GIF encoder produced no output" }
+                saveBytes(bytes, "Animated_${System.currentTimeMillis()}.gif", "image/gif")
+            } finally {
+                frames.forEach { if (!it.isRecycled) it.recycle() }
+            }
         }.onSuccess { toast(local("GIF saved", "تم حفظ GIF")) }
             .onFailure(::showError)
         finish()
