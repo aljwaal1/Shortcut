@@ -2084,14 +2084,23 @@ private fun RoutineBuilderScreen(
                 } else {
                     listOf("Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday")
                 }
-                LazyRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                    items(dayOptions.indices.toList()) { index ->
-                        FilterChip(
-                            selected = conditionValue == (index + 1).toString(),
-                            onClick = { conditionValue = (index + 1).toString() },
-                            label = { Text(dayOptions[index]) },
-                        )
-                    }
+                Button(
+                    onClick = {
+                        android.app.AlertDialog.Builder(context)
+                            .setTitle(if (ar) "اختر يوم الشرط" else "Choose condition weekday")
+                            .setSingleChoiceItems(dayOptions.toTypedArray(),
+                                (conditionValue.toIntOrNull() ?: 0) - 1) { dialog, index ->
+                                conditionValue = (index + 1).toString()
+                                dialog.dismiss()
+                            }
+                            .setNegativeButton(if (ar) "إلغاء" else "Cancel", null)
+                            .show()
+                    },
+                    modifier = Modifier.fillMaxWidth(),
+                ) {
+                    val day = (conditionValue.toIntOrNull() ?: 0) - 1
+                    Text(if (day in dayOptions.indices) dayOptions[day]
+                        else if (ar) "اضغط لاختيار اليوم" else "Tap to choose day")
                 }
             } else {
                 OutlinedTextField(
