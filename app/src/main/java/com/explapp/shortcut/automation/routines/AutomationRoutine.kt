@@ -139,6 +139,9 @@ data class RoutineAction(
         RoutineActionType.SHARE_TEXT -> value.isNotBlank()
         RoutineActionType.SHARE_FILE -> value.isNotBlank()
         RoutineActionType.WEB_SEARCH -> value.isNotBlank()
+        // Opening maps without a destination means showing the map itself.
+        // A destination is optional rather than an arbitrary package name.
+        RoutineActionType.OPEN_MAPS -> true
         else -> value.isNotBlank()
     }
 }
