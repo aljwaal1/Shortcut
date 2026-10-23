@@ -58,8 +58,8 @@ class FloatingVideoSetupActivity : AppCompatActivity() {
             textSize = 22f
         })
         layout.addView(TextView(this).apply {
-            text = if (ar) "اضغط الزر العائم لطلب موافقة تصوير الشاشة. ثم اضغطه مرة ثانية لإيقاف التسجيل وحفظ MP4 دون صوت. لا يمكن تجاوز موافقة أندرويد."
-                else "Tap the floating button to approve screen capture; tap again to stop and save a silent MP4. Android requires consent."
+            text = if (ar) "اضغط «تسجيل فيديو» ووافق على تصوير الشاشة، ثم استخدم أزرار «إيقاف مؤقت / استئناف» و«إنهاء وحفظ». بعد الحفظ ستجد «فتح» و«مشاركة» في إشعار النتيجة. يُحفظ MP4 دون صوت. موافقة أندرويد مطلوبة لكل جلسة."
+                else "Tap Record video and approve screen capture. Use Pause / Resume, then Finish and save. The saved notification has Open and Share. Video is a silent MP4. Android requires consent for each session."
             setPadding(0, 18, 0, 18)
         })
         fun add(text: String, act: () -> Unit) {
