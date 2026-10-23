@@ -116,11 +116,24 @@ internal object TelegramTdlibSession : TelegramPersonalClient {
     }
 
     private fun onAuthorizationUpdate(state: TdApi.AuthorizationState) {
+        val previous = authState
         authState = state
+        // Code timer must be based on a NEW authorization-code state, not
+        // reset every time the same state is observed. In particular, a
+        // rejected code should not leave the user waiting forever to resend.
         if (state is TdApi.AuthorizationStateWaitCode) {
-            resendAvailableAtMs = SystemClock.elapsedRealtime() + state.codeInfo.timeout.coerceAtLeast(0) * 1000L
+            val previousCode = previous as? TdApi.AuthorizationStateWaitCode
+            val sameDelivery = previousCode != null &&
+                previousCode.codeInfo.type.javaClass == state.codeInfo.type.javaClass &&
+                previousCode.codeInfo.nextType?.javaClass == state.codeInfo.nextType?.javaClass
+            if (!sameDelivery) {
+                resendAvailableAtMs = SystemClock.elapsedRealtime() +
+                    state.codeInfo.timeout.coerceAtLeast(0).toLong() * 1000L
+            }
         } else if (state is TdApi.AuthorizationStateWaitEmailCode) {
-            resendAvailableAtMs = SystemClock.elapsedRealtime()
+            if (previous !is TdApi.AuthorizationStateWaitEmailCode) {
+                resendAvailableAtMs = SystemClock.elapsedRealtime()
+            }
         }
         if (state is TdApi.AuthorizationStateWaitTdlibParameters) {
             val context = appContext ?: return
