@@ -16,6 +16,7 @@ import android.widget.LinearLayout
 import android.widget.ScrollView
 import android.widget.TextView
 import androidx.appcompat.app.AppCompatActivity
+import androidx.activity.OnBackPressedCallback
 import com.explapp.shortcut.automation.routines.TelegramPersonalCredentialVault
 import com.explapp.shortcut.automation.routines.TelegramPersonalDeliveryPolicy
 import com.explapp.shortcut.automation.routines.TelegramTdlibSession
@@ -51,6 +52,13 @@ class TelegramPersonalSetupActivity : AppCompatActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        // Back leaves the TDLib setup screen; it must not change the login
+        // state, log the user out, or restart the authorization wizard.
+        onBackPressedDispatcher.addCallback(this, object : OnBackPressedCallback(true) {
+            override fun handleOnBackPressed() {
+                finish()
+            }
+        })
         ar = resources.configuration.locales[0].language == "ar"
         val pad = (18 * resources.displayMetrics.density).toInt()
         layout = LinearLayout(this).apply {
@@ -58,6 +66,11 @@ class TelegramPersonalSetupActivity : AppCompatActivity() {
             setPadding(pad, pad, pad, pad)
         }
         setContentView(ScrollView(this).apply { addView(layout) })
+        val backToShortcut = Button(this).apply {
+            text = if (ar) "← العودة إلى Shortcut" else "← Back to Shortcut"
+            setOnClickListener { finish() }
+        }
+        layout.addView(backToShortcut, wide())
         heading = label("", 23f, true)
         guidance = label("", 15f)
         status = label("", 14f)
