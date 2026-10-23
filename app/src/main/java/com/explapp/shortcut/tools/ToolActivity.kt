@@ -46,6 +46,7 @@ import java.io.ByteArrayOutputStream
 import java.io.File
 import java.io.FileOutputStream
 import java.util.concurrent.TimeUnit
+import java.util.Locale
 import java.util.zip.ZipEntry
 import java.util.zip.ZipInputStream
 import java.util.zip.ZipOutputStream
@@ -367,9 +368,22 @@ class ToolActivity : AppCompatActivity() {
                 )
                 contentResolver.openOutputStream(output).use { raw ->
                     ZipOutputStream(requireNotNull(raw).buffered()).use { zip ->
+                        val usedNames = mutableSetOf<String>()
                         uris.forEachIndexed { index, uri ->
-                            val name = queryNameAndSize(uri).first.ifBlank { "file_$index" }
-                            zip.putNextEntry(ZipEntry(name))
+                            val rawName = queryNameAndSize(uri).first
+                            val baseName = rawName.replace('\\', '/').substringAfterLast('/')
+                                .trim().take(160).ifBlank { "file_$index" }
+                                .let { if (it == "." || it == "..") "file_$index" else it }
+                            val dot = baseName.lastIndexOf('.')
+                            val stem = if (dot > 0) baseName.substring(0, dot) else baseName
+                            val ext = if (dot > 0) baseName.substring(dot) else ""
+                            var uniqueName = baseName
+                            var suffix = 1
+                            while (!usedNames.add(uniqueName.lowercase(Locale.ROOT))) {
+                                uniqueName = "$stem ($suffix)$ext"
+                                suffix++
+                            }
+                            zip.putNextEntry(ZipEntry(uniqueName))
                             contentResolver.openInputStream(uri).use { input ->
                                 requireNotNull(input).copyTo(zip, DEFAULT_BUFFER_SIZE)
                             }
