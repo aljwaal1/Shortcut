@@ -31,6 +31,7 @@ enum class ToolId {
     URL_TO_PDF,
     MULTI_URL_TO_PDF,
     SCREENSHOT_CAPTURE,
+    SCREEN_VIDEO_RECORD,
 }
 
 data class ShortcutTool(
@@ -62,6 +63,7 @@ object ToolCatalog {
         ShortcutTool(ToolId.QR_CREATE, ToolSection.QUICK, "Create QR code", "إنشاء QR Code"),
         ShortcutTool(ToolId.CLIPBOARD, ToolSection.QUICK, "Clipboard tools", "أدوات الحافظة"),
         ShortcutTool(ToolId.SCREENSHOT_CAPTURE, ToolSection.QUICK, "Take screenshot", "التقاط لقطة شاشة"),
+        ShortcutTool(ToolId.SCREEN_VIDEO_RECORD, ToolSection.QUICK, "Floating screen recorder", "تسجيل فيديو الشاشة العائم"),
         ShortcutTool(ToolId.SCREENSHOT_OCR_SEARCH, ToolSection.QUICK, "Screenshot → OCR / Search", "لقطة شاشة → نص / بحث"),
         ShortcutTool(ToolId.WATER_EJECT, ToolSection.QUICK, "Water Eject", "طرد الماء"),
 
