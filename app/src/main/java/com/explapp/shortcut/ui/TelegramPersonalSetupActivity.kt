@@ -33,6 +33,8 @@ class TelegramPersonalSetupActivity : AppCompatActivity() {
     private lateinit var fieldOne: EditText
     private lateinit var fieldTwo: EditText
     private lateinit var secondary: Button
+    private lateinit var changeNumber: Button
+    private var editingPhoneWhileWaiting = false
     private val handler = Handler(Looper.getMainLooper())
     private var lastPhase = ""
     private var busy = false
@@ -67,6 +69,8 @@ class TelegramPersonalSetupActivity : AppCompatActivity() {
         layout.addView(primary, wide())
         secondary = Button(this)
         layout.addView(secondary, wide())
+        changeNumber = Button(this)
+        layout.addView(changeNumber, wide())
 
         val watcher = object : TextWatcher {
             override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) = Unit
@@ -87,6 +91,19 @@ class TelegramPersonalSetupActivity : AppCompatActivity() {
                 }
                 "code" -> resendCode()
             }
+        }
+        changeNumber.setOnClickListener {
+            if (busy) return@setOnClickListener
+            if (editingPhoneWhileWaiting) {
+                editingPhoneWhileWaiting = false
+                message = if (ar) "يمكنك إدخال الرمز الموجود أو إعادة إرساله إن سمح تيليجرام."
+                else "You can enter the received code or resend if Telegram permits it."
+            } else {
+                editingPhoneWhileWaiting = true
+                message = if (ar) "أدخل الرقم مجددًا مع مفتاح الدولة. هذا لا يحذف الأتمتات أو إعدادات التطبيق."
+                else "Re-enter your number with country code. Your automations and app settings are not deleted."
+            }
+            updateScreen()
         }
         // Do not request phone/code unless Telegram actually asks for them.
         if (TelegramPersonalCredentialVault.load(applicationContext) != null) {
@@ -117,7 +134,15 @@ class TelegramPersonalSetupActivity : AppCompatActivity() {
             layout.addView(it, wide())
         }
 
-    private fun phase(): String = when (TelegramTdlibSession.status()) {
+    private fun phase(): String {
+        val tdState = TelegramTdlibSession.status()
+        if (editingPhoneWhileWaiting &&
+            tdState in setOf("AuthorizationStateWaitCode", "AuthorizationStateWaitEmailCode",
+                "AuthorizationStateWaitPassword", "AuthorizationStateWaitPhoneNumber")) {
+            return "phone"
+        }
+        if (tdState == "AuthorizationStateReady") editingPhoneWhileWaiting = false
+        return when (tdState) {
         "AuthorizationStateReady" -> "ready"
         "AuthorizationStateWaitPhoneNumber" -> "phone"
         "AuthorizationStateWaitCode", "AuthorizationStateWaitEmailCode" -> "code"
@@ -125,6 +150,7 @@ class TelegramPersonalSetupActivity : AppCompatActivity() {
         "AuthorizationStateWaitEmailAddress" -> "email"
         "AuthorizationStateWaitOtherDeviceConfirmation" -> "other_device"
         else -> if (TelegramPersonalCredentialVault.load(applicationContext) == null) "api" else "connecting"
+        }
     }
 
     private fun updateScreen() {
@@ -134,7 +160,7 @@ class TelegramPersonalSetupActivity : AppCompatActivity() {
             busy = false
             fieldOne.text.clear()
             fieldTwo.text.clear()
-            message = ""
+            // Keep useful guidance when the user explicitly changes login mode.
         }
         heading.text = when (state) {
             "api" -> if (ar) "١. إعداد اتصال تيليجرام" else "1. Configure Telegram"
@@ -194,6 +220,17 @@ class TelegramPersonalSetupActivity : AppCompatActivity() {
             else -> if (ar) "بانتظار تيليجرام…" else "Waiting for Telegram…"
         }
         primary.visibility = if (state in setOf("api", "phone", "code", "password", "email")) View.VISIBLE else View.GONE
+        changeNumber.visibility = if (!editingPhoneWhileWaiting &&
+            TelegramTdlibSession.status() in setOf(
+                "AuthorizationStateWaitCode", "AuthorizationStateWaitEmailCode",
+                "AuthorizationStateWaitPassword")) View.VISIBLE
+            else if (editingPhoneWhileWaiting) View.VISIBLE else View.GONE
+        changeNumber.isEnabled = !busy
+        changeNumber.text = if (editingPhoneWhileWaiting) {
+            if (ar) "الرجوع إلى رمز التحقق" else "Back to verification code"
+        } else {
+            if (ar) "تغيير الرقم / بدء تسجيل الدخول من جديد" else "Change number / start again"
+        }
         secondary.visibility = if (state == "ready" || state == "code") View.VISIBLE else View.GONE
         if (state == "code") {
             val seconds = TelegramTdlibSession.codeResendRemainingSeconds()
@@ -273,7 +310,7 @@ class TelegramPersonalSetupActivity : AppCompatActivity() {
         Thread {
             val ok = when (state) {
                 "api" -> TelegramTdlibSession.open(applicationContext, one.toInt(), two)
-                "phone" -> TelegramTdlibSession.providePhone(one)
+                "phone" -> TelegramTdlibSession.requestPhoneNumber(one)
                 "code" -> TelegramTdlibSession.provideCode(one)
                 "password" -> TelegramTdlibSession.providePassword(one)
                 "email" -> false // TDLib email authorization varies; do not fake success.
@@ -282,6 +319,7 @@ class TelegramPersonalSetupActivity : AppCompatActivity() {
             runOnUiThread {
                 busy = false
                 if (state == "api" && ok) fieldTwo.text.clear()
+                if (state == "phone" && ok) editingPhoneWhileWaiting = false
                 if (state in setOf("code", "password")) fieldOne.text.clear()
                 message = if (ok) {
                     if (ar) "تم إرسال الطلب. بانتظار تأكيد تيليجرام…" else "Request sent. Awaiting Telegram response…"
