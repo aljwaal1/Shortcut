@@ -610,9 +610,19 @@ class PersistentScreenCaptureService : Service() {
             // not when Android accepted the service launch. Never mark a
             // user-share chooser complete before the user sends it.
             if (pendingRoutineId.isNotBlank() && !userSharePending) {
-                val finalStatus = if (result.status == com.explapp.shortcut.execution.TaskExecutionStatus.SUCCESS)
-                    RoutineRunStatus.SUCCESS else RoutineRunStatus.FAILED
-                RoutineProgressStore(applicationContext).finish(pendingRoutineId, finalStatus)
+                val original = runCatching {
+                    com.explapp.shortcut.automation.routines.RoutineStore(applicationContext)
+                        .load().firstOrNull { it.id == pendingRoutineId }
+                }.getOrNull()
+                // A single screenshot can finish after its asynchronous delivery.
+                // A multi-action routine must never be declared fully successful
+                // when only one asynchronous action has completed.
+                if (original?.actions?.size == 1 &&
+                    original.actions.first().type == com.explapp.shortcut.automation.routines.RoutineActionType.OPEN_APP_SCREENSHOT) {
+                    val finalStatus = if (result.status == com.explapp.shortcut.execution.TaskExecutionStatus.SUCCESS)
+                        RoutineRunStatus.SUCCESS else RoutineRunStatus.FAILED
+                    RoutineProgressStore(applicationContext).finish(pendingRoutineId, finalStatus)
+                }
             }
             // The original queued capture reached a terminal result; remove
             // its persistent Retry notification, not other routines' notices.
