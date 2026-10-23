@@ -147,6 +147,10 @@ class ToolActivity : AppCompatActivity() {
             ToolId.IMAGE_OCR, ToolId.IMAGE_TO_JPEG, ToolId.IMAGE_INFO,
             ToolId.IMAGE_RESIZE_COMPRESS, ToolId.IMAGE_CROP -> imagePicker.launch("image/*")
             ToolId.PDF_TEXT -> pdfPicker.launch("application/pdf")
+            ToolId.PDF_SPLIT -> {
+                startActivity(Intent(this, PdfSplitActivity::class.java))
+                finish()
+            }
             ToolId.ZIP_FILES -> filesPicker.launch(arrayOf("*/*"))
             ToolId.UNZIP_FILES -> zipPicker.launch("application/zip")
             ToolId.QR_CREATE -> promptQr()

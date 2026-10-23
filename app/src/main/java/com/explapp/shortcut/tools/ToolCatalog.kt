@@ -7,6 +7,7 @@ enum class ToolId {
     IMAGES_TO_PDF,
     IMAGE_OCR,
     PDF_TEXT,
+    PDF_SPLIT,
     ZIP_FILES,
     UNZIP_FILES,
     IMAGE_TO_JPEG,
@@ -55,6 +56,7 @@ object ToolCatalog {
         ShortcutTool(ToolId.LATEST_SCREENSHOT, ToolSection.IMAGES, "Share latest screenshot", "مشاركة آخر لقطة شاشة"),
 
         ShortcutTool(ToolId.PDF_TEXT, ToolSection.PDF_FILES, "Extract text from PDF", "استخراج النص من PDF"),
+        ShortcutTool(ToolId.PDF_SPLIT, ToolSection.PDF_FILES, "Split PDF pages / chapters", "تقسيم PDF إلى صفحات أو فصول"),
         ShortcutTool(ToolId.ZIP_FILES, ToolSection.PDF_FILES, "Create ZIP", "إنشاء ZIP"),
         ShortcutTool(ToolId.UNZIP_FILES, ToolSection.PDF_FILES, "Unzip files", "فك ZIP"),
         ShortcutTool(ToolId.URL_TO_PDF, ToolSection.PDF_FILES, "Open URL for Print → PDF", "فتح الرابط للطباعة ← PDF"),

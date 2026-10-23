@@ -24,4 +24,10 @@ class ToolCatalogTest {
         assertEquals("My automations", automations.titleEn)
         assertTrue(usage.titleAr != automations.titleAr)
     }
+
+    @Test fun pdfSplitAvailableInPdfSection() {
+        val item = ToolCatalog.all().single { it.id == ToolId.PDF_SPLIT }
+        assertEquals(ToolSection.PDF_FILES, item.section)
+        assertTrue(item.titleAr.contains("PDF"))
+    }
 }

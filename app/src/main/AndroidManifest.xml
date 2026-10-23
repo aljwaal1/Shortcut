@@ -102,6 +102,7 @@
         <activity android:name=".tools.NfcSetupActivity" android:exported="false" />
         <activity android:name=".tools.ScreenCaptureActivity" android:exported="false" />
         <activity android:name=".tools.ImageBatchActivity" android:exported="false" />
+        <activity android:name=".tools.PdfSplitActivity" android:exported="false" />
         <activity android:name=".tools.QuickFileActivity" android:exported="false" />
         <activity android:name=".tools.ImageCropActivity" android:exported="false" />
         <activity android:name=".tools.JpegConvertActivity" android:exported="false" />
