@@ -2153,31 +2153,23 @@ private fun RoutineBuilderScreen(
             ) {
                 Text(if (ar) "بحث وتصفح جميع الإجراءات" else "Search and browse all actions")
             }
-            OutlinedTextField(
-                value = actionSearch,
-                onValueChange = { actionSearch = it },
-                label = { Text(if (ar) "بحث سريع" else "Quick search") },
-                placeholder = { Text(if (ar) "ملف، مشاركة، نص، صورة، ويب، متغير..." else "File, share, text, image, web, variable...") },
-                modifier = Modifier.fillMaxWidth(),
-            )
+
         }
 
         item {
-            val grouped = visibleActionMeta.groupBy { if (ar) it.categoryAr else it.categoryEn }
-            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                grouped.forEach { (category, metas) ->
-                    Text(category, style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.Bold)
-                    LazyRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                        items(metas) { meta ->
-                            FilterChip(
-                                selected = actionType == meta.type,
-                                onClick = { actionType = meta.type; resetActionEditor() },
-                                label = { Text(if (ar) meta.titleAr else meta.titleEn) },
-                            )
-                        }
-                    }
-                }
-            }
+            // Mobile-first: one searchable action chooser rather than dozens of
+            // small, horizontal chips that conceal which action is selected.
+            val selected = RoutineCatalog.meta(actionType)
+            Text(
+                (if (ar) "الإجراء الحالي: " else "Current action: ") +
+                    (if (ar) selected.titleAr else selected.titleEn),
+                fontWeight = FontWeight.Bold,
+            )
+            ClearHint(
+                if (ar) "اضغط «بحث وتصفح جميع الإجراءات» لتغيير الإجراء. يُعرض محرر واحد واضح للإجراء المحدد."
+                else "Tap Browse all actions to switch. Only the selected action's editor is shown.",
+                ar,
+            )
         }
 
         item {
