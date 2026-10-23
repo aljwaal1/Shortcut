@@ -2943,9 +2943,12 @@ private fun RoutineBuilderScreen(
     if (showActionPicker) {
         val pickerItems = RoutineCatalog.actions.filter {
             actionPickerSearch.isBlank() ||
-                (if (ar) it.titleAr else it.titleEn).contains(actionPickerSearch, ignoreCase = true) ||
-                (if (ar) it.categoryAr else it.categoryEn).contains(actionPickerSearch, ignoreCase = true) ||
-                (if (ar) it.hintAr else it.hintEn).contains(actionPickerSearch, ignoreCase = true)
+                it.titleAr.contains(actionPickerSearch, ignoreCase = true) ||
+                it.titleEn.contains(actionPickerSearch, ignoreCase = true) ||
+                it.categoryAr.contains(actionPickerSearch, ignoreCase = true) ||
+                it.categoryEn.contains(actionPickerSearch, ignoreCase = true) ||
+                it.hintAr.contains(actionPickerSearch, ignoreCase = true) ||
+                it.hintEn.contains(actionPickerSearch, ignoreCase = true)
         }
         AlertDialog(
             onDismissRequest = { showActionPicker = false },
@@ -2960,6 +2963,7 @@ private fun RoutineBuilderScreen(
                         modifier = Modifier.fillMaxWidth(),
                     )
                     Spacer(Modifier.height(8.dp))
+                    if (pickerItems.isEmpty()) Text(if (ar) "لا توجد إجراءات مطابقة للبحث" else "No matching actions")
                     LazyColumn {
                         items(pickerItems) { meta ->
                             TextButton(
@@ -2998,7 +3002,8 @@ private fun RoutineBuilderScreen(
     if (showToolPicker) {
         val tools = ToolCatalog.all().filter {
             toolPickerSearch.isBlank() ||
-                (if (ar) it.titleAr else it.titleEn).contains(toolPickerSearch, ignoreCase = true) ||
+                it.titleAr.contains(toolPickerSearch, ignoreCase = true) ||
+                it.titleEn.contains(toolPickerSearch, ignoreCase = true) ||
                 it.id.name.contains(toolPickerSearch, ignoreCase = true)
         }
         AlertDialog(
@@ -3014,6 +3019,7 @@ private fun RoutineBuilderScreen(
                         modifier = Modifier.fillMaxWidth(),
                     )
                     Spacer(Modifier.height(8.dp))
+                    if (tools.isEmpty()) Text(if (ar) "لا توجد أدوات مطابقة للبحث" else "No matching tools")
                     LazyColumn {
                         items(tools) { tool ->
                             TextButton(
