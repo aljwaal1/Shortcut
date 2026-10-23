@@ -262,6 +262,11 @@ class PersistentScreenCaptureService : Service() {
         )
         setActive(true)
         updateNotification()
+        // The same user-approved command can now safely resume the original
+        // automation only AFTER projection, reader and display exist.
+        if (intent.getBooleanExtra(EXTRA_RESUME_AFTER_CONSENT, false)) {
+            requestCapture(intent)
+        }
     }
 
     private fun requestCapture(intent: Intent) {
@@ -674,6 +679,7 @@ class PersistentScreenCaptureService : Service() {
         const val ACTION_CAPTURE = "com.explapp.shortcut.PERSISTENT_CAPTURE"
         const val ACTION_STOP_SESSION = "com.explapp.shortcut.STOP_PERSISTENT_CAPTURE"
 
+        const val EXTRA_RESUME_AFTER_CONSENT = "resumeAfterConsent"
         const val EXTRA_RESULT_CODE = "resultCode"
         const val EXTRA_DATA = "data"
         const val EXTRA_LAUNCH_PACKAGE = "launchPackage"
