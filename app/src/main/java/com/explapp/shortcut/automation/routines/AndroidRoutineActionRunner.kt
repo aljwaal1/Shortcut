@@ -286,6 +286,17 @@ class AndroidRoutineActionRunner(
         }.getOrElse {
             return RoutineActionResult.failure(action, local("Could not access the file", "تعذر الوصول إلى الملف"))
         }
+        // A saved SAF content URI can outlive process restarts only while
+        // Android retains the read grant. Fail with a useful message if the
+        // original file was moved, deleted, or permission was revoked.
+        val readable = runCatching {
+            context.contentResolver.openFileDescriptor(uri, "r")?.use { true } ?: false
+        }.getOrDefault(false)
+        if (!readable) return RoutineActionResult.failure(
+            action,
+            local("File is missing or access has expired; edit the automation and choose it again",
+                "الملف غير موجود أو انتهت صلاحية الوصول إليه؛ عدّل الأتمتة واختر الملف من جديد"),
+        )
         val intent = Intent(Intent.ACTION_SEND).apply {
             type = action.parameters["mime"].orEmpty().ifBlank { "*/*" }
             putExtra(Intent.EXTRA_STREAM, uri)
@@ -295,7 +306,10 @@ class AndroidRoutineActionRunner(
         return if (userInitiated) {
             runCatching {
                 context.startActivity(Intent.createChooser(intent, local("Share file", "مشاركة الملف")).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
-                RoutineActionResult.success(action)
+                // Opening Android's chooser does not prove the receiving app
+                // accepted or sent the file. Keep the run pending.
+                RoutineActionResult.prepared(action, local("Choose an app and complete sharing",
+                    "اختر تطبيق المشاركة وأكمل الإرسال يدويًا"))
             }.getOrElse { RoutineActionResult.failure(action, it.message ?: local("Could not open sharing", "تعذر فتح المشاركة")) }
         } else {
             if (showNotification(local("File ready to share", "الملف جاهز للمشاركة"), local("Tap to choose where to share it", "اضغط لاختيار جهة المشاركة"), intent)) {
