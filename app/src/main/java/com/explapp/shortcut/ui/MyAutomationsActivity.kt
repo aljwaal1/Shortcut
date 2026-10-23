@@ -1228,12 +1228,27 @@ private fun DailyScreenshotTelegramWizard(
     }
 
     if (showAppPicker) {
+        var appPickerSearch by remember { mutableStateOf("") }
+        val filteredApps = installedApps.filter { app ->
+            appPickerSearch.isBlank() || app.label.contains(appPickerSearch, ignoreCase = true) ||
+                app.packageName.contains(appPickerSearch, ignoreCase = true)
+        }
         AlertDialog(
             onDismissRequest = { showAppPicker = false },
             title = { Text(if (ar) "اختر التطبيق" else "Choose app") },
             text = {
-                LazyColumn {
-                    items(installedApps, key = { it.packageName }) { app ->
+                Column {
+                    OutlinedTextField(
+                        value = appPickerSearch,
+                        onValueChange = { appPickerSearch = it },
+                        label = { Text(if (ar) "بحث عن تطبيق" else "Search apps") },
+                        placeholder = { Text(if (ar) "اكتب اسم التطبيق" else "Type an app name") },
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth(),
+                    )
+                    if (filteredApps.isEmpty()) Text(if (ar) "لا توجد نتائج" else "No matching apps")
+                    LazyColumn {
+                        items(filteredApps, key = { it.packageName }) { app ->
                         TextButton(
                             onClick = {
                                 appPackage = app.packageName
@@ -1244,6 +1259,7 @@ private fun DailyScreenshotTelegramWizard(
                             Text(app.label)
                         }
                     }
+                }
                 }
             },
             confirmButton = {
@@ -1640,12 +1656,27 @@ private fun SimpleAppScreenshotWizard(
     }
 
     if (showAppPicker) {
+        var appPickerSearch by remember { mutableStateOf("") }
+        val filteredApps = installedApps.filter { app ->
+            appPickerSearch.isBlank() || app.label.contains(appPickerSearch, ignoreCase = true) ||
+                app.packageName.contains(appPickerSearch, ignoreCase = true)
+        }
         AlertDialog(
             onDismissRequest = { showAppPicker = false },
             title = { Text(if (ar) "اختر التطبيق" else "Choose app") },
             text = {
-                LazyColumn {
-                    items(installedApps, key = { it.packageName }) { app ->
+                Column {
+                    OutlinedTextField(
+                        value = appPickerSearch,
+                        onValueChange = { appPickerSearch = it },
+                        label = { Text(if (ar) "بحث عن تطبيق" else "Search apps") },
+                        placeholder = { Text(if (ar) "اكتب اسم التطبيق" else "Type an app name") },
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth(),
+                    )
+                    if (filteredApps.isEmpty()) Text(if (ar) "لا توجد نتائج" else "No matching apps")
+                    LazyColumn {
+                        items(filteredApps, key = { it.packageName }) { app ->
                         TextButton(
                             onClick = {
                                 appPackage = app.packageName
@@ -1656,6 +1687,7 @@ private fun SimpleAppScreenshotWizard(
                             Text(app.label)
                         }
                     }
+                }
                 }
             },
             confirmButton = {
@@ -3007,12 +3039,27 @@ private fun RoutineBuilderScreen(
     }
 
     if (showAppPicker) {
+        var appPickerSearch by remember { mutableStateOf("") }
+        val filteredApps = installedApps.filter { app ->
+            appPickerSearch.isBlank() || app.label.contains(appPickerSearch, ignoreCase = true) ||
+                app.packageName.contains(appPickerSearch, ignoreCase = true)
+        }
         AlertDialog(
             onDismissRequest = { showAppPicker = false },
             title = { Text(if (ar) "اختر التطبيق" else "Choose app") },
             text = {
-                LazyColumn {
-                    items(installedApps, key = { it.packageName }) { app ->
+                Column {
+                    OutlinedTextField(
+                        value = appPickerSearch,
+                        onValueChange = { appPickerSearch = it },
+                        label = { Text(if (ar) "بحث عن تطبيق" else "Search apps") },
+                        placeholder = { Text(if (ar) "اكتب اسم التطبيق" else "Type an app name") },
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth(),
+                    )
+                    if (filteredApps.isEmpty()) Text(if (ar) "لا توجد نتائج" else "No matching apps")
+                    LazyColumn {
+                        items(filteredApps, key = { it.packageName }) { app ->
                         TextButton(
                             onClick = {
                                 value = app.packageName
@@ -3022,6 +3069,7 @@ private fun RoutineBuilderScreen(
                             modifier = Modifier.fillMaxWidth(),
                         ) { Text(app.label) }
                     }
+                }
                 }
             },
             confirmButton = { TextButton(onClick = { showAppPicker = false }) { Text(if (ar) "إلغاء" else "Cancel") } },
