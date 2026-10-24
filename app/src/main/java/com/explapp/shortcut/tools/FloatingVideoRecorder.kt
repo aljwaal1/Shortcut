@@ -101,6 +101,9 @@ class FloatingVideoSetupActivity : AppCompatActivity() {
         }
         add(if (ar) "بدء تسجيل بدون زر عائم" else "Start recording without bubble") {
             if (!savePointerChoice()) return@add
+            // Explicitly hide the overlay even if the previous session used compact mode.
+            getSharedPreferences("screen_video", MODE_PRIVATE).edit()
+                .putBoolean("compact_bubble", false).apply()
             startActivity(Intent(this, VideoRecordingPermissionActivity::class.java))
             finish()
         }
@@ -175,14 +178,17 @@ class FloatingVideoBubbleService : Service() {
     private var compactButton: Button? = null
     private var expanded = false
     private var hiddenForCapture = false
+    private var wasRecording = false
     private val main = Handler(Looper.getMainLooper())
     private val refresh = object : Runnable {
         override fun run() {
             bubble?.let {
                 val recording = ScreenVideoRecordingService.isRecording
-                // Remove ALL controls from recorded frames, including Pause and Stop.
-                // Recording remains controllable from the foreground notification.
+                // FLAG_SECURE overlays produce black rectangles in screen recordings.
+                // Hide this window unless the user opted into a visible compact bubble.
                 val compact = getSharedPreferences("screen_video", MODE_PRIVATE).getBoolean("compact_bubble", false)
+                if (recording && !wasRecording) expanded = false
+                wasRecording = recording
                 it.visibility = if (VideoOverlayPolicy.showControlBubble(recording, hiddenForCapture, compact))
                     android.view.View.VISIBLE else android.view.View.GONE
                 val controlsVisible = expanded
@@ -277,8 +283,7 @@ class FloatingVideoBubbleService : Service() {
         val options = WindowManager.LayoutParams(
             WindowManager.LayoutParams.WRAP_CONTENT, WindowManager.LayoutParams.WRAP_CONTENT,
             WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY,
-            WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or WindowManager.LayoutParams.FLAG_NOT_TOUCH_MODAL or
-                WindowManager.LayoutParams.FLAG_SECURE,
+            WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or WindowManager.LayoutParams.FLAG_NOT_TOUCH_MODAL,
             PixelFormat.TRANSLUCENT
         ).apply {
             gravity = Gravity.TOP or Gravity.START
