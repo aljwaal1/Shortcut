@@ -20,18 +20,18 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           mkdir -p dist
-          gh run download 40074634260 --repo "${{ github.repository }}" --name shortcut-debug-apk --dir dist
+          gh run download 40119654287 --repo "${{ github.repository }}" --name shortcut-debug-apk --dir dist
           test -s dist/app-debug.apk
           unzip -t dist/app-debug.apk >/dev/null
-          mv dist/app-debug.apk dist/Shortcut-2020-Speed.apk
+          mv dist/app-debug.apk dist/Shortcut-0.9.12.apk
 
       - name: Publish APK as prerelease for direct browser downloads
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          gh release create "shortcut-2020-preview" dist/Shortcut-2020-Speed.apk \
+          gh release create "v0.9.12" dist/Shortcut-0.9.12.apk \
             --repo "${{ github.repository }}" \
-            --title "Shortcut Android APK Build 2020 (speed improvements)" \
-            --notes "Verified Android CI build #2020. Improved event-trigger automation dispatch and screenshot template startup. Debug-signed preview; measure real-world latency on device." \
-            --target e408b5be9d54979264545e2e4184e6ce6ae6f662 \
+            --title "Shortcut Android v0.9.12 (screen recorder overlay fix)" \
+            --notes "Verified Android CI build #2030. Fixed black recording-overlay rectangle, added explicit small or hidden recording controls, and preserved offline translation tools. Debug-signed preview; on-device recording validation remains necessary." \
+            --target c1d1774e4175c2c2e7a597020d74a50d2d6331b6 \
             --prerelease
