@@ -1296,7 +1296,7 @@ private fun SimpleAppScreenshotWizard(
     var time by remember { mutableStateOf("") }
     var repeat by remember { mutableStateOf(RoutineRepeat.DAILY) }
     var repeatValue by remember { mutableStateOf("") }
-    var delayMs by remember { mutableStateOf("3000") }
+    var delayMs by remember { mutableStateOf("2000") }
     var shareAfterSave by remember { mutableStateOf(false) }
     var showAppPicker by remember { mutableStateOf(false) }
     var pendingRoutine by remember { mutableStateOf<AutomationRoutine?>(null) }
@@ -2276,7 +2276,7 @@ private fun RoutineBuilderScreen(
                                 Text(selectedLabel ?: if (ar) "اختر التطبيق" else "Choose app")
                             }
                             if (actionType == RoutineActionType.OPEN_APP_SCREENSHOT) {
-                                DelayChips(ar, secondary.ifBlank { "3000" }) { secondary = it }
+                                DelayChips(ar, secondary.ifBlank { "2000" }) { secondary = it }
                                 Row(verticalAlignment = Alignment.CenterVertically) {
                                     Text(
                                         if (ar) "كتابة التاريخ والوقت على الصورة" else "Stamp date and time on image",
@@ -3069,7 +3069,7 @@ private fun RoutineBuilderScreen(
                         TextButton(
                             onClick = {
                                 value = app.packageName
-                                if (actionType == RoutineActionType.OPEN_APP_SCREENSHOT && secondary.isBlank()) secondary = "3000"
+                                if (actionType == RoutineActionType.OPEN_APP_SCREENSHOT && secondary.isBlank()) secondary = "2000"
                                 showAppPicker = false
                             },
                             modifier = Modifier.fillMaxWidth(),

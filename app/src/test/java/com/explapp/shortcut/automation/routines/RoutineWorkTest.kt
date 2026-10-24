@@ -34,6 +34,22 @@ class RoutineWorkTest {
             RoutineWork.uniqueName("routine-b"),
         )
     }
+
+    @Test
+    fun eventDispatchUsesOnlyEligibleRoutinesInOriginalOrder() {
+        val event = RoutineEvent(RoutineTriggerType.CHARGER_CONNECTED)
+        val eligible = AutomationRoutine(
+            name = "Charging", trigger = RoutineTrigger(RoutineTriggerType.CHARGER_CONNECTED),
+            actions = listOf(RoutineAction(RoutineActionType.SHOW_NOTIFICATION, "Charged")),
+        )
+        val disabled = eligible.copy(id = "disabled", isEnabled = false)
+        val differentEvent = eligible.copy(id = "manual", trigger = RoutineTrigger(RoutineTriggerType.MANUAL))
+        val another = eligible.copy(id = "second")
+        assertEquals(
+            listOf(eligible.id, another.id),
+            RoutineWork.matchingRoutines(listOf(disabled, eligible, differentEvent, another), event).map { it.id },
+        )
+    }
     @Test
     fun oneShotTimeRoutineIsDisabledAfterAttempt() {
         val once = AutomationRoutine(

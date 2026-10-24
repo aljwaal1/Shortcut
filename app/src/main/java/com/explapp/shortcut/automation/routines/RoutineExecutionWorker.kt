@@ -4,6 +4,7 @@ import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.content.Context
 import android.os.Build
+import android.os.SystemClock
 import com.explapp.shortcut.execution.TaskExecutionReporter
 import com.explapp.shortcut.execution.TaskExecutionResult
 import androidx.core.app.NotificationCompat
@@ -56,11 +57,15 @@ class RoutineExecutionWorker(
             ?: return@withContext Result.success()
 
         val reporter = TaskExecutionReporter(applicationContext)
+        val enqueuedElapsedMs = inputData.getLong(KEY_ENQUEUED_ELAPSED_MS, -1L)
+        val queueWaitMs = (SystemClock.elapsedRealtime() - enqueuedElapsedMs)
+            .takeIf { enqueuedElapsedMs >= 0L && it >= 0L }
         reporter.report(
             TaskExecutionResult.prepared(
                 routine.name + " / WORKER",
                 System.currentTimeMillis(),
-                details = listOf("EVENT = WORKER_STARTED", "ROUTINE_ID = ${routine.id}", "RUN_SOURCE = SCHEDULED"),
+                details = listOf("EVENT = WORKER_STARTED", "ROUTINE_ID = ${routine.id}", "RUN_SOURCE = SCHEDULED") +
+                    listOfNotNull(queueWaitMs?.let { "QueueWaitMs = $it" }),
             ), notifyUser = false,
         )
 
@@ -104,6 +109,7 @@ class RoutineExecutionWorker(
 
     companion object {
         const val KEY_ROUTINE_ID = "routine_id"
+        const val KEY_ENQUEUED_ELAPSED_MS = "enqueued_elapsed_ms"
         private const val CHANNEL_ID = "routine_worker"
         private const val NOTIFICATION_ID = 9411
     }
@@ -114,21 +120,29 @@ object RoutineWork {
         if (routineId.isBlank()) return
         val routine = RoutineStore(context.applicationContext).load()
             .firstOrNull { it.id == routineId && it.isEnabled && it.isValid() } ?: return
+        enqueueValidated(context, routine)
+    }
+
+    private fun enqueueValidated(context: Context, routine: AutomationRoutine) {
         val needsNetwork = requiresNetwork(routine)
+        val enqueuedElapsedMs = SystemClock.elapsedRealtime()
         val request = OneTimeWorkRequestBuilder<RoutineExecutionWorker>()
             .setConstraints(
                 Constraints.Builder()
                     .setRequiredNetworkType(if (needsNetwork) NetworkType.CONNECTED else NetworkType.NOT_REQUIRED)
                     .build(),
             )
-            .setInputData(workDataOf(RoutineExecutionWorker.KEY_ROUTINE_ID to routineId))
+            .setInputData(workDataOf(
+                RoutineExecutionWorker.KEY_ROUTINE_ID to routine.id,
+                RoutineExecutionWorker.KEY_ENQUEUED_ELAPSED_MS to enqueuedElapsedMs,
+            ))
             .setExpedited(OutOfQuotaPolicy.RUN_AS_NON_EXPEDITED_WORK_REQUEST)
             .addTag(TAG)
             .build()
 
         val enqueueResult = runCatching {
             WorkManager.getInstance(context.applicationContext).enqueueUniqueWork(
-                uniqueName(routineId),
+                uniqueName(routine.id),
                 ExistingWorkPolicy.KEEP,
                 request,
             )
@@ -155,11 +169,12 @@ object RoutineWork {
     }
 
     fun enqueueMatching(context: Context, event: RoutineEvent) {
-        RoutineStore(context.applicationContext)
-            .load()
-            .filter { RoutineTriggerMatcher.matches(it, event) }
-            .forEach { enqueue(context, it.id) }
+        val routines = RoutineStore(context.applicationContext).load()
+        matchingRoutines(routines, event).forEach { enqueueValidated(context, it) }
     }
+
+    internal fun matchingRoutines(routines: List<AutomationRoutine>, event: RoutineEvent): List<AutomationRoutine> =
+        routines.filter { RoutineTriggerMatcher.matches(it, event) }
 
     internal fun requiresNetwork(routine: AutomationRoutine): Boolean =
         routine.actions.any { it.type == RoutineActionType.SEND_TELEGRAM_BOT }

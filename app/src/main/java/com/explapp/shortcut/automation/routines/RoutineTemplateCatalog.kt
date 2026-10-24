@@ -94,7 +94,7 @@ object RoutineTemplateCatalog {
                 RoutineAction(
                     RoutineActionType.OPEN_APP_SCREENSHOT,
                     "",
-                    "3000",
+                    "2000",
                     parameters = mapOf("stampDateTime" to "true", "persistentCapture" to "false"),
                 ),
             ),

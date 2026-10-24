@@ -34,4 +34,11 @@ class RoutineTemplateCatalogTest {
         assertNotNull(runCatching { ToolId.valueOf(action.value) }.getOrNull())
         assertEquals(ToolId.APP_OPEN_ROUTINE, ToolId.valueOf(action.value))
     }
+
+    @Test
+    fun guidedAppCaptureStartsWithFastTwoSecondDelay() {
+        val action = RoutineTemplateCatalog.templates()
+            .first { it.name == "Open app + dated screenshot" }.actions.single()
+        assertEquals("2000", action.secondaryValue)
+    }
 }
