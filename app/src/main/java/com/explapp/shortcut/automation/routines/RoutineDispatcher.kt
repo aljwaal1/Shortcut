@@ -1,0 +1,179 @@
+package com.explapp.shortcut.automation.routines
+
+import android.content.Context
+import com.explapp.shortcut.execution.TaskExecutionReporter
+import java.util.concurrent.ConcurrentHashMap
+
+class RoutineDispatcher(private val context: Context) {
+    fun executeAsync(
+        routine: AutomationRoutine,
+        userInitiated: Boolean,
+        onComplete: ((RoutineRunResult) -> Unit)? = null,
+    ) {
+        Thread {
+            val result = runCatching { execute(routine, userInitiated) }.getOrElse { error ->
+                runCatching {
+                    TaskExecutionReporter(context).report(
+                        com.explapp.shortcut.execution.TaskExecutionResult.failure(
+                            routine.name,
+                            error.message ?: error.javaClass.simpleName,
+                            System.currentTimeMillis(),
+                            details = listOf(
+                                "EVENT = DISPATCH_CRASH",
+                                "RUN_SOURCE = " + if (userInitiated) "MANUAL" else "SCHEDULED",
+                                "ROUTINE_ID = ${routine.id}",
+                            ),
+                        ),
+                    )
+                }
+                RoutineRunResult(
+                    routineId = routine.id,
+                    routineName = routine.name,
+                    status = RoutineRunStatus.FAILED,
+                    actionResults = emptyList(),
+                    startedAtMs = System.currentTimeMillis(),
+                    finishedAtMs = System.currentTimeMillis(),
+                )
+            }
+            runCatching { onComplete?.invoke(result) }
+        }.start()
+    }
+
+    fun dispatch(event: RoutineEvent): List<RoutineRunResult> = RoutineStore(context)
+        .load()
+        .filter { RoutineTriggerMatcher.matches(it, event) }
+        .map { execute(it, userInitiated = false) }
+
+    fun execute(routine: AutomationRoutine, userInitiated: Boolean, resumeSafeWaits: Boolean = false): RoutineRunResult {
+        val startedAt = System.currentTimeMillis()
+        if (!runningRoutineIds.add(routine.id)) {
+            val finishedAt = System.currentTimeMillis()
+            runCatching {
+                TaskExecutionReporter(context).report(
+                    com.explapp.shortcut.execution.TaskExecutionResult.failure(
+                        routine.name,
+                        "Another run of this routine is already in progress; duplicate request rejected",
+                        startedAt,
+                        details = listOf(
+                            "EVENT = CONCURRENT_RUN_REJECTED",
+                            "RUN_SOURCE = " + if (userInitiated) "MANUAL" else "SCHEDULED",
+                            "ROUTINE_ID = ${routine.id}",
+                        ),
+                    ),
+                )
+            }
+            // Duplicate dispatch is skipped; do not add a misleading PREPARED record.
+            return RoutineRunResult(
+                routineId = routine.id,
+                routineName = routine.name,
+                status = RoutineRunStatus.PREPARED,
+                actionResults = emptyList(),
+                startedAtMs = startedAt,
+                finishedAtMs = finishedAt,
+            )
+        }
+
+        return try {
+            val progress = RoutineProgressStore(context)
+            val resumeIndex = if (resumeSafeWaits) progress.safeResumeIndex(routine) else null
+            if (resumeSafeWaits && resumeIndex == null) {
+                return RoutineRunResult(
+                    routine.id, routine.name, RoutineRunStatus.FAILED,
+                    emptyList(), startedAt, System.currentTimeMillis(),
+                )
+            }
+            if (!resumeSafeWaits) {
+                // A scheduled dispatch must not erase an uncertain checkpoint from a
+                // previous process crash: that could replay an external side effect.
+                if (progress.snapshot(routine.id)?.status == "UNCERTAIN") {
+                    // A previous asynchronous capture/send may already have reached
+                    // Telegram. Do not silently replay a potentially irreversible
+                    // action. Make the blocked scheduled attempt visible in Debug.
+                    runCatching {
+                        TaskExecutionReporter(context).report(
+                            com.explapp.shortcut.execution.TaskExecutionResult.failure(
+                                routine.name,
+                                "Previous execution is UNCERTAIN; manual review required before another send",
+                                startedAt,
+                                details = listOf(
+                                    "EVENT = BLOCKED_UNCERTAIN_CHECKPOINT",
+                                    "RUN_SOURCE = " + if (userInitiated) "MANUAL" else "SCHEDULED",
+                                    "ROUTINE_ID = ${routine.id}",
+                                    "ACTION = Open the routine and explicitly confirm a new attempt",
+                                ),
+                            ),
+                        )
+                    }
+                    return RoutineRunResult(
+                        routine.id, routine.name, RoutineRunStatus.FAILED,
+                        emptyList(), startedAt, System.currentTimeMillis(),
+                    )
+                }
+                if (!progress.begin(routine)) {
+                    return RoutineRunResult(
+                        routine.id, routine.name, RoutineRunStatus.FAILED,
+                        emptyList(), startedAt, System.currentTimeMillis(),
+                    )
+                }
+            }
+            var checkpointWriteFailed = false
+            var executorCrashed = false
+            val result = runCatching {
+                RoutineExecutor(
+                    AndroidRoutineActionRunner(context, userInitiated, routine.id, routine.name),
+                    AndroidRoutineConditionEvaluator(context),
+                    onProgress = { index, status ->
+                        if (!progress.record(routine.id, index, status)) {
+                            checkpointWriteFailed = true
+                            error("Unable to persist automation progress")
+                        }
+                    },
+                    shouldContinue = { !progress.isCancelled(routine.id) },
+                    startIndex = resumeIndex ?: 0,
+                ).execute(routine, startedAtMs = startedAt)
+            }.getOrElse { _ ->
+                executorCrashed = true
+                RoutineRunResult(
+                    routineId = routine.id,
+                    routineName = routine.name,
+                    status = RoutineRunStatus.FAILED,
+                    actionResults = emptyList(),
+                    startedAtMs = startedAt,
+                    finishedAtMs = System.currentTimeMillis(),
+                )
+            }
+            // Preserve IN_FLIGHT after a checkpoint write failure: the last action
+            // may already have produced an external effect before persistence failed.
+            // Marking it FAILED would incorrectly allow a fresh replay.
+            if (!checkpointWriteFailed && !executorCrashed && !progress.isCancelled(routine.id) && !progress.finish(routine.id, result.status)) {
+                // Leave the persisted IN_FLIGHT state intact when the final status
+                // cannot be committed. Never imply durable completion.
+                checkpointWriteFailed = true
+            }
+            // Cancellation can race with an external action finishing. Preserve
+            // CANCEL_REQUESTED for review instead of overwriting it with SUCCESS.
+            // An unexpected executor crash can occur after an irreversible action.
+            // Keep the durable checkpoint uncertain rather than authorizing replay.
+            val durableResult = if (checkpointWriteFailed || executorCrashed || progress.isCancelled(routine.id)) {
+                result.copy(status = RoutineRunStatus.FAILED)
+            } else result
+            val historyResult = durableResult.toTaskExecutionResult().copy(
+                details = listOf(
+                    "RUN_SOURCE = " + if (userInitiated) "MANUAL" else "SCHEDULED",
+                    "ROUTINE_ID = ${routine.id}",
+                    "CHECKPOINT_STATE = ${progress.snapshot(routine.id)?.status ?: "UNKNOWN"}",
+                ) + durableResult.toTaskExecutionResult().details,
+            )
+            // Reporting is diagnostic only: a history storage failure must not
+            // turn an already executed external action into a retryable crash.
+            runCatching { TaskExecutionReporter(context).report(historyResult) }
+            durableResult
+        } finally {
+            runningRoutineIds.remove(routine.id)
+        }
+    }
+
+    companion object {
+        private val runningRoutineIds = ConcurrentHashMap.newKeySet<String>()
+    }
+}

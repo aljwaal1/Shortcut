@@ -1,0 +1,135 @@
+package com.explapp.shortcut.automation.routines
+
+import java.util.concurrent.Callable
+import java.util.concurrent.Executors
+
+fun interface RoutineConditionEvaluator {
+    fun matches(condition: RoutineCondition): Boolean
+}
+
+class RoutineExecutor(
+    private val runner: RoutineActionRunner,
+    private val conditionEvaluator: RoutineConditionEvaluator = RoutineConditionEvaluator { true },
+    private val onProgress: (Int, RoutineActionStatus) -> Unit = { _, _ -> },
+    private val shouldContinue: () -> Boolean = { true },
+    private val startIndex: Int = 0,
+) {
+    fun execute(
+        routine: AutomationRoutine,
+        startedAtMs: Long = System.currentTimeMillis(),
+        finishedAtMs: Long? = null,
+    ): RoutineRunResult {
+        if (!routine.isEnabled || !routine.isValid() || !RoutineReview.inspect(routine).canRun) {
+            val end = finishedAtMs ?: System.currentTimeMillis()
+            return RoutineRunResult(routine.id, routine.name, RoutineRunStatus.FAILED, emptyList(), startedAtMs, end)
+        }
+
+        if (routine.conditions.any { !conditionEvaluator.matches(it) }) {
+            val end = finishedAtMs ?: System.currentTimeMillis()
+            return RoutineRunResult(routine.id, routine.name, RoutineRunStatus.SUCCESS, emptyList(), startedAtMs, end)
+        }
+
+        val results = mutableListOf<RoutineActionResult>()
+        // Only callers that have proven earlier actions safe may use a nonzero start index.
+        var index = startIndex.coerceIn(0, routine.actions.size)
+        var cancelled = false
+        while (index < routine.actions.size) {
+            if (!shouldContinue()) {
+                cancelled = true
+                break
+            }
+            val group = routine.actions[index].parameters["parallelGroup"].orEmpty()
+            if (group.isNotBlank()) {
+                val batch = routine.actions.drop(index).takeWhile { it.parameters["parallelGroup"] == group }
+                // Only independent WAIT and SHOW_NOTIFICATION actions are admitted by RoutineReview.
+                // The Android runner keeps mutable variables and must not be shared for concurrent mutations.
+                val pool = Executors.newFixedThreadPool(batch.size.coerceAtMost(4))
+                val outcomes = try {
+                    val jobs = batch.map { item ->
+                        pool.submit(Callable {
+                            RoutineRetryPolicy.run(item, runner)
+                        })
+                    }
+                    jobs.mapIndexed { i, job ->
+                        runCatching { job.get() }
+                            .getOrElse { RoutineActionResult.failure(batch[i], it.message ?: it.javaClass.simpleName) }
+                    }
+                } finally {
+                    pool.shutdown()
+                }
+                results.addAll(outcomes)
+                outcomes.forEachIndexed { offset, outcome -> onProgress(index + offset, outcome.status) }
+                if (outcomes.any { it.status == RoutineActionStatus.PREPARED } ||
+                    outcomes.indices.any { i -> outcomes[i].status == RoutineActionStatus.FAILED && !batch[i].continueOnError }
+                ) break
+                index += batch.size
+                continue
+            }
+            var action = routine.actions[index]
+            var screenshotTelegramHandoff = false
+
+            if (
+                action.type in setOf(RoutineActionType.OPEN_APP_SCREENSHOT, RoutineActionType.TAKE_SCREENSHOT) &&
+                index + 1 < routine.actions.size &&
+                routine.actions[index + 1].type == RoutineActionType.SEND_TELEGRAM_BOT
+            ) {
+                val telegram = routine.actions[index + 1]
+                if (telegram.parameters["botToken"].isNullOrBlank() ||
+                    telegram.parameters["chatId"].isNullOrBlank()
+                ) {
+                    results += RoutineActionResult.failure(
+                        telegram,
+                        "Telegram bot token and recipient must be configured before capturing a screenshot",
+                    )
+                    break
+                }
+                action = action.copy(
+                    parameters = action.parameters + mapOf(
+                        "telegramBotToken" to telegram.parameters["botToken"].orEmpty(),
+                        "telegramChatId" to telegram.parameters["chatId"].orEmpty(),
+                        "telegramCaption" to telegram.secondaryValue,
+                    ),
+                )
+                // This action hands delivery to the screenshot pipeline. Only skip the
+                // standalone Telegram action when the capture was successfully queued.
+                // A failed capture must never be reported as a completed send.
+                screenshotTelegramHandoff = true
+            }
+
+            val result = RoutineRetryPolicy.run(action, runner)
+            results += result
+            onProgress(index, result.status)
+            if (screenshotTelegramHandoff && result.status == RoutineActionStatus.SUCCESS) {
+                // Capturing and delivering happen asynchronously; completion is not proof of sending.
+                results += RoutineActionResult.prepared(
+                    routine.actions[index + 1],
+                    "Screenshot delivery has not been confirmed",
+                )
+                break
+            }
+            if (screenshotTelegramHandoff && result.status == RoutineActionStatus.PREPARED) {
+                // The sender is part of the pending screenshot pipeline, not a second action.
+                break
+            }
+            if (result.status == RoutineActionStatus.PREPARED) break
+            if (result.status == RoutineActionStatus.FAILED && (screenshotTelegramHandoff || !action.continueOnError)) break
+            if (action.type == RoutineActionType.STOP_SHORTCUT) break
+            index += if (screenshotTelegramHandoff) 2 else 1
+        }
+
+        val status = when {
+            cancelled -> RoutineRunStatus.FAILED
+            results.any { it.status == RoutineActionStatus.FAILED } -> RoutineRunStatus.FAILED
+            results.any { it.status == RoutineActionStatus.PREPARED } -> RoutineRunStatus.PREPARED
+            else -> RoutineRunStatus.SUCCESS
+        }
+        return RoutineRunResult(
+            routineId = routine.id,
+            routineName = routine.name,
+            status = status,
+            actionResults = results,
+            startedAtMs = startedAtMs,
+            finishedAtMs = finishedAtMs ?: System.currentTimeMillis(),
+        )
+    }
+}
