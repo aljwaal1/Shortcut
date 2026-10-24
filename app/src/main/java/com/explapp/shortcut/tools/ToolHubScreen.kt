@@ -112,6 +112,26 @@ fun ToolHubScreen(
             )
         }
 
+        if (query.isBlank()) {
+            item {
+                QuickSectionHeader(
+                    title = if (isArabic) "جديد: الترجمة والقراءة" else "New: translate and read",
+                    subtitle = if (isArabic) "ترجمة دون إنترنت وقراءة صفحات PDF" else "Offline translation and PDF page reading",
+                    icon = Icons.Default.AutoAwesome,
+                )
+            }
+            item {
+                ToolPair(
+                    pair = all.filter { it.id == ToolId.OFFLINE_TRANSLATE || it.id == ToolId.PDF_TRANSLATE_READER },
+                    isArabic = isArabic,
+                    favorites = favorites,
+                    columns = columns,
+                    onOpen = ::openTool,
+                    onFavorite = { id -> favorites = store.toggleFavorite(id) },
+                )
+            }
+        }
+
         val favoriteTools = favorites.mapNotNull { id -> filtered.firstOrNull { it.id == id } }
         if (favoriteTools.isNotEmpty()) {
             item {
