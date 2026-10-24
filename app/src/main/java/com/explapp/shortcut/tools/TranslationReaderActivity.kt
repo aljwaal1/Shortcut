@@ -16,7 +16,7 @@ import android.widget.TextView
 import android.widget.Toast
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
-import com.google.mlkit.nl.translate.DownloadConditions
+import com.google.mlkit.common.model.DownloadConditions
 import com.google.mlkit.nl.translate.TranslateLanguage
 import com.google.mlkit.nl.translate.Translation
 import com.google.mlkit.nl.translate.Translator
@@ -64,7 +64,7 @@ class TranslationReaderActivity : AppCompatActivity(), TextToSpeech.OnInitListen
             orientation = LinearLayout.VERTICAL
             setPadding(dp(18), dp(20), dp(18), dp(24))
         }
-        val scroll = ScrollView(this).apply { fillViewport = true; addView(root) }
+        val scroll = ScrollView(this).apply { isFillViewport = true; addView(root) }
         setContentView(scroll)
 
         root.addView(TextView(this).apply {
