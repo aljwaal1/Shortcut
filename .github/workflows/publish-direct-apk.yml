@@ -20,18 +20,18 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           mkdir -p dist
-          gh run download 39840166699 --repo "${{ github.repository }}" --name shortcut-debug-apk --dir dist
+          gh run download 40074634260 --repo "${{ github.repository }}" --name shortcut-debug-apk --dir dist
           test -s dist/app-debug.apk
           unzip -t dist/app-debug.apk >/dev/null
-          mv dist/app-debug.apk dist/Shortcut-1868-TDLib.apk
+          mv dist/app-debug.apk dist/Shortcut-2020-Speed.apk
 
       - name: Publish APK as prerelease for direct browser downloads
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          gh release create "shortcut-1868-preview" dist/Shortcut-1868-TDLib.apk \
+          gh release create "shortcut-2020-preview" dist/Shortcut-2020-Speed.apk \
             --repo "${{ github.repository }}" \
-            --title "Shortcut Android APK Build 1868 (preview)" \
-            --notes "Verified Android CI build #1868. Debug-signed preview. Personal Telegram TDLib functionality requires on-device testing." \
-            --target 52bb090a41457e4b7187955eb96bc40225078cb0 \
+            --title "Shortcut Android APK Build 2020 (speed improvements)" \
+            --notes "Verified Android CI build #2020. Improved event-trigger automation dispatch and screenshot template startup. Debug-signed preview; measure real-world latency on device." \
+            --target e408b5be9d54979264545e2e4184e6ce6ae6f662 \
             --prerelease
