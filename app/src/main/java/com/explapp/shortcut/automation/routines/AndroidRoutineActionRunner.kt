@@ -61,7 +61,13 @@ class AndroidRoutineActionRunner(
         RoutineActionType.WEB_SEARCH -> webSearch(action)
         RoutineActionType.OPEN_TOOL -> {
             val tool = runCatching { ToolId.valueOf(action.value) }.getOrNull()
-            if (tool != null) openExternal(action, ToolRouter.intent(context, tool))
+            if (tool != null) {
+                val toolIntent = ToolRouter.intent(context, tool)
+                if (tool == ToolId.OFFLINE_TRANSLATE || tool == ToolId.PDF_TRANSLATE_READER) {
+                    toolIntent.putExtra(com.explapp.shortcut.tools.TranslationReaderActivity.EXTRA_INITIAL_TEXT, action.secondaryValue)
+                }
+                openExternal(action, toolIntent)
+            }
             else RoutineActionResult.failure(action, local("Unknown built-in tool", "أداة داخلية غير معروفة"))
         }
         RoutineActionType.SHOW_NOTIFICATION -> {

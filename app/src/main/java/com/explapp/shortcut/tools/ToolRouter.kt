@@ -28,6 +28,8 @@ object ToolRouter {
         ToolId.IMAGE_TO_JPEG -> Intent(context, JpegConvertActivity::class.java)
         ToolId.MULTI_URL_TO_PDF -> Intent(context, MultiUrlPdfActivity::class.java)
         ToolId.PDF_SPLIT -> Intent(context, PdfSplitActivity::class.java)
+        ToolId.OFFLINE_TRANSLATE,
+        ToolId.PDF_TRANSLATE_READER -> Intent(context, TranslationReaderActivity::class.java)
         ToolId.SCREEN_VIDEO_RECORD -> Intent(context, FloatingVideoSetupActivity::class.java)
         ToolId.SCREENSHOT_CAPTURE -> Intent(context, ScreenCaptureActivity::class.java)
         ToolId.SCREENSHOT_OCR_SEARCH -> Intent(context, ScreenCaptureActivity::class.java)

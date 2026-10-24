@@ -151,6 +151,10 @@ class ToolActivity : AppCompatActivity() {
                 startActivity(Intent(this, PdfSplitActivity::class.java))
                 finish()
             }
+            ToolId.OFFLINE_TRANSLATE, ToolId.PDF_TRANSLATE_READER -> {
+                startActivity(Intent(this, TranslationReaderActivity::class.java))
+                finish()
+            }
             ToolId.ZIP_FILES -> filesPicker.launch(arrayOf("*/*"))
             ToolId.UNZIP_FILES -> zipPicker.launch("application/zip")
             ToolId.QR_CREATE -> promptQr()

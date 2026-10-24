@@ -8,6 +8,8 @@ enum class ToolId {
     IMAGE_OCR,
     PDF_TEXT,
     PDF_SPLIT,
+    OFFLINE_TRANSLATE,
+    PDF_TRANSLATE_READER,
     ZIP_FILES,
     UNZIP_FILES,
     IMAGE_TO_JPEG,
@@ -57,6 +59,7 @@ object ToolCatalog {
 
         ShortcutTool(ToolId.PDF_TEXT, ToolSection.PDF_FILES, "Extract text from PDF", "استخراج النص من PDF"),
         ShortcutTool(ToolId.PDF_SPLIT, ToolSection.PDF_FILES, "Split PDF pages / chapters", "تقسيم PDF إلى صفحات أو فصول"),
+        ShortcutTool(ToolId.PDF_TRANSLATE_READER, ToolSection.PDF_FILES, "Translate and listen to PDF pages", "ترجمة صفحات PDF وقراءتها صوتيًا"),
         ShortcutTool(ToolId.ZIP_FILES, ToolSection.PDF_FILES, "Create ZIP", "إنشاء ZIP"),
         ShortcutTool(ToolId.UNZIP_FILES, ToolSection.PDF_FILES, "Unzip files", "فك ZIP"),
         ShortcutTool(ToolId.URL_TO_PDF, ToolSection.PDF_FILES, "Open URL for Print → PDF", "فتح الرابط للطباعة ← PDF"),
@@ -64,6 +67,7 @@ object ToolCatalog {
 
         ShortcutTool(ToolId.QR_CREATE, ToolSection.QUICK, "Create QR code", "إنشاء QR Code"),
         ShortcutTool(ToolId.CLIPBOARD, ToolSection.QUICK, "Clipboard tools", "أدوات الحافظة"),
+        ShortcutTool(ToolId.OFFLINE_TRANSLATE, ToolSection.QUICK, "Offline Arabic / English translation", "ترجمة عربية / إنجليزية دون إنترنت"),
         ShortcutTool(ToolId.SCREENSHOT_CAPTURE, ToolSection.QUICK, "Take screenshot", "التقاط لقطة شاشة"),
         ShortcutTool(ToolId.SCREEN_VIDEO_RECORD, ToolSection.QUICK, "Floating screen recorder", "تسجيل فيديو الشاشة العائم"),
         ShortcutTool(ToolId.SCREENSHOT_OCR_SEARCH, ToolSection.QUICK, "Screenshot → OCR / Search", "لقطة شاشة → نص / بحث"),
