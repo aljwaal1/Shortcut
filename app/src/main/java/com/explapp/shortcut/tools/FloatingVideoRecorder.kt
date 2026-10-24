@@ -62,8 +62,8 @@ class FloatingVideoSetupActivity : AppCompatActivity() {
             textSize = 22f
         })
         layout.addView(TextView(this).apply {
-            text = if (ar) "زر التحكم لا يظهر في الفيديو. أثناء التسجيل استخدم إشعار Android للإيقاف المؤقت والاستئناف والإنهاء والحفظ. بعد النجاح يصلك إشعار لفتح MP4 أو مشاركته. التسجيل بلا صوت."
-                else "The control bubble stays out of the video. Use the Android recording notification to pause, resume, finish and save. A saved notification lets you open or share the silent MP4."
+            text = if (ar) "يمكنك التحكم بالتسجيل من إشعارات Android، أو اختيار زر عائم صغير إذا سمح الهاتف بذلك. قد يظهر الزر الصغير في الفيديو. بعد الحفظ يصل إشعار فتح ومشاركة MP4. التسجيل بلا صوت."
+                else "Control recording from Android notifications, or enable a tiny floating button if the phone permits it. The tiny button may appear in video. Open/share the silent MP4 from the saved notification."
             setPadding(0, 18, 0, 18)
         })
         val pointerOption = CheckBox(this).apply {
@@ -71,6 +71,11 @@ class FloatingVideoSetupActivity : AppCompatActivity() {
             isChecked = getSharedPreferences("screen_video", MODE_PRIVATE).getBoolean("pointer", false)
         }
         layout.addView(pointerOption)
+        val compactBubble = CheckBox(this).apply {
+            text = if (ar) "زر تحكم صغير أثناء التسجيل (قد يظهر في الفيديو)" else "Tiny control bubble during recording (may appear in video)"
+            isChecked = getSharedPreferences("screen_video", MODE_PRIVATE).getBoolean("compact_bubble", false)
+        }
+        layout.addView(compactBubble)
         fun savePointerChoice(): Boolean {
             if (pointerOption.isChecked && !Settings.canDrawOverlays(this)) {
                 Toast.makeText(this, if (ar) "فعّل الظهور فوق التطبيقات لاستخدام المؤشر، ثم عد إلى هنا" else "Allow display over other apps for the pointer, then return", Toast.LENGTH_LONG).show()
@@ -78,6 +83,7 @@ class FloatingVideoSetupActivity : AppCompatActivity() {
                 return false
             }
             getSharedPreferences("screen_video", MODE_PRIVATE).edit().putBoolean("pointer", pointerOption.isChecked).apply()
+            getSharedPreferences("screen_video", MODE_PRIVATE).edit().putBoolean("compact_bubble", compactBubble.isChecked).apply()
             return true
         }
         fun add(text: String, act: () -> Unit) {
@@ -115,7 +121,8 @@ class VideoRecordingPermissionActivity : AppCompatActivity() {
     }
     private val consent = registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
         if (result.resultCode == Activity.RESULT_OK && result.data != null) {
-            if (FloatingVideoBubbleService.isActive) {
+            if (FloatingVideoBubbleService.isActive &&
+                !getSharedPreferences("screen_video", MODE_PRIVATE).getBoolean("compact_bubble", false)) {
                 startService(Intent(this, FloatingVideoBubbleService::class.java).setAction(FloatingVideoBubbleService.ACTION_HIDE))
             }
             val intent = Intent(this, ScreenVideoRecordingService::class.java)
@@ -165,6 +172,8 @@ class FloatingVideoBubbleService : Service() {
     private var pauseButton: Button? = null
     private var stopButton: Button? = null
     private var startButton: Button? = null
+    private var compactButton: Button? = null
+    private var expanded = false
     private var hiddenForCapture = false
     private val main = Handler(Looper.getMainLooper())
     private val refresh = object : Runnable {
@@ -173,8 +182,16 @@ class FloatingVideoBubbleService : Service() {
                 val recording = ScreenVideoRecordingService.isRecording
                 // Remove ALL controls from recorded frames, including Pause and Stop.
                 // Recording remains controllable from the foreground notification.
-                it.visibility = if (VideoOverlayPolicy.showControlBubble(recording, hiddenForCapture))
+                val compact = getSharedPreferences("screen_video", MODE_PRIVATE).getBoolean("compact_bubble", false)
+                it.visibility = if (VideoOverlayPolicy.showControlBubble(recording, hiddenForCapture, compact))
                     android.view.View.VISIBLE else android.view.View.GONE
+                val controlsVisible = expanded
+                startButton?.visibility = if (!recording && controlsVisible) android.view.View.VISIBLE else android.view.View.GONE
+                pauseButton?.visibility = if (recording && controlsVisible) android.view.View.VISIBLE else android.view.View.GONE
+                stopButton?.visibility = if (recording && controlsVisible) android.view.View.VISIBLE else android.view.View.GONE
+                pauseButton?.text = if (ScreenVideoRecordingService.isPaused)
+                    local("▶ Resume", "▶ استئناف") else local("Ⅱ Pause", "Ⅱ إيقاف مؤقت")
+                compactButton?.text = if (expanded) "×" else "●"
             }
             if (bubble != null) main.postDelayed(this, 750L)
         }
@@ -209,7 +226,7 @@ class FloatingVideoBubbleService : Service() {
         val d = resources.displayMetrics.density
         val view = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
-            setPadding((7*d).toInt(), (7*d).toInt(), (7*d).toInt(), (7*d).toInt())
+            setPadding((3*d).toInt(), (3*d).toInt(), (3*d).toInt(), (3*d).toInt())
             background = GradientDrawable().apply {
                 cornerRadius = 16*d
                 setColor(Color.rgb(28, 46, 68))
@@ -222,6 +239,25 @@ class FloatingVideoBubbleService : Service() {
             setOnClickListener { click() }
             view.addView(this)
         }
+        val handle = Button(this).apply {
+            text = "●"
+            textSize = 13f
+            minHeight = (28*d).toInt()
+            minimumHeight = (28*d).toInt()
+            minWidth = (28*d).toInt()
+            minimumWidth = (28*d).toInt()
+            setPadding(0, 0, 0, 0)
+            layoutParams = LinearLayout.LayoutParams((32*d).toInt(), (32*d).toInt())
+            setOnClickListener {
+                expanded = !expanded
+                val recording = ScreenVideoRecordingService.isRecording
+                startButton?.visibility = if (!recording && expanded) android.view.View.VISIBLE else android.view.View.GONE
+                pauseButton?.visibility = if (recording && expanded) android.view.View.VISIBLE else android.view.View.GONE
+                stopButton?.visibility = if (recording && expanded) android.view.View.VISIBLE else android.view.View.GONE
+            }
+            view.addView(this)
+        }
+        compactButton = handle
         startButton = button(local("● Record video", "● تسجيل فيديو")) {
             startActivity(Intent(this, VideoRecordingPermissionActivity::class.java)
                 .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
@@ -235,6 +271,7 @@ class FloatingVideoBubbleService : Service() {
             startService(Intent(this, ScreenVideoRecordingService::class.java)
                 .setAction(ScreenVideoRecordingService.ACTION_STOP))
         }
+        startButton?.visibility = android.view.View.GONE
         pauseButton?.visibility = android.view.View.GONE
         stopButton?.visibility = android.view.View.GONE
         val options = WindowManager.LayoutParams(
@@ -245,28 +282,35 @@ class FloatingVideoBubbleService : Service() {
             PixelFormat.TRANSLUCENT
         ).apply {
             gravity = Gravity.TOP or Gravity.START
-            x = (resources.displayMetrics.widthPixels - 165*d).toInt().coerceAtLeast(0)
+            x = (resources.displayMetrics.widthPixels - 42*d).toInt().coerceAtLeast(0)
             y = (resources.displayMetrics.heightPixels / 2)
         }
         var x0 = 0
         var y0 = 0
         var touchX = 0f
         var touchY = 0f
-        // Drag the empty container; actual control buttons handle taps.
-        view.setOnTouchListener { _, event ->
+        // Drag the compact handle; a tap expands the action menu.
+        var dragged = false
+        handle.setOnTouchListener { _, event ->
             when (event.actionMasked) {
                 MotionEvent.ACTION_DOWN -> {
                     x0 = options.x; y0 = options.y
                     touchX = event.rawX; touchY = event.rawY
+                    dragged = false
                     true
                 }
                 MotionEvent.ACTION_MOVE -> {
+                    dragged = dragged || abs(event.rawX - touchX) > 8*d || abs(event.rawY - touchY) > 8*d
                     options.x = (x0 + (event.rawX - touchX).toInt()).coerceAtLeast(0)
                     options.y = (y0 + (event.rawY - touchY).toInt()).coerceAtLeast(0)
                     runCatching { wm.updateViewLayout(view, options) }
                     true
                 }
-                else -> true
+                MotionEvent.ACTION_UP -> {
+                    if (!dragged) handle.performClick()
+                    true
+                }
+                else -> false
             }
         }
         wm.addView(view, options)
@@ -282,6 +326,7 @@ class FloatingVideoBubbleService : Service() {
         startButton=null
         pauseButton=null
         stopButton=null
+        compactButton=null
         super.onDestroy()
     }
     companion object {

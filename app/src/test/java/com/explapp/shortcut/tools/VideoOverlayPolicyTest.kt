@@ -17,4 +17,10 @@ class VideoOverlayPolicyTest {
         assertFalse(VideoOverlayPolicy.showPointer(true, true, false))
         assertTrue(VideoOverlayPolicy.showPointer(true, true, true))
     }
+
+    @Test fun compactControlsCanRemainVisibleDuringRecordingButNotWhenExplicitlyHidden() {
+        assertTrue(VideoOverlayPolicy.showControlBubble(true, false, true))
+        assertFalse(VideoOverlayPolicy.showControlBubble(true, true, true))
+        assertTrue(VideoOverlayPolicy.showControlBubble(false, false, true))
+    }
 }
