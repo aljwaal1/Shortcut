@@ -3291,7 +3291,8 @@ private fun RoutineTemplatesScreen(onBack: () -> Unit, onUse: (AutomationRoutine
             ElevatedCard(Modifier.fillMaxWidth()) {
                 Row(Modifier.fillMaxWidth().padding(14.dp), verticalAlignment = Alignment.CenterVertically) {
                     Column(Modifier.weight(1f)) {
-                        Text(template.name, fontWeight = FontWeight.Bold)
+                        Text(RoutineTemplateCatalog.title(template, ar), fontWeight = FontWeight.Bold)
+                        Text(RoutineTemplateCatalog.description(template, ar), style = MaterialTheme.typography.bodySmall)
                         Text(triggerTitle(template.trigger.type, ar) + " • " + template.actions.firstOrNull()?.let { RoutineCatalog.meta(it.type).let { m -> if (ar) m.titleAr else m.titleEn } }.orEmpty(), style = MaterialTheme.typography.bodySmall)
                     }
                     Button(onClick = { onUse(template) }) { Text(if (ar) "استخدام" else "Use") }
