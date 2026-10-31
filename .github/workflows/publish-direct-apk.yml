@@ -1,0 +1,37 @@
+name: Publish direct-download Shortcut APK
+
+on:
+  push:
+    branches:
+      - feature/android-v1-phase1
+    paths:
+      - .github/workflows/publish-direct-apk.yml
+
+permissions:
+  contents: write
+  actions: read
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download verified successful CI APK
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          mkdir -p dist
+          gh run download 40119654287 --repo "${{ github.repository }}" --name shortcut-debug-apk --dir dist
+          test -s dist/app-debug.apk
+          unzip -t dist/app-debug.apk >/dev/null
+          mv dist/app-debug.apk dist/Shortcut-0.9.12.apk
+
+      - name: Publish APK as prerelease for direct browser downloads
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "v0.9.12" dist/Shortcut-0.9.12.apk \
+            --repo "${{ github.repository }}" \
+            --title "Shortcut Android v0.9.12 (screen recorder overlay fix)" \
+            --notes "Verified Android CI build #2030. Fixed black recording-overlay rectangle, added explicit small or hidden recording controls, and preserved offline translation tools. Debug-signed preview; on-device recording validation remains necessary." \
+            --target c1d1774e4175c2c2e7a597020d74a50d2d6331b6 \
+            --prerelease
