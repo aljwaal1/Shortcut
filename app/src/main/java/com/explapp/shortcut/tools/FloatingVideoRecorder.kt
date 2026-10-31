@@ -134,6 +134,9 @@ class VideoRecordingPermissionActivity : AppCompatActivity() {
                 .putExtra(ScreenVideoRecordingService.EXTRA_DATA, result.data)
             try {
                 androidx.core.content.ContextCompat.startForegroundService(this, intent)
+                if (this.intent.getBooleanExtra(EXTRA_FROM_FLOATING_BUTTON, false)) {
+                    moveTaskToBack(true)
+                }
             } catch (error: Exception) {
                 restoreBubble()
                 Toast.makeText(this, error.message ?: "Cannot start recording", Toast.LENGTH_LONG).show()
@@ -156,6 +159,10 @@ class VideoRecordingPermissionActivity : AppCompatActivity() {
             checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) {
             notificationPermission.launch(Manifest.permission.POST_NOTIFICATIONS)
         } else requestScreenConsent()
+    }
+
+    companion object {
+        const val EXTRA_FROM_FLOATING_BUTTON = "from_floating_video_button"
     }
 
     private fun requestScreenConsent() {
@@ -269,6 +276,7 @@ class FloatingVideoBubbleService : Service() {
         compactButton = handle
         startButton = button(local("● Record video", "● تسجيل فيديو")) {
             startActivity(Intent(this, VideoRecordingPermissionActivity::class.java)
+                .putExtra(VideoRecordingPermissionActivity.EXTRA_FROM_FLOATING_BUTTON, true)
                 .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
         }
         pauseButton = button(local("Ⅱ Pause", "Ⅱ إيقاف مؤقت")) {
