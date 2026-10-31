@@ -23,4 +23,8 @@ class VideoOverlayPolicyTest {
         assertFalse(VideoOverlayPolicy.showControlBubble(true, true, true))
         assertTrue(VideoOverlayPolicy.showControlBubble(false, false, true))
     }
+    @Test fun recordingWaitsForPermissionActivityToLeaveScreen() {
+        assertTrue(VideoOverlayPolicy.startAfterConsentDelayMs >= 1000L)
+    }
+
 }
