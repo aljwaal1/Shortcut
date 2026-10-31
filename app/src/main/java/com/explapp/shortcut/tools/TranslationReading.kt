@@ -13,7 +13,7 @@ object TranslationReading {
         while (rest.length > maxChars) {
             val candidate = rest.substring(0, maxChars)
             val punctuation = candidate.indices.lastOrNull { index ->
-                candidate[index] in ".!?؟؛。\\n" &&
+                candidate[index] in ".!?؟؛。" &&
                     index + 1 < rest.length &&
                     rest[index + 1].isWhitespace()
             }?.plus(1) ?: -1
