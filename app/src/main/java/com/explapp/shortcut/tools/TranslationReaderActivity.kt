@@ -62,70 +62,142 @@ class TranslationReaderActivity : AppCompatActivity(), TextToSpeech.OnInitListen
 
         val root = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
-            setPadding(dp(18), dp(20), dp(18), dp(24))
+            setPadding(dp(16), dp(18), dp(16), dp(30))
+            setBackgroundColor(android.graphics.Color.rgb(246, 248, 253))
         }
-        val scroll = ScrollView(this).apply { isFillViewport = true; addView(root) }
-        setContentView(scroll)
+        setContentView(ScrollView(this).apply { isFillViewport = true; addView(root) })
 
-        root.addView(TextView(this).apply {
-            text = label("Offline translation and PDF reading", "الترجمة المحلية وقراءة PDF")
-            textSize = 23f
-            setPadding(0, 0, 0, dp(10))
+        val hero = panel(root, android.graphics.Color.rgb(41, 52, 119))
+        hero.addView(TextView(this).apply {
+            text = label("Translate & Read", "الترجمة والقراءة")
+            textSize = 25f
+            setTextColor(android.graphics.Color.WHITE)
+            setTypeface(null, android.graphics.Typeface.BOLD)
         })
-        status = TextView(this).apply { textSize = 15f; setPadding(0, 0, 0, dp(12)) }
-        root.addView(status)
-        showStatus(label("Download Arabic/English models once before offline use.", "نزّل نموذجي العربية والإنجليزية مرة واحدة قبل العمل دون إنترنت."))
+        hero.addView(TextView(this).apply {
+            text = label("Text and PDF pages • Arabic ↔ English • Offline", "النصوص وصفحات PDF • عربي ↔ إنجليزي • دون إنترنت")
+            textSize = 14f
+            setTextColor(android.graphics.Color.rgb(224, 230, 255))
+            setPadding(0, dp(6), 0, 0)
+        })
 
-        languageButton = button(root, "English → Arabic", "إنجليزي ← عربي") {
+        val controls = panel(root)
+        controls.addView(sectionTitle(label("Languages", "اللغات")))
+        languageButton = button(controls, "English → Arabic  ⇄", "إنجليزي ← عربي  ⇄") {
             sourceEnglish = !sourceEnglish
+            generation++
             modelsReady = false
             translator?.close()
             translator = null
             languageButton.text = label(
-                if (sourceEnglish) "English → Arabic" else "Arabic → English",
-                if (sourceEnglish) "إنجليزي ← عربي" else "عربي ← إنجليزي",
+                if (sourceEnglish) "English → Arabic  ⇄" else "Arabic → English  ⇄",
+                if (sourceEnglish) "إنجليزي ← عربي  ⇄" else "عربي ← إنجليزي  ⇄",
             )
-            showStatus(label("Direction changed. Confirm models are installed.", "تم تغيير الاتجاه. تأكد من تنزيل النماذج."))
+            showStatus(label("Direction changed. Check the offline model.", "تغير اتجاه الترجمة؛ تحقّق من النموذج المحلي."))
         }
-        button(root, "Download / check offline languages", "تنزيل / فحص لغات الترجمة") { prepareModels() }
-        button(root, "Choose PDF from phone", "اختيار ملف PDF من الهاتف") { pdfPicker.launch(arrayOf("application/pdf")) }
-        pageLabel = TextView(this).apply { gravity = Gravity.CENTER; textSize = 16f }
-        root.addView(pageLabel)
-        button(root, "Previous page", "الصفحة السابقة") { changePage(-1) }
-        button(root, "Next page", "الصفحة التالية") { changePage(1) }
+        button(controls, "Check / download offline model", "فحص / تنزيل نموذج الترجمة المحلي") { prepareModels() }
+        status = TextView(this).apply {
+            textSize = 14f
+            setTextColor(android.graphics.Color.rgb(59, 74, 104))
+            setPadding(dp(4), dp(8), dp(4), dp(3))
+        }
+        controls.addView(status)
+        showStatus(label("Check the model once; then translate without Internet.", "افحص النموذج مرة واحدة ثم ترجم دون إنترنت."))
 
+        val inputCard = panel(root)
+        inputCard.addView(sectionTitle(label("Original text", "النص الأصلي")))
         sourceInput = EditText(this).apply {
-            hint = label("Enter text or select a PDF page", "اكتب النص أو اختر صفحة PDF")
+            hint = label("Write, paste, or open a PDF page…", "اكتب أو الصق نصًا أو افتح صفحة PDF…")
             minLines = 5
             maxLines = 14
+            textSize = 17f
             gravity = Gravity.TOP
             setTextIsSelectable(true)
+            setPadding(dp(14), dp(14), dp(14), dp(14))
+            background = rounded(android.graphics.Color.rgb(247, 249, 255), 16)
         }
-        root.addView(sourceInput, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT))
-        button(root, "Translate text / current page", "ترجمة النص / الصفحة الحالية") { translate() }
+        inputCard.addView(sourceInput, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT))
+        button(inputCard, "Translate now", "ترجم الآن") { translate() }
+
+        val pdfCard = panel(root)
+        pdfCard.addView(sectionTitle(label("PDF page reader", "قارئ صفحات PDF")))
+        button(pdfCard, "Open PDF from phone", "فتح ملف PDF من الهاتف") { pdfPicker.launch(arrayOf("application/pdf")) }
+        pageLabel = TextView(this).apply {
+            text = label("No PDF selected", "لم يتم اختيار ملف PDF")
+            gravity = Gravity.CENTER
+            textSize = 14f
+            setTextColor(android.graphics.Color.rgb(74, 84, 110))
+            setPadding(0, dp(8), 0, dp(4))
+        }
+        pdfCard.addView(pageLabel)
+        val pageActions = horizontalRow(pdfCard)
+        button(pageActions, "◀ Previous", "◀ السابقة") { changePage(-1) }
+        button(pageActions, "Next ▶", "التالية ▶") { changePage(1) }
+
+        val resultCard = panel(root)
+        resultCard.addView(sectionTitle(label("Translation", "الترجمة")))
         translatedText = TextView(this).apply {
             textSize = 17f
             setTextIsSelectable(true)
-            setPadding(dp(8), dp(14), dp(8), dp(14))
+            setTextColor(android.graphics.Color.rgb(32, 44, 72))
+            setPadding(dp(14), dp(18), dp(14), dp(18))
             text = label("Translation will appear here", "ستظهر الترجمة هنا")
+            minHeight = dp(110)
+            background = rounded(android.graphics.Color.rgb(247, 249, 255), 16)
         }
-        root.addView(translatedText)
-        button(root, "Read original aloud", "قراءة النص الأصلي صوتيًا") { speak(sourceInput.text.toString(), original = true) }
-        button(root, "Read translation aloud", "قراءة الترجمة صوتيًا") { speak(translatedText.text.toString(), original = false) }
-        button(root, "Stop reading", "إيقاف القراءة") { tts?.stop() }
-        button(root, "Copy translation", "نسخ الترجمة") {
+        resultCard.addView(translatedText, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT))
+        val resultActions = horizontalRow(resultCard)
+        button(resultActions, "Copy", "نسخ") {
             val clip = getSystemService(CLIPBOARD_SERVICE) as ClipboardManager
             clip.setPrimaryClip(ClipData.newPlainText("translation", translatedText.text))
             showStatus(label("Copied", "تم النسخ"))
         }
-        button(root, "Share translation", "مشاركة الترجمة") {
+        button(resultActions, "Share", "مشاركة") {
             startActivity(Intent.createChooser(Intent(Intent.ACTION_SEND).apply {
                 type = "text/plain"
                 putExtra(Intent.EXTRA_TEXT, translatedText.text.toString())
             }, label("Share", "مشاركة")))
         }
-        pageLabel.text = ""
+        val speechActions = horizontalRow(resultCard)
+        button(speechActions, "Listen: original", "نطق الأصل") { speak(sourceInput.text.toString(), original = true) }
+        button(speechActions, "Listen: result", "نطق الترجمة") { speak(translatedText.text.toString(), original = false) }
+        button(resultCard, "Stop speaking", "إيقاف النطق") { tts?.stop() }
+
         intent.getStringExtra(EXTRA_INITIAL_TEXT)?.takeIf { it.isNotBlank() }?.let(sourceInput::setText)
+    }
+
+    private fun rounded(color: Int, radius: Int) = android.graphics.drawable.GradientDrawable().apply {
+        setColor(color)
+        cornerRadius = dp(radius).toFloat()
+    }
+
+    private fun panel(parent: LinearLayout, color: Int = android.graphics.Color.WHITE): LinearLayout =
+        LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(dp(16), dp(16), dp(16), dp(16))
+            background = rounded(color, 22)
+            elevation = dp(2).toFloat()
+            parent.addView(this, LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                ViewGroup.LayoutParams.WRAP_CONTENT,
+            ).apply { bottomMargin = dp(14) })
+        }
+
+    private fun horizontalRow(parent: LinearLayout): LinearLayout =
+        LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            parent.addView(this, LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                ViewGroup.LayoutParams.WRAP_CONTENT,
+            ))
+        }
+
+    private fun sectionTitle(title: String): TextView = TextView(this).apply {
+        text = title
+        textSize = 17f
+        setTypeface(null, android.graphics.Typeface.BOLD)
+        setTextColor(android.graphics.Color.rgb(41, 52, 119))
+        setPadding(0, 0, 0, dp(12))
     }
 
     private fun prepareModels() {
@@ -260,8 +332,20 @@ class TranslationReaderActivity : AppCompatActivity(), TextToSpeech.OnInitListen
     private fun showStatus(message: String) { status.text = message }
     private fun button(parent: LinearLayout, en: String, ar: String, action: () -> Unit): Button = Button(this).also {
         it.text = label(en, ar)
+        it.isAllCaps = false
+        it.textSize = 14f
+        it.setTextColor(android.graphics.Color.WHITE)
+        it.background = rounded(android.graphics.Color.rgb(77, 77, 222), 14)
         it.setOnClickListener { _ -> action() }
-        parent.addView(it, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT))
+        val horizontal = parent.orientation == LinearLayout.HORIZONTAL
+        parent.addView(it, LinearLayout.LayoutParams(
+            if (horizontal) 0 else ViewGroup.LayoutParams.MATCH_PARENT,
+            dp(48),
+            if (horizontal) 1f else 0f,
+        ).apply {
+            topMargin = dp(8)
+            if (horizontal) { marginStart = dp(3); marginEnd = dp(3) }
+        })
     }
 
     companion object { const val EXTRA_INITIAL_TEXT = "initial_text" }
