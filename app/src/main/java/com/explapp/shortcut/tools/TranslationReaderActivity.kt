@@ -100,6 +100,7 @@ class TranslationReaderActivity : AppCompatActivity(), TextToSpeech.OnInitListen
             showStatus(label("Direction changed. Check the offline model.", "تغير اتجاه الترجمة؛ تحقّق من النموذج المحلي."))
         }
         button(controls, "Check / download offline model", "فحص / تنزيل نموذج الترجمة المحلي") { prepareModels() }
+        button(controls, "Download Arabic OCR model", "تنزيل نموذج قراءة الصور العربية") { prepareArabicOcr() }
         status = TextView(this).apply {
             textSize = 14f
             setTextColor(android.graphics.Color.rgb(59, 74, 104))
@@ -202,6 +203,22 @@ class TranslationReaderActivity : AppCompatActivity(), TextToSpeech.OnInitListen
         setTypeface(null, android.graphics.Typeface.BOLD)
         setTextColor(android.graphics.Color.rgb(41, 52, 119))
         setPadding(0, 0, 0, dp(12))
+    }
+
+    private fun prepareArabicOcr() {
+        if (ArabicOcrEngine.available(this)) {
+            showStatus(label("Arabic OCR is ready for offline use.", "نموذج قراءة الصور العربية جاهز دون إنترنت."))
+            return
+        }
+        showStatus(label("Downloading Arabic OCR once…", "جارٍ تنزيل نموذج OCR العربي لأول مرة…"))
+        Thread {
+            val result = runCatching { ArabicOcrEngine.download(applicationContext) }
+            runOnUiThread {
+                if (isDestroyed) return@runOnUiThread
+                result.onSuccess { showStatus(label("Arabic OCR is installed.", "تم تثبيت نموذج OCR العربي.")) }
+                    .onFailure { showStatus(label("Arabic OCR download failed: ", "فشل تنزيل OCR العربي: ") + it.localizedMessage) }
+            }
+        }.start()
     }
 
     private fun prepareModels() {
@@ -318,28 +335,43 @@ class TranslationReaderActivity : AppCompatActivity(), TextToSpeech.OnInitListen
                 }
             }
             rendered.onSuccess { bitmap ->
-                val recognizer = TextRecognition.getClient(TextRecognizerOptions.DEFAULT_OPTIONS)
-                recognizer.process(InputImage.fromBitmap(bitmap, 0))
-                    .addOnSuccessListener { result ->
-                        if (request == generation && !isDestroyed) {
-                            sourceInput.setText(result.text)
-                            showStatus(if (result.text.isBlank()) {
-                                label(
-                                    "No readable Latin text. Arabic scanned PDF needs an Arabic OCR engine.",
-                                    "لم يُعثر على نص لاتيني. صفحات PDF العربية المصوّرة تحتاج محرك OCR عربي.",
-                                )
-                            } else label("Scanned text extracted. You can translate it now.", "تم استخراج النص المصوّر، ويمكن ترجمته الآن."))
+                if (!sourceEnglish) {
+                    val result = runCatching { ArabicOcrEngine.recognize(applicationContext, bitmap) }
+                    bitmap.recycle()
+                    runOnUiThread {
+                        if (request != generation || isDestroyed) return@runOnUiThread
+                        result.onSuccess { extracted ->
+                            sourceInput.setText(extracted)
+                            showStatus(if (extracted.isBlank()) {
+                                label("No Arabic text found in this page.", "لم يُعثر على نص عربي واضح في الصفحة.")
+                            } else label("Arabic OCR complete. Translate when ready.", "اكتمل استخراج النص العربي. يمكنك ترجمته الآن."))
+                        }.onFailure { error ->
+                            showStatus(if (!ArabicOcrEngine.available(this)) {
+                                label("Download the Arabic OCR model first.", "نزّل نموذج OCR العربي أولًا من قسم اللغات.")
+                            } else label("Arabic OCR failed: ", "فشل OCR العربي: ") + error.localizedMessage)
                         }
                     }
-                    .addOnFailureListener { error ->
-                        if (request == generation && !isDestroyed) {
-                            showStatus(label("OCR failed: ", "فشل التعرف على النص: ") + error.localizedMessage)
+                } else {
+                    val recognizer = TextRecognition.getClient(TextRecognizerOptions.DEFAULT_OPTIONS)
+                    recognizer.process(InputImage.fromBitmap(bitmap, 0))
+                        .addOnSuccessListener { result ->
+                            if (request == generation && !isDestroyed) {
+                                sourceInput.setText(result.text)
+                                showStatus(if (result.text.isBlank()) {
+                                    label("No readable text found.", "لم يُعثر على نص واضح.")
+                                } else label("Scanned text extracted. You can translate it now.", "تم استخراج النص المصوّر، ويمكن ترجمته الآن."))
+                            }
                         }
-                    }
-                    .addOnCompleteListener {
-                        bitmap.recycle()
-                        recognizer.close()
-                    }
+                        .addOnFailureListener { error ->
+                            if (request == generation && !isDestroyed) {
+                                showStatus(label("OCR failed: ", "فشل التعرف على النص: ") + error.localizedMessage)
+                            }
+                        }
+                        .addOnCompleteListener {
+                            bitmap.recycle()
+                            recognizer.close()
+                        }
+                }
             }
         }.start()
     }
