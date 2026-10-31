@@ -360,10 +360,11 @@ private fun ToolCard(
     ElevatedCard(
         onClick = onClick,
         modifier = modifier.heightIn(min = 142.dp),
+        shape = RoundedCornerShape(28.dp),
         colors = CardDefaults.elevatedCardColors(containerColor = container),
         elevation = CardDefaults.elevatedCardElevation(defaultElevation = if (dark) 0.dp else 2.dp),
     ) {
-        Column(modifier = Modifier.fillMaxWidth().padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        Column(modifier = Modifier.fillMaxWidth().padding(18.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
                 Surface(
                     shape = RoundedCornerShape(14.dp),
@@ -403,6 +404,7 @@ private fun sectionTitle(section: ToolSection, ar: Boolean): String = when (sect
     ToolSection.PDF_FILES -> if (ar) "PDF والملفات" else "PDF & files"
     ToolSection.QUICK -> if (ar) "أدوات سريعة" else "Quick tools"
     ToolSection.AUTOMATION -> if (ar) "الأتمتة" else "Automation"
+    ToolSection.ACCOUNTING -> if (ar) "أدوات المحاسب" else "Accounting tools"
 }
 
 private fun sectionSubtitle(section: ToolSection, ar: Boolean): String = when (section) {
@@ -410,6 +412,7 @@ private fun sectionSubtitle(section: ToolSection, ar: Boolean): String = when (s
     ToolSection.PDF_FILES -> if (ar) "PDF، ZIP واستخراج النص" else "PDF, ZIP and text extraction"
     ToolSection.QUICK -> if (ar) "QR، Screenshot والحافظة" else "QR, screenshots and clipboard"
     ToolSection.AUTOMATION -> if (ar) "السيارة، البطارية، NFC والاستخدام" else "Car, battery, NFC and usage"
+    ToolSection.ACCOUNTING -> if (ar) "التصوير والحسابات السريعة" else "Scanning and quick calculations"
 }
 
 private fun sectionIcon(section: ToolSection): ImageVector = when (section) {
@@ -417,4 +420,5 @@ private fun sectionIcon(section: ToolSection): ImageVector = when (section) {
     ToolSection.PDF_FILES -> Icons.Default.Description
     ToolSection.QUICK -> Icons.Default.AutoAwesome
     ToolSection.AUTOMATION -> Icons.Default.SettingsSuggest
+    ToolSection.ACCOUNTING -> Icons.Default.Description
 }
