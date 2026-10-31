@@ -214,7 +214,7 @@ private fun MyAutomationsScreen(onBack: () -> Unit, initialMode: String = "") {
 
         showTemplates -> RoutineTemplatesScreen(
             onBack = { showTemplates = false },
-            onUse = { template -> editing = template.duplicate(); showTemplates = false },
+            onUse = { template -> editing = template.duplicate().copy(name = RoutineTemplateCatalog.title(template, ar)); showTemplates = false },
         )
 
         else -> LazyColumn(
