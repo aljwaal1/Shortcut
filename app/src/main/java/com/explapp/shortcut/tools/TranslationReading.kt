@@ -12,8 +12,17 @@ object TranslationReading {
         var rest = trimmed
         while (rest.length > maxChars) {
             val candidate = rest.substring(0, maxChars)
+            val punctuation = candidate.indices.lastOrNull { index ->
+                candidate[index] in ".!?؟؛。\\n" &&
+                    index + 1 < rest.length &&
+                    rest[index + 1].isWhitespace()
+            }?.plus(1) ?: -1
             val space = candidate.lastIndexOf(' ')
-            val split = if (space >= maxChars / 2) space else maxChars
+            val split = when {
+                punctuation >= maxChars / 4 -> punctuation
+                space >= maxChars / 2 -> space
+                else -> maxChars
+            }
             result += rest.substring(0, split).trim()
             rest = rest.substring(split).trimStart()
         }
