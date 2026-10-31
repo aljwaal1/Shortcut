@@ -38,6 +38,7 @@ enum class ToolId {
     ACCOUNTING_CALCULATORS,
     DOCUMENT_SCANNER,
     ACCOUNTING_DOCUMENT_SCANNER,
+    TABLE_PHOTO_EXCEL,
 }
 
 data class ShortcutTool(
@@ -78,6 +79,7 @@ object ToolCatalog {
         ShortcutTool(ToolId.WATER_EJECT, ToolSection.QUICK, "Water Eject", "طرد الماء"),
         ShortcutTool(ToolId.ACCOUNTING_CALCULATORS, ToolSection.ACCOUNTING, "Accounting calculators", "الحاسبات المحاسبية"),
         ShortcutTool(ToolId.ACCOUNTING_DOCUMENT_SCANNER, ToolSection.ACCOUNTING, "Scan invoices and documents", "تصوير الفواتير والمستندات"),
+        ShortcutTool(ToolId.TABLE_PHOTO_EXCEL, ToolSection.ACCOUNTING, "Photo table to Excel", "تصوير جدول إلى Excel"),
 
         ShortcutTool(ToolId.CAR_MODE, ToolSection.AUTOMATION, "Guided car mode", "وضع السيارة الموجّه"),
         ShortcutTool(ToolId.PARKED_CAR, ToolSection.AUTOMATION, "Parked car location", "موقع السيارة المركونة"),
