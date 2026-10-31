@@ -174,6 +174,7 @@ class FloatingVideoBubbleService : Service() {
     private var bubble: LinearLayout? = null
     private var pauseButton: Button? = null
     private var stopButton: Button? = null
+    private var disableButton: Button? = null
     private var startButton: Button? = null
     private var compactButton: Button? = null
     private var expanded = false
@@ -195,6 +196,7 @@ class FloatingVideoBubbleService : Service() {
                 startButton?.visibility = if (!recording && controlsVisible) android.view.View.VISIBLE else android.view.View.GONE
                 pauseButton?.visibility = if (recording && controlsVisible) android.view.View.VISIBLE else android.view.View.GONE
                 stopButton?.visibility = if (recording && controlsVisible) android.view.View.VISIBLE else android.view.View.GONE
+                disableButton?.visibility = if (controlsVisible) android.view.View.VISIBLE else android.view.View.GONE
                 pauseButton?.text = if (ScreenVideoRecordingService.isPaused)
                     local("▶ Resume", "▶ استئناف") else local("Ⅱ Pause", "Ⅱ إيقاف مؤقت")
                 compactButton?.text = if (expanded) "×" else "●"
@@ -260,6 +262,7 @@ class FloatingVideoBubbleService : Service() {
                 startButton?.visibility = if (!recording && expanded) android.view.View.VISIBLE else android.view.View.GONE
                 pauseButton?.visibility = if (recording && expanded) android.view.View.VISIBLE else android.view.View.GONE
                 stopButton?.visibility = if (recording && expanded) android.view.View.VISIBLE else android.view.View.GONE
+                disableButton?.visibility = if (expanded) android.view.View.VISIBLE else android.view.View.GONE
             }
             view.addView(this)
         }
@@ -277,9 +280,17 @@ class FloatingVideoBubbleService : Service() {
             startService(Intent(this, ScreenVideoRecordingService::class.java)
                 .setAction(ScreenVideoRecordingService.ACTION_STOP))
         }
+        disableButton = button(local("✕ Disable floating button", "✕ إلغاء تفعيل الزر العائم")) {
+            Toast.makeText(this, local(
+                "Floating button disabled. Recording can still be controlled from notifications.",
+                "تم إيقاف الزر العائم. يمكنك التحكم بالتسجيل من الإشعارات.",
+            ), Toast.LENGTH_LONG).show()
+            stopSelf()
+        }
         startButton?.visibility = android.view.View.GONE
         pauseButton?.visibility = android.view.View.GONE
         stopButton?.visibility = android.view.View.GONE
+        disableButton?.visibility = android.view.View.GONE
         val options = WindowManager.LayoutParams(
             WindowManager.LayoutParams.WRAP_CONTENT, WindowManager.LayoutParams.WRAP_CONTENT,
             WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY,
@@ -331,6 +342,7 @@ class FloatingVideoBubbleService : Service() {
         startButton=null
         pauseButton=null
         stopButton=null
+        disableButton=null
         compactButton=null
         super.onDestroy()
     }
@@ -423,12 +435,19 @@ class ScreenVideoRecordingService : Service() {
     private val main = Handler(Looper.getMainLooper())
     private var startElapsed: Long = 0L
     private val maxDuration = Runnable { stopRecording() }
+    private var pendingStart: Runnable? = null
     private var latestSavedUri: Uri? = null
     private var pointerEnabled = false
 
     override fun onBind(intent: Intent?): IBinder? = null
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         if (intent?.action == ACTION_STOP) {
+            pendingStart?.let {
+                main.removeCallbacks(it)
+                pendingStart = null
+                stopSelf()
+                return START_NOT_STICKY
+            }
             stopRecording()
             return START_NOT_STICKY
         }
@@ -452,7 +471,7 @@ class ScreenVideoRecordingService : Service() {
             }
             return START_NOT_STICKY
         }
-        if (intent?.action != ACTION_START || isRecording) return START_NOT_STICKY
+        if (intent?.action != ACTION_START || isRecording || pendingStart != null) return START_NOT_STICKY
         val data = if (Build.VERSION.SDK_INT >= 33) {
             intent.getParcelableExtra(EXTRA_DATA, Intent::class.java)
         } else {
@@ -468,7 +487,21 @@ class ScreenVideoRecordingService : Service() {
         try {
             if (Build.VERSION.SDK_INT >= 29) startForeground(2217, startingNotice, ServiceInfo.FOREGROUND_SERVICE_TYPE_MEDIA_PROJECTION)
             else startForeground(2217, startingNotice)
-            startRecording(intent.getIntExtra(EXTRA_RESULT, Activity.RESULT_CANCELED), data)
+            // The permission UI belongs to Shortcut. Begin capturing only after it disappears,
+            // so the resulting video starts on the user's foreground screen.
+            val permissionCode = intent.getIntExtra(EXTRA_RESULT, Activity.RESULT_CANCELED)
+            val deferredStart = Runnable {
+                pendingStart = null
+                try {
+                    startRecording(permissionCode, data)
+                } catch (error: Exception) {
+                    notifyResult(false, error.message)
+                    cleanup(false)
+                    stopSelf()
+                }
+            }
+            pendingStart = deferredStart
+            main.postDelayed(deferredStart, VideoOverlayPolicy.startAfterConsentDelayMs)
         } catch (error: Exception) {
             notifyResult(false, error.message)
             cleanup(false)
@@ -691,6 +724,8 @@ class ScreenVideoRecordingService : Service() {
         latestSavedUri = null
     }
     override fun onDestroy() {
+        pendingStart?.let { main.removeCallbacks(it) }
+        pendingStart = null
         main.removeCallbacks(maxDuration)
         if (isRecording) stopRecording() else cleanup(false)
         super.onDestroy()
