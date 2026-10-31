@@ -29,6 +29,7 @@ object ToolRouter {
         ToolId.MULTI_URL_TO_PDF -> Intent(context, MultiUrlPdfActivity::class.java)
         ToolId.DOCUMENT_SCANNER,
         ToolId.ACCOUNTING_DOCUMENT_SCANNER -> Intent(context, DocumentScannerActivity::class.java)
+        ToolId.TABLE_PHOTO_EXCEL -> Intent(context, TablePhotoExcelActivity::class.java)
         ToolId.ACCOUNTING_CALCULATORS -> Intent(context, AccountingCalculatorsActivity::class.java)
         ToolId.PDF_SPLIT -> Intent(context, PdfSplitActivity::class.java)
         ToolId.OFFLINE_TRANSLATE,
