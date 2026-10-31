@@ -147,6 +147,10 @@ class ToolActivity : AppCompatActivity() {
             ToolId.IMAGE_OCR, ToolId.IMAGE_TO_JPEG, ToolId.IMAGE_INFO,
             ToolId.IMAGE_RESIZE_COMPRESS, ToolId.IMAGE_CROP -> imagePicker.launch("image/*")
             ToolId.PDF_TEXT -> pdfPicker.launch("application/pdf")
+            ToolId.ACCOUNTING_CALCULATORS -> {
+                startActivity(Intent(this, AccountingCalculatorsActivity::class.java))
+                finish()
+            }
             ToolId.PDF_SPLIT -> {
                 startActivity(Intent(this, PdfSplitActivity::class.java))
                 finish()
