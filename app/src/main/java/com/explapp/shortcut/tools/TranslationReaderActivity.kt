@@ -24,6 +24,10 @@ import com.google.mlkit.nl.translate.TranslatorOptions
 import com.tom_roush.pdfbox.android.PDFBoxResourceLoader
 import com.tom_roush.pdfbox.pdmodel.PDDocument
 import com.tom_roush.pdfbox.text.PDFTextStripper
+import com.tom_roush.pdfbox.rendering.PDFRenderer
+import com.google.mlkit.vision.common.InputImage
+import com.google.mlkit.vision.text.TextRecognition
+import com.google.mlkit.vision.text.latin.TextRecognizerOptions
 import java.util.Locale
 
 /** Native counterpart of Aidict's offline translation and PDF-reader's reading experience. */
@@ -286,8 +290,56 @@ class TranslationReaderActivity : AppCompatActivity(), TextToSpeech.OnInitListen
                     pageLabel.text = label("Page ${actual + 1} / $count", "الصفحة ${actual + 1} من $count")
                     translatedText.text = preferences().getString("translation_${pdfUri}_${page}", "").orEmpty()
                     preferences().edit().putInt("page_$uri", actual).apply()
-                    showStatus(if (text.isBlank()) label("No extractable text. Scanned pages need OCR.", "لا يوجد نص قابل للاستخراج؛ الصفحات المصوّرة تحتاج OCR.") else label("Page ready", "الصفحة جاهزة"))
+                    if (text.isBlank()) {
+                        showStatus(label("Scanned page: reading text with OCR…", "صفحة مصوّرة: جارٍ التعرف على النص…"))
+                        recognizeScannedPage(uri, actual, thisGeneration)
+                    } else {
+                        showStatus(label("Page ready", "الصفحة جاهزة"))
+                    }
                 }.onFailure { showStatus(label("PDF error: ", "خطأ في PDF: ") + it.localizedMessage) }
+            }
+        }.start()
+    }
+
+    private fun recognizeScannedPage(uri: Uri, pageIndex: Int, request: Int) {
+        Thread {
+            val rendered = runCatching {
+                contentResolver.openInputStream(uri)?.use { stream ->
+                    PDDocument.load(stream).use { pdf ->
+                        PDFRenderer(pdf).renderImageWithDPI(pageIndex, 120f)
+                    }
+                } ?: error("Cannot open scanned page")
+            }
+            rendered.onFailure { error ->
+                runOnUiThread {
+                    if (request == generation && !isDestroyed) {
+                        showStatus(label("OCR failed: ", "فشل التعرف على النص: ") + error.localizedMessage)
+                    }
+                }
+            }
+            rendered.onSuccess { bitmap ->
+                val recognizer = TextRecognition.getClient(TextRecognizerOptions.DEFAULT_OPTIONS)
+                recognizer.process(InputImage.fromBitmap(bitmap, 0))
+                    .addOnSuccessListener { result ->
+                        if (request == generation && !isDestroyed) {
+                            sourceInput.setText(result.text)
+                            showStatus(if (result.text.isBlank()) {
+                                label(
+                                    "No readable Latin text. Arabic scanned PDF needs an Arabic OCR engine.",
+                                    "لم يُعثر على نص لاتيني. صفحات PDF العربية المصوّرة تحتاج محرك OCR عربي.",
+                                )
+                            } else label("Scanned text extracted. You can translate it now.", "تم استخراج النص المصوّر، ويمكن ترجمته الآن."))
+                        }
+                    }
+                    .addOnFailureListener { error ->
+                        if (request == generation && !isDestroyed) {
+                            showStatus(label("OCR failed: ", "فشل التعرف على النص: ") + error.localizedMessage)
+                        }
+                    }
+                    .addOnCompleteListener {
+                        bitmap.recycle()
+                        recognizer.close()
+                    }
             }
         }.start()
     }
