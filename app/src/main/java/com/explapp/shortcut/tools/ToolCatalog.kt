@@ -35,6 +35,7 @@ enum class ToolId {
     MULTI_URL_TO_PDF,
     SCREENSHOT_CAPTURE,
     SCREEN_VIDEO_RECORD,
+    ACCOUNTING_CALCULATORS,
 }
 
 data class ShortcutTool(
@@ -72,6 +73,7 @@ object ToolCatalog {
         ShortcutTool(ToolId.SCREEN_VIDEO_RECORD, ToolSection.QUICK, "Floating screen recorder", "تسجيل فيديو الشاشة العائم"),
         ShortcutTool(ToolId.SCREENSHOT_OCR_SEARCH, ToolSection.QUICK, "Screenshot → OCR / Search", "لقطة شاشة → نص / بحث"),
         ShortcutTool(ToolId.WATER_EJECT, ToolSection.QUICK, "Water Eject", "طرد الماء"),
+        ShortcutTool(ToolId.ACCOUNTING_CALCULATORS, ToolSection.QUICK, "Accounting calculators", "الحاسبات المحاسبية"),
 
         ShortcutTool(ToolId.CAR_MODE, ToolSection.AUTOMATION, "Guided car mode", "وضع السيارة الموجّه"),
         ShortcutTool(ToolId.PARKED_CAR, ToolSection.AUTOMATION, "Parked car location", "موقع السيارة المركونة"),
