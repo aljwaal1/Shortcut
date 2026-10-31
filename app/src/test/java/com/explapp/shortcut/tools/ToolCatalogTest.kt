@@ -6,11 +6,11 @@ import org.junit.Test
 
 class ToolCatalogTest {
     @Test
-    fun containsEveryApprovedSeptember16ToolInFourSections() {
+    fun containsEveryApprovedSeptember16ToolInFiveSections() {
         val tools = ToolCatalog.all()
         assertEquals(ToolId.entries.size, tools.size)
         assertEquals(tools.size, tools.map { it.id }.toSet().size)
-        assertEquals(4, tools.map { it.section }.distinct().size)
+        assertEquals(5, tools.map { it.section }.distinct().size)
         assertTrue(ToolId.entries.all { id -> tools.any { it.id == id } })
     }
 
