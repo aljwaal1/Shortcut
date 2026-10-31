@@ -21,6 +21,10 @@ object VisualIdentity {
             accentArgb = 0xFF00A88F.toInt(),
             softArgb = 0xFFDDF7F1.toInt(),
         )
+        ToolSection.ACCOUNTING -> SectionVisualStyle(
+            accentArgb = 0xFF1685D9.toInt(),
+            softArgb = 0xFFE3F2FF.toInt(),
+        )
         ToolSection.AUTOMATION -> SectionVisualStyle(
             accentArgb = 0xFFF39A3F.toInt(),
             softArgb = 0xFFFFEEDC.toInt(),
