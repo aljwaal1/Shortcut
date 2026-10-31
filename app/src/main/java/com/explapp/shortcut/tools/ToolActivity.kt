@@ -655,39 +655,87 @@ class ToolActivity : AppCompatActivity() {
     }
 
     private fun imagesToGif(uris: List<Uri>) {
-        runCatching {
-            require(uris.size >= 2) {
-                local("Select at least two images to make an animated GIF",
-                    "اختر صورتين على الأقل لإنشاء GIF متحرك")
+        if (uris.size < 2) {
+            showError(IllegalArgumentException(local(
+                "Choose at least two images to create a GIF.",
+                "اختر صورتين على الأقل لإنشاء صورة متحركة.",
+            )))
+            return
+        }
+        val speeds = arrayOf(
+            local("Fast • 0.15 seconds", "سريع • 0.15 ثانية"),
+            local("Normal • 0.35 seconds", "عادي • 0.35 ثانية"),
+            local("Slow • 0.7 seconds", "بطيء • 0.7 ثانية"),
+        )
+        val delays = longArrayOf(150, 350, 700)
+        AlertDialog.Builder(this)
+            .setTitle(local("GIF animation speed", "سرعة الصورة المتحركة"))
+            .setSingleChoiceItems(speeds, 1) { dialog, selected ->
+                dialog.dismiss()
+                generateGif(uris, delays[selected])
             }
-            // Cap size and number of frames to reduce memory pressure on phones.
-            val frames = mutableListOf<Bitmap>()
-            try {
-                uris.take(12).forEach { uri -> frames += loadScaledBitmap(uri, 480) }
-                val width = frames.maxOf { it.width }
-                val height = frames.maxOf { it.height }
-                val out = ByteArrayOutputStream()
-                val encoder = GifEncoder(out, width, height, 0)
-                val options = ImageOptions().apply { setDelay(350, TimeUnit.MILLISECONDS) }
-                frames.forEach { frame ->
-                    val normalized = if (frame.width == width && frame.height == height) frame
-                        else Bitmap.createScaledBitmap(frame, width, height, true)
-                    try {
-                        encoder.addImage(bitmapPixels(normalized), options)
-                    } finally {
-                        if (normalized !== frame) normalized.recycle()
+            .setNegativeButton(local("Cancel", "إلغاء")) { _, _ -> finish() }
+            .setOnCancelListener { finish() }
+            .show()
+    }
+
+    private fun generateGif(uris: List<Uri>, frameDelayMs: Long) {
+        toast(local("Creating GIF…", "جارٍ إنشاء الصورة المتحركة…"))
+        Thread {
+            val result = runCatching {
+                val frames = mutableListOf<Bitmap>()
+                try {
+                    uris.take(12).forEach { uri -> frames += loadScaledBitmap(uri, 480) }
+                    val width = frames.maxOf { it.width }
+                    val height = frames.maxOf { it.height }
+                    val out = ByteArrayOutputStream()
+                    val encoder = GifEncoder(out, width, height, 0)
+                    val options = ImageOptions().apply { setDelay(frameDelayMs, TimeUnit.MILLISECONDS) }
+                    frames.forEach { frame ->
+                        val normalized = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
+                        try {
+                            val canvas = Canvas(normalized)
+                            canvas.drawColor(Color.WHITE)
+                            val x = (width - frame.width) / 2f
+                            val y = (height - frame.height) / 2f
+                            canvas.drawBitmap(frame, x, y, null)
+                            encoder.addImage(bitmapPixels(normalized), options)
+                        } finally {
+                            normalized.recycle()
+                        }
                     }
+                    encoder.finishEncoding()
+                    val bytes = out.toByteArray()
+                    require(bytes.isNotEmpty()) { "GIF encoder produced no output" }
+                    saveBytes(bytes, "Animated_${System.currentTimeMillis()}.gif", "image/gif")
+                } finally {
+                    frames.forEach { if (!it.isRecycled) it.recycle() }
                 }
-                encoder.finishEncoding()
-                val bytes = out.toByteArray()
-                require(bytes.isNotEmpty()) { "GIF encoder produced no output" }
-                saveBytes(bytes, "Animated_${System.currentTimeMillis()}.gif", "image/gif")
-            } finally {
-                frames.forEach { if (!it.isRecycled) it.recycle() }
             }
-        }.onSuccess { toast(local("GIF saved", "تم حفظ GIF")) }
-            .onFailure(::showError)
-        finish()
+            runOnUiThread {
+                if (isFinishing || isDestroyed) return@runOnUiThread
+                result.onSuccess { saved ->
+                    AlertDialog.Builder(this)
+                        .setTitle(local("GIF saved", "تم حفظ GIF"))
+                        .setMessage(local(
+                            "Your GIF is saved in Pictures/Shortcut.",
+                            "تم حفظ الصورة المتحركة في Pictures/Shortcut.",
+                        ))
+                        .setPositiveButton(local("Share GIF", "مشاركة GIF")) { _, _ ->
+                            startActivity(Intent.createChooser(Intent(Intent.ACTION_SEND).apply {
+                                type = "image/gif"
+                                putExtra(Intent.EXTRA_STREAM, saved)
+                                addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                                clipData = ClipData.newUri(contentResolver, "GIF", saved)
+                            }, local("Share GIF", "مشاركة GIF")))
+                            finish()
+                        }
+                        .setNegativeButton(local("Done", "تم")) { _, _ -> finish() }
+                        .setOnCancelListener { finish() }
+                        .show()
+                }.onFailure(::showError)
+            }
+        }.start()
     }
 
     private fun bitmapPixels(bitmap: Bitmap): Array<IntArray> {
