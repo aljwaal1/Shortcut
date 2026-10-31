@@ -27,6 +27,7 @@ object ToolRouter {
         ToolId.IMAGE_CROP -> Intent(context, ImageCropActivity::class.java)
         ToolId.IMAGE_TO_JPEG -> Intent(context, JpegConvertActivity::class.java)
         ToolId.MULTI_URL_TO_PDF -> Intent(context, MultiUrlPdfActivity::class.java)
+        ToolId.ACCOUNTING_CALCULATORS -> Intent(context, AccountingCalculatorsActivity::class.java)
         ToolId.PDF_SPLIT -> Intent(context, PdfSplitActivity::class.java)
         ToolId.OFFLINE_TRANSLATE,
         ToolId.PDF_TRANSLATE_READER -> Intent(context, TranslationReaderActivity::class.java)
