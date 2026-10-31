@@ -24,6 +24,6 @@ class AccountingCalculatorsTest {
     }
 
     @Test fun decliningBalanceDepreciationNeverBelowSalvage() {
-        assertEquals(1000.0, AccountingCalculators.decliningBalanceDepreciation(1500.0, 1000.0, 0.8), 0.001)
+        assertEquals(500.0, AccountingCalculators.decliningBalanceDepreciation(1500.0, 1000.0, 0.8), 0.001)
     }
 }
