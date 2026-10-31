@@ -151,6 +151,10 @@ class ToolActivity : AppCompatActivity() {
                 startActivity(Intent(this, DocumentScannerActivity::class.java))
                 finish()
             }
+            ToolId.TABLE_PHOTO_EXCEL -> {
+                startActivity(Intent(this, TablePhotoExcelActivity::class.java))
+                finish()
+            }
             ToolId.ACCOUNTING_CALCULATORS -> {
                 startActivity(Intent(this, AccountingCalculatorsActivity::class.java))
                 finish()
