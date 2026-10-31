@@ -1,6 +1,6 @@
 package com.explapp.shortcut.tools
 
-enum class ToolSection { IMAGES, PDF_FILES, QUICK, AUTOMATION }
+enum class ToolSection { IMAGES, PDF_FILES, QUICK, AUTOMATION, ACCOUNTING }
 
 enum class ToolId {
     MERGE_IMAGES,
@@ -36,6 +36,8 @@ enum class ToolId {
     SCREENSHOT_CAPTURE,
     SCREEN_VIDEO_RECORD,
     ACCOUNTING_CALCULATORS,
+    DOCUMENT_SCANNER,
+    ACCOUNTING_DOCUMENT_SCANNER,
 }
 
 data class ShortcutTool(
@@ -60,6 +62,7 @@ object ToolCatalog {
 
         ShortcutTool(ToolId.PDF_TEXT, ToolSection.PDF_FILES, "Extract text from PDF", "استخراج النص من PDF"),
         ShortcutTool(ToolId.PDF_SPLIT, ToolSection.PDF_FILES, "Split PDF pages / chapters", "تقسيم PDF إلى صفحات أو فصول"),
+        ShortcutTool(ToolId.DOCUMENT_SCANNER, ToolSection.PDF_FILES, "Document scanner", "ماسح المستندات الاحترافي"),
         ShortcutTool(ToolId.PDF_TRANSLATE_READER, ToolSection.PDF_FILES, "Translate and listen to PDF pages", "ترجمة صفحات PDF وقراءتها صوتيًا"),
         ShortcutTool(ToolId.ZIP_FILES, ToolSection.PDF_FILES, "Create ZIP", "إنشاء ZIP"),
         ShortcutTool(ToolId.UNZIP_FILES, ToolSection.PDF_FILES, "Unzip files", "فك ZIP"),
@@ -73,7 +76,8 @@ object ToolCatalog {
         ShortcutTool(ToolId.SCREEN_VIDEO_RECORD, ToolSection.QUICK, "Floating screen recorder", "تسجيل فيديو الشاشة العائم"),
         ShortcutTool(ToolId.SCREENSHOT_OCR_SEARCH, ToolSection.QUICK, "Screenshot → OCR / Search", "لقطة شاشة → نص / بحث"),
         ShortcutTool(ToolId.WATER_EJECT, ToolSection.QUICK, "Water Eject", "طرد الماء"),
-        ShortcutTool(ToolId.ACCOUNTING_CALCULATORS, ToolSection.QUICK, "Accounting calculators", "الحاسبات المحاسبية"),
+        ShortcutTool(ToolId.ACCOUNTING_CALCULATORS, ToolSection.ACCOUNTING, "Accounting calculators", "الحاسبات المحاسبية"),
+        ShortcutTool(ToolId.ACCOUNTING_DOCUMENT_SCANNER, ToolSection.ACCOUNTING, "Scan invoices and documents", "تصوير الفواتير والمستندات"),
 
         ShortcutTool(ToolId.CAR_MODE, ToolSection.AUTOMATION, "Guided car mode", "وضع السيارة الموجّه"),
         ShortcutTool(ToolId.PARKED_CAR, ToolSection.AUTOMATION, "Parked car location", "موقع السيارة المركونة"),
