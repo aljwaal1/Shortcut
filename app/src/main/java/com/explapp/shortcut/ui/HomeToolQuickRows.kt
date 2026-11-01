@@ -8,6 +8,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.Star
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.ElevatedCard
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -85,8 +86,8 @@ private fun QuickGroup(
         tools.chunked(2).forEach { pair ->
             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                 pair.forEach { tool ->
-                    ElevatedCard(onClick = { onOpen(tool.id) }, modifier = Modifier.weight(1f)) {
-                        Column(Modifier.fillMaxWidth().padding(13.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                    ElevatedCard(onClick = { onOpen(tool.id) }, modifier = Modifier.weight(1f), shape = RoundedCornerShape(26.dp)) {
+                        Column(Modifier.fillMaxWidth().padding(17.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                             Text(if (isArabic) tool.titleAr else tool.titleEn, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
                             Text(if (isArabic) "فتح ←" else "Open →", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.primary)
                         }
