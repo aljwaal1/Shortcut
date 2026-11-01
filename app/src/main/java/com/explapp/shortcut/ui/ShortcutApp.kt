@@ -454,7 +454,7 @@ private fun CreateChoice(
     accent: Color,
     onClick: () -> Unit,
 ) {
-    ElevatedCard(
+    ElevatedCard(shape = RoundedCornerShape(26.dp), 
         onClick = onClick,
         modifier = Modifier.fillMaxWidth(),
         colors = CardDefaults.elevatedCardColors(containerColor = accent.copy(alpha = 0.08f)),
@@ -482,10 +482,9 @@ private fun HomeNavCard(
     modifier: Modifier = Modifier,
     onClick: () -> Unit,
 ) {
-    ElevatedCard(
+    ElevatedCard(shape = RoundedCornerShape(26.dp), 
         onClick = onClick,
         modifier = modifier,
-        shape = RoundedCornerShape(18.dp),
         colors = CardDefaults.elevatedCardColors(containerColor = MaterialTheme.colorScheme.surface),
         elevation = CardDefaults.elevatedCardElevation(defaultElevation = 2.dp),
     ) {
@@ -692,7 +691,7 @@ private fun HomeScreen(
         }
         item {
             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                ElevatedCard(
+                ElevatedCard(shape = RoundedCornerShape(26.dp), 
                     onClick = { context.startActivity(Intent(context, MyAutomationsActivity::class.java)) },
                     modifier = Modifier.weight(1f),
                     colors = CardDefaults.elevatedCardColors(containerColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.62f)),
@@ -708,7 +707,7 @@ private fun HomeScreen(
                         )
                     }
                 }
-                ElevatedCard(
+                ElevatedCard(shape = RoundedCornerShape(26.dp), 
                     onClick = { context.startActivity(Intent(context, CommandPaletteActivity::class.java)) },
                     modifier = Modifier.weight(1f),
                     colors = CardDefaults.elevatedCardColors(containerColor = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.62f)),
@@ -769,7 +768,7 @@ private fun HomeScreen(
             val exactReady = Build.VERSION.SDK_INT < Build.VERSION_CODES.S || alarmManager.canScheduleExactAlarms()
             val captureReady = PersistentScreenCaptureService.isSessionActive(context)
 
-            ElevatedCard(
+            ElevatedCard(shape = RoundedCornerShape(26.dp), 
                 modifier = Modifier.fillMaxWidth(),
                 colors = CardDefaults.elevatedCardColors(containerColor = MaterialTheme.colorScheme.surface),
             ) {
@@ -833,7 +832,7 @@ private fun HomeScreen(
                 )
             }
             items(shortcuts, key = { it.id }) { shortcut ->
-                ElevatedCard(
+                ElevatedCard(shape = RoundedCornerShape(26.dp), 
                     modifier = Modifier.fillMaxWidth(),
                     colors = CardDefaults.elevatedCardColors(containerColor = MaterialTheme.colorScheme.surface),
                 ) {
@@ -871,7 +870,7 @@ private fun HomeScreen(
                 )
             }
             items(messages, key = { it.id }) { message ->
-                ElevatedCard(modifier = Modifier.fillMaxWidth()) {
+                ElevatedCard(shape = RoundedCornerShape(26.dp), modifier = Modifier.fillMaxWidth()) {
                     Row(
                         Modifier.fillMaxWidth().padding(16.dp),
                         horizontalArrangement = Arrangement.spacedBy(8.dp),
@@ -1099,7 +1098,7 @@ private fun TemplatesScreen(
             }
         }
         items(visibleTemplates, key = { it.id }) { template ->
-            ElevatedCard(
+            ElevatedCard(shape = RoundedCornerShape(26.dp), 
                 modifier = Modifier.fillMaxWidth(),
                 colors = CardDefaults.elevatedCardColors(containerColor = template.accent.copy(alpha = 0.09f)),
                 onClick = { openTemplate(template) },
@@ -1166,7 +1165,7 @@ private fun SettingsScreen(padding: PaddingValues, onOpenPermissions: () -> Unit
             )
         }
         item {
-            ElevatedCard(
+            ElevatedCard(shape = RoundedCornerShape(26.dp), 
                 modifier = Modifier.fillMaxWidth(),
                 colors = CardDefaults.elevatedCardColors(containerColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.55f)),
             ) {
@@ -1184,7 +1183,7 @@ private fun SettingsScreen(padding: PaddingValues, onOpenPermissions: () -> Unit
             }
         }
         item {
-            ElevatedCard(
+            ElevatedCard(shape = RoundedCornerShape(26.dp), 
                 modifier = Modifier.fillMaxWidth(),
                 colors = CardDefaults.elevatedCardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.65f)),
             ) {
@@ -1231,7 +1230,7 @@ private fun SettingsScreen(padding: PaddingValues, onOpenPermissions: () -> Unit
             }
         }
         item {
-            ElevatedCard(
+            ElevatedCard(shape = RoundedCornerShape(26.dp), 
                 onClick = onOpenPermissions,
                 modifier = Modifier.fillMaxWidth(),
                 colors = CardDefaults.elevatedCardColors(containerColor = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.55f)),
@@ -1248,7 +1247,7 @@ private fun SettingsScreen(padding: PaddingValues, onOpenPermissions: () -> Unit
             }
         }
         item {
-            ElevatedCard(
+            ElevatedCard(shape = RoundedCornerShape(26.dp), 
                 onClick = { context.startActivity(Intent(context, BackupTransferActivity::class.java)) },
                 modifier = Modifier.fillMaxWidth(),
                 colors = CardDefaults.elevatedCardColors(containerColor = MaterialTheme.colorScheme.tertiaryContainer.copy(alpha = 0.45f)),
@@ -1272,7 +1271,7 @@ private fun SettingsScreen(padding: PaddingValues, onOpenPermissions: () -> Unit
             }
         }
         item {
-            ElevatedCard(
+            ElevatedCard(shape = RoundedCornerShape(26.dp), 
                 onClick = { openProjectPage("issues/new") },
                 modifier = Modifier.fillMaxWidth(),
             ) {
@@ -1295,7 +1294,7 @@ private fun SettingsScreen(padding: PaddingValues, onOpenPermissions: () -> Unit
             }
         }
         item {
-            ElevatedCard(
+            ElevatedCard(shape = RoundedCornerShape(26.dp), 
                 onClick = { openProjectPage("issues") },
                 modifier = Modifier.fillMaxWidth(),
             ) {
@@ -1319,7 +1318,7 @@ private fun SettingsScreen(padding: PaddingValues, onOpenPermissions: () -> Unit
         }
         if (crashRecord != null) {
             item {
-                ElevatedCard(
+                ElevatedCard(shape = RoundedCornerShape(26.dp), 
                     onClick = { infoDialog = "crash" },
                     modifier = Modifier.fillMaxWidth(),
                     colors = CardDefaults.elevatedCardColors(containerColor = MaterialTheme.colorScheme.error.copy(alpha = 0.07f)),
@@ -1348,7 +1347,7 @@ private fun SettingsScreen(padding: PaddingValues, onOpenPermissions: () -> Unit
             }
         }
         item {
-            ElevatedCard(
+            ElevatedCard(shape = RoundedCornerShape(26.dp), 
                 onClick = { infoDialog = "privacy" },
                 modifier = Modifier.fillMaxWidth(),
             ) {
@@ -1364,7 +1363,7 @@ private fun SettingsScreen(padding: PaddingValues, onOpenPermissions: () -> Unit
             }
         }
         item {
-            ElevatedCard(
+            ElevatedCard(shape = RoundedCornerShape(26.dp), 
                 onClick = { infoDialog = "about" },
                 modifier = Modifier.fillMaxWidth(),
             ) {
@@ -1523,7 +1522,7 @@ private fun PermissionsScreen(onBack: () -> Unit) {
 @Composable
 private fun PermissionCard(title: String, description: String, granted: Boolean, action: (() -> Unit)?) {
     val accent = if (granted) Color(0xFF1B9C68) else MaterialTheme.colorScheme.tertiary
-    ElevatedCard(
+    ElevatedCard(shape = RoundedCornerShape(26.dp), 
         modifier = Modifier.fillMaxWidth(),
         colors = CardDefaults.elevatedCardColors(containerColor = accent.copy(alpha = 0.08f)),
     ) {
