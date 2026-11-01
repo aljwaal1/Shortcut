@@ -6,6 +6,7 @@ on:
       - feature/android-v1-phase1
     paths:
       - .github/workflows/publish-direct-apk.yml
+  workflow_dispatch:
 
 permissions:
   contents: write
@@ -15,23 +16,23 @@ jobs:
   publish:
     runs-on: ubuntu-latest
     steps:
-      - name: Download verified successful CI APK
+      - name: Download successful Android CI APK
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           mkdir -p dist
-          gh run download 40119654287 --repo "${{ github.repository }}" --name shortcut-debug-apk --dir dist
+          gh run download 41329327694 --repo "${{ github.repository }}" --name shortcut-debug-apk --dir dist
           test -s dist/app-debug.apk
           unzip -t dist/app-debug.apk >/dev/null
-          mv dist/app-debug.apk dist/Shortcut-0.9.12.apk
+          mv dist/app-debug.apk dist/Shortcut-latest-2026-11-01.apk
 
-      - name: Publish APK as prerelease for direct browser downloads
+      - name: Publish direct-download prerelease
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          gh release create "v0.9.12" dist/Shortcut-0.9.12.apk \
+          gh release create "shortcut-2026-11-01-preview" dist/Shortcut-latest-2026-11-01.apk \
             --repo "${{ github.repository }}" \
-            --title "Shortcut Android v0.9.12 (screen recorder overlay fix)" \
-            --notes "Verified Android CI build #2030. Fixed black recording-overlay rectangle, added explicit small or hidden recording controls, and preserved offline translation tools. Debug-signed preview; on-device recording validation remains necessary." \
-            --target c1d1774e4175c2c2e7a597020d74a50d2d6331b6 \
+            --title "Shortcut Android - November 1, 2026 preview" \
+            --notes "Built from verified successful Android CI run 41329327694 (commit f3306112422f0b13654bbf5a8131732e876068f5). Document scanner, table-photo Excel, accounting calculators, improved cards and navigation. Debug-signed Android preview; on-device testing pending." \
+            --target f3306112422f0b13654bbf5a8131732e876068f5 \
             --prerelease
