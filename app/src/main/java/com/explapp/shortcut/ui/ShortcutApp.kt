@@ -333,14 +333,18 @@ private fun MainShell(
                 containerColor = MaterialTheme.colorScheme.surface,
                 tonalElevation = 5.dp,
             ) {
-                MainTab.entries.filter { it == MainTab.HOME || it == MainTab.TEMPLATES || it == MainTab.TOOLS }.forEach { tab ->
+                MainTab.entries.filter { it == MainTab.HOME || it == MainTab.TEMPLATES || it == MainTab.TOOLS || it == MainTab.SETTINGS }.forEach { tab ->
                     NavigationBarItem(
                         selected = selected == tab,
                         onClick = {
                             if (tab == MainTab.TOOLS) onOpenTools() else selected = tab
                         },
                         icon = { Icon(tab.icon, contentDescription = null) },
-                        label = { Text(stringResource(tab.label)) },
+                        label = { Text(when (tab) {
+                            MainTab.TEMPLATES -> if (ar) "الأتمتة" else "Automation"
+                            MainTab.SETTINGS -> if (ar) "المزيد" else "More"
+                            else -> stringResource(tab.label)
+                        }) },
                     )
                 }
             }
