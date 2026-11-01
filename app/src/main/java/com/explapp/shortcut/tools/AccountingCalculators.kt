@@ -31,6 +31,26 @@ object AccountingCalculators {
         return units.toLong()
     }
 
+    fun simpleInterest(principal: Double, annualRate: Double, years: Double): Double {
+        require(principal.isFinite() && principal >= 0 && annualRate.isFinite() && annualRate >= 0)
+        require(years.isFinite() && years >= 0)
+        return principal * annualRate * years
+    }
+
+    fun compoundAmount(principal: Double, annualRate: Double, years: Int): Double {
+        require(principal.isFinite() && principal >= 0 && annualRate.isFinite() && annualRate >= 0)
+        require(years >= 0)
+        return principal * Math.pow(1.0 + annualRate, years.toDouble())
+    }
+
+    fun roiPercent(returnedAmount: Double, investment: Double): Double {
+        require(returnedAmount.isFinite() && investment.isFinite() && investment > 0)
+        return (returnedAmount - investment) / investment * 100.0
+    }
+
+    fun contributionMarginPercent(price: Double, variableCost: Double): Double =
+        contributionMarginPerUnit(price, variableCost) / price * 100.0
+
     fun breakEvenSales(fixedCosts: Double, price: Double, variableCost: Double): Double {
         require(fixedCosts.isFinite() && fixedCosts >= 0)
         val marginRatio = contributionMarginPerUnit(price, variableCost) / price
