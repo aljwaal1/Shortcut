@@ -39,7 +39,8 @@ class AccountingCalculatorsActivity : ComponentActivity() {
 }
 
 private enum class AccountingMode {
-    STRAIGHT_LINE, DECLINING_BALANCE, BREAK_EVEN_UNITS, BREAK_EVEN_SALES
+    STRAIGHT_LINE, DECLINING_BALANCE, BREAK_EVEN_UNITS, BREAK_EVEN_SALES,
+    SIMPLE_INTEREST, COMPOUND_AMOUNT, ROI, CONTRIBUTION_MARGIN
 }
 
 @Composable
@@ -51,14 +52,17 @@ private fun AccountingCalculatorsScreen() {
     var third by remember(mode) { mutableStateOf("") }
     var result by remember(mode) { mutableStateOf<String?>(null) }
     val numberFormatter = remember { NumberFormat.getNumberInstance(Locale.getDefault()).apply { maximumFractionDigits = 2 } }
-    val names = if (ar) listOf("الإهلاك بالقسط الثابت", "إهلاك الرصيد المتناقص", "نقطة التعادل بالوحدات", "نقطة التعادل بالمبيعات") else
-        listOf("Straight-line depreciation", "Declining-balance depreciation", "Break-even units", "Break-even sales")
+    val names = if (ar) listOf("الإهلاك بالقسط الثابت", "إهلاك الرصيد المتناقص", "نقطة التعادل بالوحدات", "نقطة التعادل بالمبيعات", "الفوائد البسيطة", "الفوائد المركبة", "العائد على الاستثمار", "هامش المساهمة %") else
+        listOf("Straight-line depreciation", "Declining-balance depreciation", "Break-even units", "Break-even sales", "Simple interest", "Compound interest", "Return on investment", "Contribution margin %")
     val currentIndex = AccountingMode.entries.indexOf(mode)
     val currency = if (ar) "المبلغ (بعملتك)" else "Amount (your currency)"
     val fields = when(mode) {
         AccountingMode.STRAIGHT_LINE -> if(ar) listOf("تكلفة الأصل", "القيمة التخريدية", "العمر الإنتاجي بالسنوات") else listOf("Asset cost", "Salvage value", "Useful life in years")
         AccountingMode.DECLINING_BALANCE -> if(ar) listOf("القيمة الدفترية الحالية", "القيمة التخريدية", "معدل الإهلاك السنوي %") else listOf("Current book value", "Salvage value", "Annual depreciation rate %")
         AccountingMode.BREAK_EVEN_UNITS, AccountingMode.BREAK_EVEN_SALES -> if(ar) listOf("التكاليف الثابتة", "سعر بيع الوحدة", "التكلفة المتغيرة للوحدة") else listOf("Fixed costs", "Selling price per unit", "Variable cost per unit")
+        AccountingMode.SIMPLE_INTEREST, AccountingMode.COMPOUND_AMOUNT -> if(ar) listOf("أصل المبلغ", "معدل الفائدة السنوي %", "المدة بالسنوات") else listOf("Principal", "Annual interest rate %", "Years")
+        AccountingMode.ROI -> if(ar) listOf("المبلغ المسترد", "قيمة الاستثمار", "غير مطلوب") else listOf("Returned amount", "Investment", "Not needed")
+        AccountingMode.CONTRIBUTION_MARGIN -> if(ar) listOf("سعر بيع الوحدة", "التكلفة المتغيرة", "غير مطلوب") else listOf("Selling price per unit", "Variable cost", "Not needed")
     }
 
     Scaffold { padding ->
@@ -81,22 +85,32 @@ private fun AccountingCalculatorsScreen() {
             Text(names[currentIndex], fontWeight = FontWeight.Bold)
             OutlinedTextField(value = first, onValueChange = { first = it; result = null }, label = { Text(fields[0]) }, modifier = Modifier.fillMaxWidth(), singleLine = true)
             OutlinedTextField(value = second, onValueChange = { second = it; result = null }, label = { Text(fields[1]) }, modifier = Modifier.fillMaxWidth(), singleLine = true)
-            OutlinedTextField(value = third, onValueChange = { third = it; result = null }, label = { Text(fields[2]) }, modifier = Modifier.fillMaxWidth(), singleLine = true)
+            if (mode != AccountingMode.ROI && mode != AccountingMode.CONTRIBUTION_MARGIN) {
+                OutlinedTextField(value = third, onValueChange = { third = it; result = null }, label = { Text(fields[2]) }, modifier = Modifier.fillMaxWidth(), singleLine = true)
+            }
             Button(
                 onClick = {
                     result = runCatching {
                         fun parse(value: String): Double = value.trim().replace(',', '.').toDouble()
                         val a = parse(first)
                         val b = parse(second)
-                        val c = parse(third)
+                        val c = if (mode == AccountingMode.ROI || mode == AccountingMode.CONTRIBUTION_MARGIN) 0.0 else parse(third)
                         val answer = when(mode) {
                             AccountingMode.STRAIGHT_LINE -> AccountingCalculators.straightLineDepreciation(a, b, c.toInt().also { require(it.toDouble() == c) })
                             AccountingMode.DECLINING_BALANCE -> AccountingCalculators.decliningBalanceDepreciation(a, b, c / 100.0)
                             AccountingMode.BREAK_EVEN_UNITS -> AccountingCalculators.breakEvenUnits(a, b, c).toDouble()
                             AccountingMode.BREAK_EVEN_SALES -> AccountingCalculators.breakEvenSales(a, b, c)
+                            AccountingMode.SIMPLE_INTEREST -> AccountingCalculators.simpleInterest(a, b / 100.0, c)
+                            AccountingMode.COMPOUND_AMOUNT -> AccountingCalculators.compoundAmount(a, b / 100.0, c.toInt().also { require(it.toDouble() == c) })
+                            AccountingMode.ROI -> AccountingCalculators.roiPercent(a, b)
+                            AccountingMode.CONTRIBUTION_MARGIN -> AccountingCalculators.contributionMarginPercent(a, b)
                         }
                         (if(ar) "النتيجة: " else "Result: ") + numberFormatter.format(answer) +
-                            (if(mode == AccountingMode.BREAK_EVEN_UNITS) (if(ar) " وحدة" else " units") else "")
+                            (when(mode) {
+                                AccountingMode.BREAK_EVEN_UNITS -> if(ar) " وحدة" else " units"
+                                AccountingMode.ROI, AccountingMode.CONTRIBUTION_MARGIN -> " %"
+                                else -> ""
+                            })
                     }.getOrElse {
                         if(ar) "راجع الأرقام: القيم يجب أن تكون صحيحة، وسعر البيع أكبر من التكلفة المتغيرة." else
                             "Check values: enter valid numbers and make sure selling price exceeds variable cost."
