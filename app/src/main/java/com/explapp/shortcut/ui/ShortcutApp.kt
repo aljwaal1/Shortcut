@@ -393,7 +393,7 @@ private fun MainShell(
             )
             MainTab.TOOLS -> Unit
             MainTab.HISTORY -> ExecutionHistoryScreen(padding)
-            MainTab.SETTINGS -> SettingsScreen(padding, onOpenPermissions)
+            MainTab.SETTINGS -> SettingsScreen(padding, onOpenPermissions, onOpenHistory = { selected = MainTab.HISTORY })
         }
     }
 
@@ -1135,7 +1135,7 @@ private fun TemplatesScreen(
 }
 
 @Composable
-private fun SettingsScreen(padding: PaddingValues, onOpenPermissions: () -> Unit) {
+private fun SettingsScreen(padding: PaddingValues, onOpenPermissions: () -> Unit, onOpenHistory: () -> Unit) {
     val context = LocalContext.current
     val configuration = LocalConfiguration.current
     val ar = configuration.locales[0].language == "ar"
@@ -1163,6 +1163,11 @@ private fun SettingsScreen(padding: PaddingValues, onOpenPermissions: () -> Unit
                 title = stringResource(R.string.settings),
                 subtitle = if (ar) "خصص اللغة والصلاحيات وخيارات التطبيق" else "Language, permissions and app options",
             )
+        }
+        item {
+            ElevatedCard(shape = RoundedCornerShape(26.dp), onClick = onOpenHistory, modifier = Modifier.fillMaxWidth()) {
+                Text(if (ar) "سجل التنفيذ والعمليات" else "Execution history", modifier = Modifier.padding(18.dp), style = MaterialTheme.typography.titleMedium)
+            }
         }
         item {
             ElevatedCard(shape = RoundedCornerShape(26.dp), 
