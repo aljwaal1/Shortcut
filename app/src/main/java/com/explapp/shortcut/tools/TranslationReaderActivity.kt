@@ -8,6 +8,7 @@ import android.os.Bundle
 import android.speech.tts.TextToSpeech
 import android.view.Gravity
 import android.view.ViewGroup
+import android.view.View
 import android.widget.Button
 import android.widget.EditText
 import android.widget.LinearLayout
@@ -85,6 +86,28 @@ class TranslationReaderActivity : AppCompatActivity(), TextToSpeech.OnInitListen
             setPadding(0, dp(6), 0, 0)
         })
 
+        // Start with the document, not with model-management settings.
+        val modeCard = panel(root)
+        modeCard.addView(sectionTitle(label("What would you like to translate?", "ماذا تريد أن تترجم؟")))
+        val pdfMode = button(modeCard, "PDF document", "ملف PDF") { }
+        val textMode = button(modeCard, "Write or paste text", "كتابة أو لصق نص") { }
+
+        val pdfCard = panel(root)
+        pdfCard.addView(sectionTitle(label("1. Choose your PDF", "١. اختر ملف PDF")))
+        button(pdfCard, "Choose PDF from phone", "اختيار PDF من الهاتف") { pdfPicker.launch(arrayOf("application/pdf")) }
+        pageLabel = TextView(this).apply {
+            text = label("No PDF selected", "لم يتم اختيار ملف PDF")
+            gravity = Gravity.CENTER
+            textSize = 14f
+            setTextColor(android.graphics.Color.rgb(74, 84, 110))
+            setPadding(0, dp(8), 0, dp(4))
+        }
+        pdfCard.addView(pageLabel)
+        val pageActions = horizontalRow(pdfCard)
+        button(pageActions, "◀ Previous", "◀ السابقة") { changePage(-1) }
+        button(pageActions, "Next ▶", "التالية ▶") { changePage(1) }
+        button(pdfCard, "Translate this page", "ترجمة الصفحة الحالية") { translate() }
+
         val controls = panel(root)
         controls.addView(sectionTitle(label("Languages", "اللغات")))
         languageButton = button(controls, "English → Arabic  ⇄", "إنجليزي ← عربي  ⇄") {
@@ -99,8 +122,15 @@ class TranslationReaderActivity : AppCompatActivity(), TextToSpeech.OnInitListen
             )
             showStatus(label("Direction changed. Check the offline model.", "تغير اتجاه الترجمة؛ تحقّق من النموذج المحلي."))
         }
-        button(controls, "Check / download offline model", "فحص / تنزيل نموذج الترجمة المحلي") { prepareModels() }
-        button(controls, "Download Arabic OCR model", "تنزيل نموذج قراءة الصور العربية") { prepareArabicOcr() }
+        val modelButton = button(controls, "Download offline language model", "تنزيل نموذج اللغة للاستخدام دون إنترنت") { prepareModels() }
+        val ocrButton = button(controls, "Download Arabic OCR model", "تنزيل نموذج قراءة الصور العربية") { prepareArabicOcr() }
+        modelButton.visibility = View.GONE
+        ocrButton.visibility = View.GONE
+        button(controls, "Offline settings ▾", "إعدادات العمل دون إنترنت ▾") {
+            val expanded = modelButton.visibility != View.VISIBLE
+            modelButton.visibility = if (expanded) View.VISIBLE else View.GONE
+            ocrButton.visibility = if (expanded) View.VISIBLE else View.GONE
+        }
         status = TextView(this).apply {
             textSize = 14f
             setTextColor(android.graphics.Color.rgb(59, 74, 104))
@@ -124,20 +154,15 @@ class TranslationReaderActivity : AppCompatActivity(), TextToSpeech.OnInitListen
         inputCard.addView(sourceInput, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT))
         button(inputCard, "Translate now", "ترجم الآن") { translate() }
 
-        val pdfCard = panel(root)
-        pdfCard.addView(sectionTitle(label("PDF page reader", "قارئ صفحات PDF")))
-        button(pdfCard, "Open PDF from phone", "فتح ملف PDF من الهاتف") { pdfPicker.launch(arrayOf("application/pdf")) }
-        pageLabel = TextView(this).apply {
-            text = label("No PDF selected", "لم يتم اختيار ملف PDF")
-            gravity = Gravity.CENTER
-            textSize = 14f
-            setTextColor(android.graphics.Color.rgb(74, 84, 110))
-            setPadding(0, dp(8), 0, dp(4))
+        fun showMode(pdf: Boolean) {
+            pdfCard.visibility = if (pdf) View.VISIBLE else View.GONE
+            inputCard.visibility = if (pdf) View.GONE else View.VISIBLE
+            pdfMode.isEnabled = !pdf
+            textMode.isEnabled = pdf
         }
-        pdfCard.addView(pageLabel)
-        val pageActions = horizontalRow(pdfCard)
-        button(pageActions, "◀ Previous", "◀ السابقة") { changePage(-1) }
-        button(pageActions, "Next ▶", "التالية ▶") { changePage(1) }
+        pdfMode.setOnClickListener { showMode(true) }
+        textMode.setOnClickListener { showMode(false) }
+        showMode(intent.getStringExtra(EXTRA_INITIAL_TEXT).isNullOrBlank())
 
         val resultCard = panel(root)
         resultCard.addView(sectionTitle(label("Translation", "الترجمة")))
@@ -221,7 +246,7 @@ class TranslationReaderActivity : AppCompatActivity(), TextToSpeech.OnInitListen
         }.start()
     }
 
-    private fun prepareModels() {
+    private fun prepareModels(onReady: (() -> Unit)? = null) {
         showStatus(label("Checking / downloading languages…", "جارٍ فحص / تنزيل اللغات…"))
         modelsReady = false
         translator?.close()
@@ -235,6 +260,7 @@ class TranslationReaderActivity : AppCompatActivity(), TextToSpeech.OnInitListen
                 if (active === translator && !isDestroyed) {
                     modelsReady = true
                     showStatus(label("Languages ready. Translation now works offline.", "اللغات جاهزة. الترجمة تعمل الآن دون إنترنت."))
+                    onReady?.invoke()
                 }
             }.addOnFailureListener {
                 if (active === translator && !isDestroyed) showStatus(label("Model download failed: ", "فشل تنزيل النموذج: ") + it.localizedMessage)
@@ -244,7 +270,10 @@ class TranslationReaderActivity : AppCompatActivity(), TextToSpeech.OnInitListen
     private fun translate() {
         val input = sourceInput.text.toString().trim()
         if (input.isBlank()) return showStatus(label("Enter some text first.", "أدخل نصًا أولًا."))
-        if (!modelsReady) return showStatus(label("Download / check the models first.", "نزّل النماذج أو تحقق منها أولًا."))
+        if (!modelsReady) {
+            prepareModels { translate() }
+            return
+        }
         val active = translator ?: return
         val segments = TranslationReading.chunks(input, 450)
         val results = ArrayList<String>(segments.size)
