@@ -1,0 +1,58 @@
+package com.explapp.shortcut.automation.routines
+
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertTrue
+import org.junit.Test
+
+class RoutineTriggerMatcherTest {
+    @Test
+    fun matchesTimeAndChargerAndBatteryThresholds() {
+        assertTrue(RoutineTriggerMatcher.matches(RoutineTrigger(RoutineTriggerType.TIME, "07:30"), RoutineEvent(RoutineTriggerType.TIME, "07:30")))
+        assertFalse(RoutineTriggerMatcher.matches(RoutineTrigger(RoutineTriggerType.TIME, "07:30"), RoutineEvent(RoutineTriggerType.TIME, "07:31")))
+        assertTrue(RoutineTriggerMatcher.matches(RoutineTrigger(RoutineTriggerType.CHARGER_CONNECTED), RoutineEvent(RoutineTriggerType.CHARGER_CONNECTED)))
+        assertTrue(RoutineTriggerMatcher.matches(RoutineTrigger(RoutineTriggerType.BATTERY_BELOW, "20"), RoutineEvent(RoutineTriggerType.BATTERY_BELOW, "15")))
+        assertFalse(RoutineTriggerMatcher.matches(RoutineTrigger(RoutineTriggerType.BATTERY_BELOW, "20"), RoutineEvent(RoutineTriggerType.BATTERY_BELOW, "50")))
+    }
+
+    @Test
+    fun unlockEventsMatchOnlyTheirOwnTrigger() {
+        assertTrue(RoutineTriggerMatcher.matches(
+            RoutineTrigger(RoutineTriggerType.DEVICE_UNLOCKED),
+            RoutineEvent(RoutineTriggerType.DEVICE_UNLOCKED)))
+        assertFalse(RoutineTriggerMatcher.matches(
+            RoutineTrigger(RoutineTriggerType.FIRST_UNLOCK_DAILY),
+            RoutineEvent(RoutineTriggerType.FIRST_UNLOCK_AFTER_BOOT)))
+    }
+
+    @Test
+    fun connectivityEventsAreDistinct() {
+        assertTrue(RoutineTriggerMatcher.matches(
+            RoutineTrigger(RoutineTriggerType.INTERNET_CONNECTED),
+            RoutineEvent(RoutineTriggerType.INTERNET_CONNECTED)))
+        assertFalse(RoutineTriggerMatcher.matches(
+            RoutineTrigger(RoutineTriggerType.INTERNET_CONNECTED),
+            RoutineEvent(RoutineTriggerType.INTERNET_DISCONNECTED)))
+    }
+
+    @Test
+    fun pausedRoutineNeverMatches() {
+        val routine = AutomationRoutine(
+            name = "Paused",
+            isEnabled = false,
+            trigger = RoutineTrigger(RoutineTriggerType.CHARGER_CONNECTED),
+            actions = emptyList(),
+        )
+        assertFalse(RoutineTriggerMatcher.matches(routine, RoutineEvent(RoutineTriggerType.CHARGER_CONNECTED)))
+    }
+
+    @Test
+    fun enabledButInvalidRoutineNeverMatches() {
+        val routine = AutomationRoutine(
+            name = "Incomplete template",
+            isEnabled = true,
+            trigger = RoutineTrigger(RoutineTriggerType.CHARGER_CONNECTED),
+            actions = listOf(RoutineAction(RoutineActionType.OPEN_APP, "")),
+        )
+        assertFalse(RoutineTriggerMatcher.matches(routine, RoutineEvent(RoutineTriggerType.CHARGER_CONNECTED)))
+    }
+}

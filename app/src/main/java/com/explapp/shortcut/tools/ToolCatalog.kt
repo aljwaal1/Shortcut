@@ -1,0 +1,93 @@
+package com.explapp.shortcut.tools
+
+enum class ToolSection { IMAGES, PDF_FILES, QUICK, AUTOMATION, ACCOUNTING }
+
+enum class ToolId {
+    MERGE_IMAGES,
+    IMAGES_TO_PDF,
+    IMAGE_OCR,
+    PDF_TEXT,
+    PDF_SPLIT,
+    OFFLINE_TRANSLATE,
+    PDF_TRANSLATE_READER,
+    ZIP_FILES,
+    UNZIP_FILES,
+    IMAGE_TO_JPEG,
+    IMAGE_INFO,
+    QR_CREATE,
+    CLIPBOARD,
+    SCREENSHOT_OCR_SEARCH,
+    CAR_MODE,
+    PARKED_CAR,
+    BATTERY_CHARGER,
+    NFC_TRIGGER,
+    APP_OPEN_ROUTINE,
+    MY_AUTOMATIONS,
+    MORNING_SLEEP,
+    CALENDAR_REMINDERS,
+    WATER_EJECT,
+    GIF_CREATE,
+    IMAGE_RESIZE_COMPRESS,
+    IMAGE_CROP,
+    LATEST_PHOTO,
+    LATEST_SCREENSHOT,
+    URL_TO_PDF,
+    MULTI_URL_TO_PDF,
+    SCREENSHOT_CAPTURE,
+    SCREEN_VIDEO_RECORD,
+    ACCOUNTING_CALCULATORS,
+    DOCUMENT_SCANNER,
+    ACCOUNTING_DOCUMENT_SCANNER,
+    TABLE_PHOTO_EXCEL,
+}
+
+data class ShortcutTool(
+    val id: ToolId,
+    val section: ToolSection,
+    val titleEn: String,
+    val titleAr: String,
+)
+
+object ToolCatalog {
+    fun all(): List<ShortcutTool> = listOf(
+        ShortcutTool(ToolId.MERGE_IMAGES, ToolSection.IMAGES, "Merge images", "دمج الصور"),
+        ShortcutTool(ToolId.IMAGES_TO_PDF, ToolSection.IMAGES, "Images to PDF", "الصور إلى PDF"),
+        ShortcutTool(ToolId.IMAGE_OCR, ToolSection.IMAGES, "Extract text from image", "استخراج النص من الصورة"),
+        ShortcutTool(ToolId.IMAGE_TO_JPEG, ToolSection.IMAGES, "Convert to JPEG", "تحويل إلى JPEG"),
+        ShortcutTool(ToolId.IMAGE_INFO, ToolSection.IMAGES, "Image information", "معلومات الصورة"),
+        ShortcutTool(ToolId.GIF_CREATE, ToolSection.IMAGES, "Create GIF", "إنشاء GIF"),
+        ShortcutTool(ToolId.IMAGE_RESIZE_COMPRESS, ToolSection.IMAGES, "Compress / resize image", "ضغط / تغيير حجم الصورة"),
+        ShortcutTool(ToolId.IMAGE_CROP, ToolSection.IMAGES, "Crop image", "قص الصورة"),
+        ShortcutTool(ToolId.LATEST_PHOTO, ToolSection.IMAGES, "Share latest photo", "مشاركة آخر صورة"),
+        ShortcutTool(ToolId.LATEST_SCREENSHOT, ToolSection.IMAGES, "Share latest screenshot", "مشاركة آخر لقطة شاشة"),
+
+        ShortcutTool(ToolId.PDF_TEXT, ToolSection.PDF_FILES, "Extract text from PDF", "استخراج النص من PDF"),
+        ShortcutTool(ToolId.PDF_SPLIT, ToolSection.PDF_FILES, "Split PDF pages / chapters", "تقسيم PDF إلى صفحات أو فصول"),
+        ShortcutTool(ToolId.DOCUMENT_SCANNER, ToolSection.PDF_FILES, "Document scanner", "ماسح المستندات الاحترافي"),
+        ShortcutTool(ToolId.PDF_TRANSLATE_READER, ToolSection.PDF_FILES, "Translate and listen to PDF pages", "ترجمة صفحات PDF وقراءتها صوتيًا"),
+        ShortcutTool(ToolId.ZIP_FILES, ToolSection.PDF_FILES, "Create ZIP", "إنشاء ZIP"),
+        ShortcutTool(ToolId.UNZIP_FILES, ToolSection.PDF_FILES, "Unzip files", "فك ZIP"),
+        ShortcutTool(ToolId.URL_TO_PDF, ToolSection.PDF_FILES, "Open URL for Print → PDF", "فتح الرابط للطباعة ← PDF"),
+        ShortcutTool(ToolId.MULTI_URL_TO_PDF, ToolSection.PDF_FILES, "Open URLs for Print → PDFs", "فتح الروابط للطباعة ← PDFs"),
+
+        ShortcutTool(ToolId.QR_CREATE, ToolSection.QUICK, "Create QR code", "إنشاء QR Code"),
+        ShortcutTool(ToolId.CLIPBOARD, ToolSection.QUICK, "Clipboard tools", "أدوات الحافظة"),
+        ShortcutTool(ToolId.OFFLINE_TRANSLATE, ToolSection.QUICK, "Offline Arabic / English translation", "ترجمة عربية / إنجليزية دون إنترنت"),
+        ShortcutTool(ToolId.SCREENSHOT_CAPTURE, ToolSection.QUICK, "Take screenshot", "التقاط لقطة شاشة"),
+        ShortcutTool(ToolId.SCREEN_VIDEO_RECORD, ToolSection.QUICK, "Floating screen recorder", "تسجيل فيديو الشاشة العائم"),
+        ShortcutTool(ToolId.SCREENSHOT_OCR_SEARCH, ToolSection.QUICK, "Screenshot → OCR / Search", "لقطة شاشة → نص / بحث"),
+        ShortcutTool(ToolId.WATER_EJECT, ToolSection.QUICK, "Water Eject", "طرد الماء"),
+        ShortcutTool(ToolId.ACCOUNTING_CALCULATORS, ToolSection.ACCOUNTING, "Accounting calculators", "الحاسبات المحاسبية"),
+        ShortcutTool(ToolId.ACCOUNTING_DOCUMENT_SCANNER, ToolSection.ACCOUNTING, "Scan invoices and documents", "تصوير الفواتير والمستندات"),
+        ShortcutTool(ToolId.TABLE_PHOTO_EXCEL, ToolSection.ACCOUNTING, "Photo table to Excel", "تصوير جدول إلى Excel"),
+
+        ShortcutTool(ToolId.CAR_MODE, ToolSection.AUTOMATION, "Guided car mode", "وضع السيارة الموجّه"),
+        ShortcutTool(ToolId.PARKED_CAR, ToolSection.AUTOMATION, "Parked car location", "موقع السيارة المركونة"),
+        ShortcutTool(ToolId.BATTERY_CHARGER, ToolSection.AUTOMATION, "Battery / charger automation", "أتمتة البطارية / الشاحن"),
+        ShortcutTool(ToolId.NFC_TRIGGER, ToolSection.AUTOMATION, "NFC trigger", "تشغيل عبر NFC"),
+        ShortcutTool(ToolId.APP_OPEN_ROUTINE, ToolSection.AUTOMATION, "App usage time", "وقت استخدام التطبيقات"),
+        ShortcutTool(ToolId.MY_AUTOMATIONS, ToolSection.AUTOMATION, "My automations", "الأتمتة الخاصة بي"),
+        ShortcutTool(ToolId.MORNING_SLEEP, ToolSection.AUTOMATION, "Morning / sleep alarm setup", "إعداد منبه الصباح / النوم"),
+        ShortcutTool(ToolId.CALENDAR_REMINDERS, ToolSection.AUTOMATION, "Add calendar reminder", "إضافة تذكير للتقويم"),
+    )
+}
