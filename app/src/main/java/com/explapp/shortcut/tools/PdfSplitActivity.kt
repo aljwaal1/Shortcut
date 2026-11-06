@@ -139,10 +139,14 @@ class PdfSplitActivity : AppCompatActivity() {
                     pageCount = count
                     suggestedStarts = starts
                     val suggestions = PdfSplitPlan.chapters(count, starts)
-                    rangeEditor.setText(suggestions.joinToString(", ") { "${it.firstPage}-${it.lastPage}" })
-                    status.text = local(
+                    val foundChapters = starts.any { it > 1 }
+                    rangeEditor.setText(if (foundChapters) suggestions.joinToString(", ") { "${it.firstPage}-${it.lastPage}" } else "")
+                    status.text = if (foundChapters) local(
                         "$sourceName · $count pages · ${suggestions.size} proposed chapter(s). Review the boundaries before exporting.",
                         "$sourceName · $count صفحة · ${suggestions.size} فصل مقترح. راجع الحدود قبل التقسيم.",
+                    ) else local(
+                        "$sourceName · $count pages. Chapter boundaries could not be detected. Enter ranges manually or split into pages.",
+                        "$sourceName · $count صفحة. لم نتمكن من كشف حدود الفصول. أدخل نطاقات الفصول يدويًا أو اختر التقسيم إلى صفحات.",
                     )
                     exportButton.isEnabled = true
                 }
