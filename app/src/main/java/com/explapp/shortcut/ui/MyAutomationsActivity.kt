@@ -32,6 +32,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.CardDefaults
@@ -3345,14 +3346,29 @@ private fun RoutineTemplatesScreen(onBack: () -> Unit, onUse: (AutomationRoutine
             }
         }
         items(templates) { template ->
-            ElevatedCard(Modifier.fillMaxWidth()) {
-                Row(Modifier.fillMaxWidth().padding(14.dp), verticalAlignment = Alignment.CenterVertically) {
-                    Column(Modifier.weight(1f)) {
-                        Text(RoutineTemplateCatalog.title(template, ar), fontWeight = FontWeight.Bold)
-                        Text(RoutineTemplateCatalog.description(template, ar), style = MaterialTheme.typography.bodySmall)
-                        Text(triggerTitle(template.trigger.type, ar) + " • " + template.actions.firstOrNull()?.let { RoutineCatalog.meta(it.type).let { m -> if (ar) m.titleAr else m.titleEn } }.orEmpty(), style = MaterialTheme.typography.bodySmall)
+            ElevatedCard(Modifier.fillMaxWidth(), shape = RoundedCornerShape(22.dp)) {
+                Column(Modifier.fillMaxWidth().padding(18.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    Text(
+                        RoutineTemplateCatalog.title(template, ar),
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold,
+                        maxLines = 3,
+                        softWrap = true,
+                    )
+                    Text(
+                        RoutineTemplateCatalog.description(template, ar),
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        softWrap = true,
+                    )
+                    Text(
+                        triggerTitle(template.trigger.type, ar) + " • " + template.actions.firstOrNull()?.let { RoutineCatalog.meta(it.type).let { m -> if (ar) m.titleAr else m.titleEn } }.orEmpty(),
+                        style = MaterialTheme.typography.labelMedium,
+                        color = MaterialTheme.colorScheme.primary,
+                    )
+                    Button(onClick = { onUse(template) }, modifier = Modifier.fillMaxWidth()) {
+                        Text(if (ar) "استخدام هذا القالب" else "Use this template")
                     }
-                    Button(onClick = { onUse(template) }) { Text(if (ar) "استخدام" else "Use") }
                 }
             }
         }
