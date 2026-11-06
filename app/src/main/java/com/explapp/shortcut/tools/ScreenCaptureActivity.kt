@@ -151,7 +151,7 @@ class ScreenCaptureActivity : AppCompatActivity() {
             finish()
         } else {
             val packageNameToOpen = launchPackage
-            val handleResultInService = !runOcr && !packageNameToOpen.isNullOrBlank()
+            val handleResultInService = !runOcr && (!packageNameToOpen.isNullOrBlank() || floatingQuickCapture)
             val service = Intent(this, ScreenCaptureService::class.java)
                 .putExtra(ScreenCaptureService.EXTRA_RESULT_CODE, result.resultCode)
                 .putExtra(ScreenCaptureService.EXTRA_DATA, data)
@@ -182,6 +182,11 @@ class ScreenCaptureActivity : AppCompatActivity() {
                     Toast.makeText(this, local("Target app is unavailable", "التطبيق المطلوب غير متاح"), Toast.LENGTH_LONG).show()
                     finish()
                 }
+            } else if (floatingQuickCapture) {
+                // Finish only the transparent permission activity: keep the current
+                // app (including Shortcut itself) visible in the captured frame.
+                restoreFloatingButton(delayMs = captureDelayMs + 4_000L)
+                finish()
             } else {
                 moveTaskToBack(true)
             }
@@ -230,49 +235,27 @@ class ScreenCaptureActivity : AppCompatActivity() {
     }
 
     private fun showFloatingCaptureChoices() {
-        val options = arrayOf(
-            local("Save to gallery", "حفظ في المعرض"),
-            local("Share with an app", "مشاركة مع تطبيق"),
-            local("Share in Telegram", "مشاركة عبر تيليجرام"),
-        )
-        AlertDialog.Builder(this)
-            .setTitle(local("Screenshot: choose an action", "لقطة شاشة: اختر الإجراء"))
-            .setItems(options) { _, selected ->
-                galleryOnly = selected == 0
-                shareAnyApp = selected == 1
-                normalTelegramShare = selected == 2
-                // All floating-button destinations receive the same timestamped image.
-                stampDateTime = true
-                captureDelayMs = 1_500L
-                if (PersistentScreenCaptureService.isSessionActive(this)) {
-                    val capture = Intent(this, PersistentScreenCaptureService::class.java)
-                        .setAction(PersistentScreenCaptureService.ACTION_CAPTURE)
-                        .putExtra(PersistentScreenCaptureService.EXTRA_SKIP_APP_LAUNCH, true)
-                        .putExtra(PersistentScreenCaptureService.EXTRA_CAPTURE_DELAY_MS, 1_000L)
-                        .putExtra(PersistentScreenCaptureService.EXTRA_SHARE_ANY_APP, shareAnyApp)
-                        .putExtra(PersistentScreenCaptureService.EXTRA_NORMAL_TELEGRAM_SHARE, normalTelegramShare)
-                        .putExtra(PersistentScreenCaptureService.EXTRA_STAMP_DATE_TIME, stampDateTime)
-                        .putExtra(PersistentScreenCaptureService.EXTRA_FLOATING_CAPTURE, true)
-                    runCatching { startService(capture) }
-                        .onFailure {
-                            restoreFloatingButton()
-                            Toast.makeText(this, local("Could not start capture", "تعذر بدء التصوير"), Toast.LENGTH_LONG).show()
-                        }
-                    // The persistent service restores the overlay after the actual result.
-                    finish()
-                } else {
-                    launchConsent()
-                }
-            }
-            .setNegativeButton(local("Cancel", "إلغاء")) { _, _ ->
+        // A floating-button tap has one predictable action: capture and save.
+        // Sharing is available from the saved image after capture.
+        galleryOnly = true
+        shareAnyApp = false
+        normalTelegramShare = false
+        stampDateTime = false
+        captureDelayMs = 1_500L
+        if (PersistentScreenCaptureService.isSessionActive(this)) {
+            val capture = Intent(this, PersistentScreenCaptureService::class.java)
+                .setAction(PersistentScreenCaptureService.ACTION_CAPTURE)
+                .putExtra(PersistentScreenCaptureService.EXTRA_SKIP_APP_LAUNCH, true)
+                .putExtra(PersistentScreenCaptureService.EXTRA_CAPTURE_DELAY_MS, 1_000L)
+                .putExtra(PersistentScreenCaptureService.EXTRA_FLOATING_CAPTURE, true)
+            runCatching { startService(capture) }.onFailure {
                 restoreFloatingButton()
-                finish()
+                Toast.makeText(this, local("Could not start capture", "تعذر بدء التصوير"), Toast.LENGTH_LONG).show()
             }
-            .setOnCancelListener {
-                restoreFloatingButton()
-                finish()
-            }
-            .show()
+            finish()
+        } else {
+            launchConsent()
+        }
     }
 
     private fun showCaptureInstructions() {
