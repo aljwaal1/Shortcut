@@ -104,6 +104,7 @@ import com.explapp.shortcut.tools.ToolCatalog
 import com.explapp.shortcut.tools.ToolRouter
 import com.explapp.shortcut.tools.ToolPreferencesStore
 import com.explapp.shortcut.tools.PersistentScreenCaptureService
+import com.explapp.shortcut.tools.FloatingScreenshotSetupActivity
 import com.explapp.shortcut.scheduler.AndroidAlarmScheduler
 import com.explapp.shortcut.scheduler.AndroidMessageScheduler
 
@@ -1167,6 +1168,18 @@ private fun SettingsScreen(padding: PaddingValues, onOpenPermissions: () -> Unit
         item {
             ElevatedCard(shape = RoundedCornerShape(26.dp), onClick = onOpenHistory, modifier = Modifier.fillMaxWidth()) {
                 Text(if (ar) "سجل التنفيذ والعمليات" else "Execution history", modifier = Modifier.padding(18.dp), style = MaterialTheme.typography.titleMedium)
+            }
+        }
+        item {
+            ElevatedCard(
+                shape = RoundedCornerShape(22.dp),
+                onClick = { context.startActivity(Intent(context, FloatingScreenshotSetupActivity::class.java)) },
+                modifier = Modifier.fillMaxWidth(),
+            ) {
+                Column(Modifier.padding(18.dp), verticalArrangement = Arrangement.spacedBy(5.dp)) {
+                    Text(if (ar) "التقاط الشاشة والزر العائم" else "Screen capture and floating button", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                    Text(if (ar) "تفعيل زر التصوير، تحديد مدته أو إيقافه" else "Enable, time or disable the capture control", style = MaterialTheme.typography.bodySmall)
+                }
             }
         }
         item {
