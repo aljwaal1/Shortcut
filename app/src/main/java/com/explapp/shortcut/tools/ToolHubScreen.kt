@@ -63,7 +63,9 @@ fun ToolHubScreen(
     val columns = when {
         configuration.screenWidthDp >= 900 -> 4
         configuration.screenWidthDp >= 600 -> 3
-        else -> 2
+        // Two columns squeeze Arabic titles beyond the available card width.
+        configuration.screenWidthDp >= 480 && configuration.fontScale <= 1.1f -> 2
+        else -> 1
     }
     val context = LocalContext.current
     val store = remember(context) { ToolPreferencesStore(context.applicationContext) }
@@ -364,12 +366,12 @@ private fun ToolCard(
     val container = if (dark) accent.copy(alpha = 0.18f) else accent.copy(alpha = 0.11f)
     ElevatedCard(
         onClick = onClick,
-        modifier = modifier.heightIn(min = 132.dp),
-        shape = RoundedCornerShape(30.dp),
+        modifier = modifier.heightIn(min = 110.dp),
+        shape = RoundedCornerShape(22.dp),
         colors = CardDefaults.elevatedCardColors(containerColor = container),
         elevation = CardDefaults.elevatedCardElevation(defaultElevation = if (dark) 0.dp else 2.dp),
     ) {
-        Column(modifier = Modifier.fillMaxWidth().padding(15.dp), verticalArrangement = Arrangement.spacedBy(9.dp)) {
+        Column(modifier = Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
                 Surface(
                     shape = RoundedCornerShape(17.dp),
@@ -393,6 +395,8 @@ private fun ToolCard(
                 style = MaterialTheme.typography.titleSmall,
                 fontWeight = FontWeight.Bold,
                 color = MaterialTheme.colorScheme.onSurface,
+                softWrap = true,
+                maxLines = 4,
             )
             Text(
                 if (isArabic) "افتح الأداة  ←" else "Open tool  →",
