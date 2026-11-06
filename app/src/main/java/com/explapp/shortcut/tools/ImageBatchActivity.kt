@@ -28,6 +28,7 @@ import kotlin.math.max
 class ImageBatchActivity : AppCompatActivity() {
     private lateinit var tool: ToolId
     private var mergeVertical = false
+    private var gifQuality = GifRenderOptions.BALANCED
 
     // Use Android's document browser rather than a gallery-only picker:
     // users can search folders, select files from different providers, and
@@ -83,6 +84,46 @@ class ImageBatchActivity : AppCompatActivity() {
                 .show()
             return
         }
+        if (tool == ToolId.GIF_CREATE) {
+            val qualities = arrayOf(
+                local("Compact · up to 480 px", "صغير · حتى 480 بكسل"),
+                local("Balanced · up to 960 px", "متوازن · حتى 960 بكسل"),
+                local("High quality · up to 1440 px", "جودة عالية · حتى 1440 بكسل"),
+            )
+            AlertDialog.Builder(this)
+                .setTitle(local("GIF output quality", "جودة صورة GIF"))
+                .setSingleChoiceItems(qualities, gifQuality.ordinal) { dialog, selected ->
+                    gifQuality = GifRenderOptions.entries[selected]
+                    dialog.dismiss()
+                    confirmGifSpeed(uris)
+                }
+                .setNegativeButton(local("Cancel", "إلغاء")) { _, _ -> finish() }
+                .setOnCancelListener { finish() }
+                .show()
+            return
+        }
+        confirmFinalSelection(uris)
+    }
+
+    private fun confirmGifSpeed(uris: List<Uri>) {
+        val options = arrayOf(local("Fast · 0.15 seconds", "سريع · 0.15 ثانية"),
+            local("Normal · 0.35 seconds", "عادي · 0.35 ثانية"),
+            local("Slow · 0.7 seconds", "بطيء · 0.7 ثانية"))
+        AlertDialog.Builder(this)
+            .setTitle(local("GIF frame speed", "سرعة GIF"))
+            .setSingleChoiceItems(options, 1) { dialog, choice ->
+                dialog.dismiss()
+                gifFrameDelayMillis = longArrayOf(150, 350, 700)[choice]
+                confirmFinalSelection(uris)
+            }
+            .setNegativeButton(local("Cancel", "إلغاء")) { _, _ -> finish() }
+            .setOnCancelListener { finish() }
+            .show()
+    }
+
+    private var gifFrameDelayMillis = 350L
+
+    private fun confirmFinalSelection(uris: List<Uri>) {
         val action = when (tool) {
             ToolId.MERGE_IMAGES -> local("Merge", "دمج")
             ToolId.IMAGES_TO_PDF -> local("Create PDF", "إنشاء PDF")
@@ -184,6 +225,7 @@ class ImageBatchActivity : AppCompatActivity() {
 
     private fun merge(uris: List<Uri>, vertical: Boolean, cancelled: AtomicBoolean, step: (Int) -> Unit): Uri {
         require(uris.isNotEmpty()) { "No images selected" }
+        val maxDimension = gifQuality.maxDimension
         val dimensions = uris.map { uri ->
             check(!cancelled.get()) { "Cancelled" }
             val bitmap = loadOrientedBitmap(uri, 1600)
@@ -247,14 +289,14 @@ class ImageBatchActivity : AppCompatActivity() {
         }
         val dimensions = uris.map { uri ->
             check(!cancelled.get()) { "Cancelled" }
-            val bitmap = loadOrientedBitmap(uri, 640)
+            val bitmap = loadOrientedBitmap(uri, maxDimension)
             try { bitmap.width to bitmap.height } finally { bitmap.recycle() }
         }
         // Use a consistent output size, including mixed portrait/landscape images.
         // GIF encoders require every submitted frame to have identical dimensions.
         val width = dimensions.maxOf { it.first }.coerceAtLeast(1)
         val height = dimensions.maxOf { it.second }.coerceAtLeast(1)
-        require(width.toLong() * height <= 640L * 640L) { "GIF dimensions are too large" }
+        require(width.toLong() * height <= maxDimension.toLong() * maxDimension) { "GIF dimensions are too large" }
         val output = ToolOutputStore(this).create(
             "Animated_${System.currentTimeMillis()}.gif", "image/gif", true,
         )
@@ -262,10 +304,10 @@ class ImageBatchActivity : AppCompatActivity() {
             contentResolver.openOutputStream(output, "w").use { stream ->
                 val out = requireNotNull(stream) { "Cannot open GIF output file" }
                 val encoder = GifEncoder(out, width, height, 0)
-                val options = ImageOptions().apply { setDelay(350, TimeUnit.MILLISECONDS) }
+                val options = ImageOptions().apply { setDelay(gifFrameDelayMillis, TimeUnit.MILLISECONDS) }
                 uris.forEachIndexed { index, uri ->
                     check(!cancelled.get()) { "Cancelled" }
-                    val frame = loadOrientedBitmap(uri, 640)
+                    val frame = loadOrientedBitmap(uri, maxDimension)
                     try {
                         // Centre each image instead of stretching it and distorting the result.
                         val canvasBitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)

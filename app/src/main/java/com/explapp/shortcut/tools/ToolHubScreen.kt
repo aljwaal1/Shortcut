@@ -354,25 +354,30 @@ private fun ToolCard(
     onFavorite: () -> Unit,
 ) {
     val style = VisualIdentity.forSection(tool.section)
-    val accent = Color(style.accentArgb)
+    // Alternate hues within each section: cards identify individual tools, not only their category.
+    val palette = listOf(
+        Color(0xFF315ACB), Color(0xFF0B806B), Color(0xFF9D4A82),
+        Color(0xFFB36B19), Color(0xFF5D58B7), Color(0xFF087D9E),
+    )
+    val accent = palette[tool.id.ordinal % palette.size]
     val dark = isSystemInDarkTheme()
-    val container = if (dark) accent.copy(alpha = 0.12f) else Color(style.softArgb)
+    val container = if (dark) accent.copy(alpha = 0.18f) else accent.copy(alpha = 0.11f)
     ElevatedCard(
         onClick = onClick,
-        modifier = modifier.heightIn(min = 142.dp),
-        shape = RoundedCornerShape(28.dp),
+        modifier = modifier.heightIn(min = 132.dp),
+        shape = RoundedCornerShape(30.dp),
         colors = CardDefaults.elevatedCardColors(containerColor = container),
         elevation = CardDefaults.elevatedCardElevation(defaultElevation = if (dark) 0.dp else 2.dp),
     ) {
-        Column(modifier = Modifier.fillMaxWidth().padding(18.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+        Column(modifier = Modifier.fillMaxWidth().padding(15.dp), verticalArrangement = Arrangement.spacedBy(9.dp)) {
             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
                 Surface(
-                    shape = RoundedCornerShape(14.dp),
+                    shape = RoundedCornerShape(17.dp),
                     color = accent.copy(alpha = if (dark) 0.24f else 0.16f),
                     modifier = Modifier.size(42.dp),
                 ) {
                     Box(contentAlignment = Alignment.Center) {
-                        Icon(sectionIcon(tool.section), contentDescription = null, tint = accent, modifier = Modifier.size(22.dp))
+                        Icon(toolIcon(tool.id, tool.section), contentDescription = null, tint = accent, modifier = Modifier.size(22.dp))
                     }
                 }
                 IconButton(onClick = onFavorite, modifier = Modifier.size(36.dp)) {
@@ -385,7 +390,7 @@ private fun ToolCard(
             }
             Text(
                 if (isArabic) tool.titleAr else tool.titleEn,
-                style = MaterialTheme.typography.titleMedium,
+                style = MaterialTheme.typography.titleSmall,
                 fontWeight = FontWeight.Bold,
                 color = MaterialTheme.colorScheme.onSurface,
             )
@@ -397,6 +402,13 @@ private fun ToolCard(
             )
         }
     }
+}
+
+private fun toolIcon(id: ToolId, section: ToolSection): ImageVector = when (id) {
+    ToolId.GIF_CREATE, ToolId.MERGE_IMAGES, ToolId.IMAGE_RESIZE_COMPRESS,
+    ToolId.IMAGES_TO_PDF -> Icons.Default.Image
+    ToolId.PDF_SPLIT, ToolId.PDF_TEXT, ToolId.PDF_TRANSLATE_READER -> Icons.Default.Description
+    else -> sectionIcon(section)
 }
 
 private fun sectionTitle(section: ToolSection, ar: Boolean): String = when (section) {

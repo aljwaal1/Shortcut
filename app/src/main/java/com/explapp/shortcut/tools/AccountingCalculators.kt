@@ -5,6 +5,56 @@ import kotlin.math.min
 
 /** Pure, offline accounting formulas; monetary values are expressed in the caller's currency. */
 object AccountingCalculators {
+    private fun nonnegative(vararg values: Double) {
+        require(values.all { it.isFinite() && it >= 0.0 }) { "All values must be non-negative and finite" }
+    }
+
+    fun currentRatio(currentAssets: Double, currentLiabilities: Double): Double {
+        nonnegative(currentAssets, currentLiabilities)
+        require(currentLiabilities > 0.0)
+        return currentAssets / currentLiabilities
+    }
+
+    fun quickRatio(currentAssets: Double, inventory: Double, currentLiabilities: Double): Double {
+        nonnegative(currentAssets, inventory, currentLiabilities)
+        require(inventory <= currentAssets && currentLiabilities > 0.0)
+        return (currentAssets - inventory) / currentLiabilities
+    }
+
+    fun grossProfitMargin(revenue: Double, costOfGoodsSold: Double): Double {
+        nonnegative(revenue, costOfGoodsSold)
+        require(revenue > 0.0)
+        return (revenue - costOfGoodsSold) / revenue * 100.0
+    }
+
+    fun inventoryTurnover(costOfGoodsSold: Double, averageInventory: Double): Double {
+        nonnegative(costOfGoodsSold, averageInventory)
+        require(averageInventory > 0.0)
+        return costOfGoodsSold / averageInventory
+    }
+
+    fun markupPercent(cost: Double, sellingPrice: Double): Double {
+        nonnegative(cost, sellingPrice)
+        require(cost > 0.0)
+        return (sellingPrice - cost) / cost * 100.0
+    }
+
+    fun marginOfSafetyPercent(actualSales: Double, breakEvenSales: Double): Double {
+        nonnegative(actualSales, breakEvenSales)
+        require(actualSales > 0.0)
+        return (actualSales - breakEvenSales) / actualSales * 100.0
+    }
+
+    fun reorderPoint(dailyDemand: Double, leadTimeDays: Double, safetyStock: Double): Double {
+        nonnegative(dailyDemand, leadTimeDays, safetyStock)
+        return dailyDemand * leadTimeDays + safetyStock
+    }
+
+    fun weightedAverageCost(firstQuantity: Double, firstUnitCost: Double, secondQuantity: Double, secondUnitCost: Double): Double {
+        nonnegative(firstQuantity, firstUnitCost, secondQuantity, secondUnitCost)
+        require(firstQuantity + secondQuantity > 0.0)
+        return (firstQuantity * firstUnitCost + secondQuantity * secondUnitCost) / (firstQuantity + secondQuantity)
+    }
     fun straightLineDepreciation(cost: Double, salvage: Double, usefulLifeYears: Int): Double {
         require(cost.isFinite() && salvage.isFinite() && cost >= 0 && salvage >= 0 && salvage <= cost)
         require(usefulLifeYears > 0)

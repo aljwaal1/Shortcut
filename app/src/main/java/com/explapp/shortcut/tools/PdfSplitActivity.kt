@@ -21,6 +21,7 @@ import com.tom_roush.pdfbox.android.PDFBoxResourceLoader
 import com.tom_roush.pdfbox.pdmodel.PDDocument
 import com.tom_roush.pdfbox.pdmodel.interactive.documentnavigation.outline.PDOutlineItem
 import com.tom_roush.pdfbox.text.PDFTextStripper
+import java.io.File
 
 /** Entirely offline PDF splitting: Android's document picker owns input and output permissions. */
 class PdfSplitActivity : AppCompatActivity() {
@@ -129,8 +130,8 @@ class PdfSplitActivity : AppCompatActivity() {
         local("Reading PDF and finding chapters…", "جارٍ قراءة PDF والبحث عن الفصول…")
     ) {
         PDFBoxResourceLoader.init(applicationContext)
-        contentResolver.openInputStream(uri).use { input ->
-            PDDocument.load(requireNotNull(input) { "Cannot read selected PDF" }).use { document ->
+        withLocalPdf(uri) { sourceFile ->
+            PDDocument.load(sourceFile).use { document ->
                 val count = document.numberOfPages
                 require(count > 0) { "PDF has no pages" }
                 val starts = detectChapters(document)
@@ -169,6 +170,9 @@ class PdfSplitActivity : AppCompatActivity() {
         }
         walk(outline?.firstChild, 0)
         if (starts.any { it > 1 }) return (starts + 1).distinct().sorted()
+        if (!PdfLargeFilePolicy.shouldScanAllPages(document.numberOfPages)) {
+            return listOf(1) // Users can still enter exact chapter ranges for very large PDFs.
+        }
         val textReader = PDFTextStripper()
         val heading = Regex("^(?:chapter|unit|part|الفصل|الوحدة|الباب)\\s*(?:[0-9٠-٩]+|[:：-])?", RegexOption.IGNORE_CASE)
         for (page in 1..document.numberOfPages) {
@@ -199,8 +203,8 @@ class PdfSplitActivity : AppCompatActivity() {
         }
         var saved = 0
         try {
-            contentResolver.openInputStream(inputUri).use { input ->
-                PDDocument.load(requireNotNull(input)).use { original ->
+            withLocalPdf(inputUri) { sourceFile ->
+                PDDocument.load(sourceFile).use { original ->
                     require(original.numberOfPages == pageCount) { "PDF changed since selection" }
                     ranges.forEachIndexed { index, part ->
                         val destination = requireNotNull(DocumentsContract.createDocument(contentResolver,
@@ -244,6 +248,20 @@ class PdfSplitActivity : AppCompatActivity() {
                 }
                 .setNegativeButton(local("Close", "إغلاق"), null)
                 .show()
+        }
+    }
+
+    /** PDFBox uses a file-backed random-access source, avoiding an unbounded in-memory input copy. */
+    private inline fun <T> withLocalPdf(uri: Uri, action: (File) -> T): T {
+        val file = File.createTempFile("shortcut_pdf_", ".pdf", cacheDir)
+        try {
+            contentResolver.openInputStream(uri).use { source ->
+                requireNotNull(source) { "Cannot read selected PDF" }
+                file.outputStream().buffered().use { target -> source.copyTo(target, 64 * 1024) }
+            }
+            return action(file)
+        } finally {
+            file.delete()
         }
     }
 

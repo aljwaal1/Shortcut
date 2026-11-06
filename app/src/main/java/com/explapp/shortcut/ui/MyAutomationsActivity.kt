@@ -119,6 +119,7 @@ private fun MyAutomationsScreen(onBack: () -> Unit, initialMode: String = "") {
     var editing by remember { mutableStateOf<AutomationRoutine?>(null) }
     var creating by remember(initialMode) { mutableStateOf(initialMode == MyAutomationsActivity.MODE_CREATE) }
     var showTemplates by remember(initialMode) { mutableStateOf(initialMode == MyAutomationsActivity.MODE_TEMPLATES) }
+    var selectedTemplate by remember { mutableStateOf<AutomationRoutine?>(null) }
     var showSimpleScreenshot by remember(initialMode) { mutableStateOf(initialMode == MyAutomationsActivity.MODE_SCREENSHOT) }
     var showDailyScreenshotTelegram by remember { mutableStateOf(false) }
     var showDailyScreenshotTelegramChat by remember { mutableStateOf(false) }
@@ -178,6 +179,13 @@ private fun MyAutomationsScreen(onBack: () -> Unit, initialMode: String = "") {
             },
         )
 
+        selectedTemplate != null -> RoutineTemplateQuickStart(
+            template = requireNotNull(selectedTemplate),
+            onCancel = { selectedTemplate = null; showTemplates = true },
+            onSave = { routine -> upsert(routine); selectedTemplate = null },
+            onAdvanced = { routine -> editing = routine; selectedTemplate = null },
+        )
+
         creating || editing != null -> RoutineBuilderScreen(
             initial = editing,
             onCancel = { creating = false; editing = null },
@@ -214,7 +222,10 @@ private fun MyAutomationsScreen(onBack: () -> Unit, initialMode: String = "") {
 
         showTemplates -> RoutineTemplatesScreen(
             onBack = { showTemplates = false },
-            onUse = { template -> editing = template.duplicate().copy(name = RoutineTemplateCatalog.title(template, ar)); showTemplates = false },
+            onUse = { template ->
+                selectedTemplate = template.duplicate().copy(name = RoutineTemplateCatalog.title(template, ar))
+                showTemplates = false
+            },
         )
 
         else -> LazyColumn(
@@ -3270,6 +3281,52 @@ private fun actionSummary(action: RoutineAction, appLabel: String?, ar: Boolean)
     RoutineActionType.SHARE_FILE -> if (ar) "مشاركة ملف" else "Share file"
     RoutineActionType.WEB_SEARCH -> if (ar) "بحث: " + action.value.take(70) else "Search: " + action.value.take(70)
     else -> action.value.take(100)
+}
+
+@Composable
+private fun RoutineTemplateQuickStart(
+    template: AutomationRoutine,
+    onCancel: () -> Unit,
+    onSave: (AutomationRoutine) -> Unit,
+    onAdvanced: (AutomationRoutine) -> Unit,
+) {
+    val ar = LocalConfiguration.current.locales[0].language == "ar"
+    var name by remember(template.id) { mutableStateOf(template.name) }
+    val prepared = template.copy(name = name.trim())
+    val ready = prepared.isValid() && RoutineReview.inspect(prepared).canRun
+    LazyColumn(
+        modifier = Modifier.fillMaxSize().navigationBarsPadding(),
+        contentPadding = PaddingValues(20.dp),
+        verticalArrangement = Arrangement.spacedBy(16.dp),
+    ) {
+        item { Text(if (ar) "إعداد القالب الجاهز" else "Ready automation setup",
+            style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.ExtraBold) }
+        item { OutlinedTextField(value = name, onValueChange = { name = it },
+            label = { Text(if (ar) "اسم الأتمتة" else "Automation name") }, modifier = Modifier.fillMaxWidth()) }
+        item { ElevatedCard(Modifier.fillMaxWidth(), colors = CardDefaults.elevatedCardColors(
+            containerColor = MaterialTheme.colorScheme.primaryContainer)) {
+            Column(Modifier.padding(20.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                Text(if (ar) "موعد التشغيل" else "Trigger", fontWeight = FontWeight.Bold)
+                Text(triggerTitle(template.trigger.type, ar) + " · " + template.trigger.value)
+                Text(if (ar) "الإجراءات" else "Actions", fontWeight = FontWeight.Bold)
+                template.actions.forEach { action ->
+                    val meta = RoutineCatalog.meta(action.type)
+                    Text("• " + (if (ar) meta.titleAr else meta.titleEn))
+                }
+            }
+        } }
+        item { Text(if (ready) (if (ar) "القالب جاهز للحفظ." else "This template is ready to save.")
+            else (if (ar) "هذا القالب يحتاج إعداد بيانات إضافية قبل تشغيله." else "This template needs more configuration before it can run."),
+            color = if (ready) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.error) }
+        item { Button(onClick = { onSave(prepared) }, enabled = ready,
+            modifier = Modifier.fillMaxWidth()) { Text(if (ar) "حفظ الأتمتة" else "Save automation") } }
+        item { Button(onClick = { onAdvanced(prepared) }, modifier = Modifier.fillMaxWidth()) {
+            Text(if (ar) "تعديل متقدم للإعدادات" else "Advanced configuration")
+        } }
+        item { TextButton(onClick = onCancel, modifier = Modifier.fillMaxWidth()) {
+            Text(if (ar) "العودة للقوالب" else "Back to templates")
+        } }
+    }
 }
 
 @Composable

@@ -49,7 +49,9 @@ class AccountingCalculatorsActivity : ComponentActivity() {
 
 private enum class AccountingMode {
     STRAIGHT_LINE, DECLINING_BALANCE, BREAK_EVEN_UNITS, BREAK_EVEN_SALES,
-    SIMPLE_INTEREST, COMPOUND_AMOUNT, ROI, CONTRIBUTION_MARGIN
+    SIMPLE_INTEREST, COMPOUND_AMOUNT, ROI, CONTRIBUTION_MARGIN,
+    CURRENT_RATIO, QUICK_RATIO, GROSS_MARGIN, INVENTORY_TURNOVER,
+    MARKUP, SAFETY_MARGIN, REORDER_POINT, WEIGHTED_AVERAGE_COST
 }
 
 private fun labels(mode: AccountingMode, ar: Boolean): List<String> = when (mode) {
@@ -59,6 +61,14 @@ private fun labels(mode: AccountingMode, ar: Boolean): List<String> = when (mode
     AccountingMode.SIMPLE_INTEREST, AccountingMode.COMPOUND_AMOUNT -> if (ar) listOf("أصل المبلغ", "معدل الفائدة السنوي %", "المدة بالسنوات") else listOf("Principal", "Annual interest rate %", "Years")
     AccountingMode.ROI -> if (ar) listOf("المبلغ المسترد", "قيمة الاستثمار") else listOf("Returned amount", "Investment")
     AccountingMode.CONTRIBUTION_MARGIN -> if (ar) listOf("سعر بيع الوحدة", "التكلفة المتغيرة للوحدة") else listOf("Selling price per unit", "Variable cost per unit")
+    AccountingMode.CURRENT_RATIO -> if (ar) listOf("الأصول المتداولة", "الالتزامات المتداولة") else listOf("Current assets", "Current liabilities")
+    AccountingMode.QUICK_RATIO -> if (ar) listOf("الأصول المتداولة", "المخزون", "الالتزامات المتداولة") else listOf("Current assets", "Inventory", "Current liabilities")
+    AccountingMode.GROSS_MARGIN -> if (ar) listOf("صافي المبيعات", "تكلفة البضاعة المباعة") else listOf("Net sales", "Cost of goods sold")
+    AccountingMode.INVENTORY_TURNOVER -> if (ar) listOf("تكلفة البضاعة المباعة", "متوسط المخزون") else listOf("Cost of goods sold", "Average inventory")
+    AccountingMode.MARKUP -> if (ar) listOf("تكلفة الصنف", "سعر بيعه") else listOf("Item cost", "Selling price")
+    AccountingMode.SAFETY_MARGIN -> if (ar) listOf("المبيعات الفعلية", "مبيعات نقطة التعادل") else listOf("Actual sales", "Break-even sales")
+    AccountingMode.REORDER_POINT -> if (ar) listOf("الطلب اليومي بالوحدات", "مهلة التوريد بالأيام", "مخزون الأمان") else listOf("Daily demand in units", "Lead time in days", "Safety stock")
+    AccountingMode.WEIGHTED_AVERAGE_COST -> if (ar) listOf("كمية الدفعة الأولى", "تكلفة وحدة الدفعة الأولى", "كمية الدفعة الثانية", "تكلفة وحدة الدفعة الثانية") else listOf("First batch quantity", "First batch unit cost", "Second batch quantity", "Second batch unit cost")
 }
 
 private fun parseCalculatorNumber(raw: String): Double {
@@ -78,6 +88,8 @@ private fun calculate(mode: AccountingMode, values: List<String>): Double {
     val a = parseCalculatorNumber(values[0])
     val b = parseCalculatorNumber(values[1])
     val c = if (labels(mode, false).size == 3) parseCalculatorNumber(values[2]) else 0.0
+    val third = if (labels(mode, false).size >= 3) parseCalculatorNumber(values[2]) else 0.0
+    val fourth = if (labels(mode, false).size >= 4) parseCalculatorNumber(values[3]) else 0.0
     return when (mode) {
         AccountingMode.STRAIGHT_LINE -> AccountingCalculators.straightLineDepreciation(a, b, c.toInt().also { require(it.toDouble() == c) })
         AccountingMode.DECLINING_BALANCE -> AccountingCalculators.decliningBalanceDepreciation(a, b, c / 100.0)
@@ -87,6 +99,14 @@ private fun calculate(mode: AccountingMode, values: List<String>): Double {
         AccountingMode.COMPOUND_AMOUNT -> AccountingCalculators.compoundAmount(a, b / 100.0, c.toInt().also { require(it.toDouble() == c) })
         AccountingMode.ROI -> AccountingCalculators.roiPercent(a, b)
         AccountingMode.CONTRIBUTION_MARGIN -> AccountingCalculators.contributionMarginPercent(a, b)
+        AccountingMode.CURRENT_RATIO -> AccountingCalculators.currentRatio(a, b)
+        AccountingMode.QUICK_RATIO -> AccountingCalculators.quickRatio(a, b, third)
+        AccountingMode.GROSS_MARGIN -> AccountingCalculators.grossProfitMargin(a, b)
+        AccountingMode.INVENTORY_TURNOVER -> AccountingCalculators.inventoryTurnover(a, b)
+        AccountingMode.MARKUP -> AccountingCalculators.markupPercent(a, b)
+        AccountingMode.SAFETY_MARGIN -> AccountingCalculators.marginOfSafetyPercent(a, b)
+        AccountingMode.REORDER_POINT -> AccountingCalculators.reorderPoint(a, b, third)
+        AccountingMode.WEIGHTED_AVERAGE_COST -> AccountingCalculators.weightedAverageCost(a, b, third, fourth)
     }
 }
 
@@ -95,17 +115,23 @@ private fun AccountingCalculatorsScreen() {
     val ar = LocalConfiguration.current.locales[0].language == "ar"
     var mode by remember { mutableStateOf<AccountingMode?>(null) }
     var step by remember(mode) { mutableIntStateOf(0) }
-    val values = remember(mode) { mutableStateListOf("", "", "") }
+    val values = remember(mode) { mutableStateListOf("", "", "", "") }
     var error by remember(mode) { mutableStateOf<String?>(null) }
     var answer by remember(mode) { mutableStateOf<Double?>(null) }
     val names = if (ar) listOf(
         "الإهلاك بالقسط الثابت", "إهلاك الرصيد المتناقص", "نقطة التعادل بالوحدات",
         "نقطة التعادل بالمبيعات", "الفوائد البسيطة", "الفوائد المركبة",
-        "العائد على الاستثمار", "هامش المساهمة %"
+        "العائد على الاستثمار", "هامش المساهمة %",
+        "نسبة التداول", "نسبة السيولة السريعة", "هامش مجمل الربح",
+        "معدل دوران المخزون", "نسبة الزيادة على التكلفة", "هامش الأمان",
+        "نقطة إعادة الطلب", "متوسط تكلفة المخزون المرجّح"
     ) else listOf(
         "Straight-line depreciation", "Declining-balance depreciation", "Break-even units",
         "Break-even sales", "Simple interest", "Compound interest",
-        "Return on investment", "Contribution margin %"
+        "Return on investment", "Contribution margin %",
+        "Current ratio", "Quick ratio", "Gross profit margin",
+        "Inventory turnover", "Markup %", "Margin of safety %",
+        "Reorder point", "Weighted average inventory cost"
     )
     val current = mode
     val fields = current?.let { labels(it, ar) }.orEmpty()
@@ -139,7 +165,7 @@ private fun AccountingCalculatorsScreen() {
                             ) {
                                 Column(modifier = Modifier.fillMaxSize().padding(16.dp),
                                     verticalArrangement = Arrangement.SpaceBetween) {
-                                    Text(listOf("◈", "▣", "◉", "◆", "∑", "◇", "%", "▤")[index],
+                                    Text(listOf("◈", "▣", "◉", "◆", "∑", "◇", "%", "▤", "÷", "◎", "▥", "⇄", "↗", "△", "▦", "∑")[index],
                                         style = MaterialTheme.typography.titleLarge)
                                     Text(names[index], style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold)
                                 }
@@ -223,7 +249,10 @@ private fun AccountingCalculatorsScreen() {
                             Text(if (ar) "النتيجة" else "Result", style = MaterialTheme.typography.titleMedium)
                             val suffix = when (current) {
                                 AccountingMode.BREAK_EVEN_UNITS -> if (ar) " وحدة" else " units"
-                                AccountingMode.ROI, AccountingMode.CONTRIBUTION_MARGIN -> " %"
+                                AccountingMode.ROI, AccountingMode.CONTRIBUTION_MARGIN,
+                                AccountingMode.GROSS_MARGIN, AccountingMode.MARKUP,
+                                AccountingMode.SAFETY_MARGIN -> " %"
+                                AccountingMode.REORDER_POINT -> if (ar) " وحدة" else " units"
                                 else -> ""
                             }
                             Text(formatter.format(answer ?: 0.0) + suffix,

@@ -5,6 +5,43 @@ import org.junit.Assert.assertThrows
 import org.junit.Test
 
 class AccountingCalculatorsTest {
+    @Test fun currentRatioUsesCurrentLiabilities() {
+        assertEquals(2.5, AccountingCalculators.currentRatio(5000.0, 2000.0), 0.0001)
+    }
+
+    @Test fun currentRatioRejectsZeroLiabilities() {
+        assertThrows(IllegalArgumentException::class.java) {
+            AccountingCalculators.currentRatio(5000.0, 0.0)
+        }
+    }
+
+    @Test fun quickRatioExcludesInventory() {
+        assertEquals(1.5, AccountingCalculators.quickRatio(5000.0, 2000.0, 2000.0), 0.0001)
+    }
+
+    @Test fun grossMarginUsesRevenueDenominator() {
+        assertEquals(40.0, AccountingCalculators.grossProfitMargin(1000.0, 600.0), 0.0001)
+    }
+
+    @Test fun inventoryTurnoverUsesAverageInventory() {
+        assertEquals(4.0, AccountingCalculators.inventoryTurnover(8000.0, 2000.0), 0.0001)
+    }
+
+    @Test fun markupDiffersFromMargin() {
+        assertEquals(25.0, AccountingCalculators.markupPercent(100.0, 125.0), 0.0001)
+    }
+
+    @Test fun safetyMarginUsesActualSales() {
+        assertEquals(20.0, AccountingCalculators.marginOfSafetyPercent(10000.0, 8000.0), 0.0001)
+    }
+
+    @Test fun reorderPointIncludesSafetyStock() {
+        assertEquals(65.0, AccountingCalculators.reorderPoint(20.0, 3.0, 5.0), 0.0001)
+    }
+
+    @Test fun weightedAverageInventoryCost() {
+        assertEquals(12.5, AccountingCalculators.weightedAverageCost(10.0, 10.0, 10.0, 15.0), 0.0001)
+    }
     @Test fun straightLineDepreciationUsesSalvageValue() {
         assertEquals(1800.0, AccountingCalculators.straightLineDepreciation(10000.0, 1000.0, 5), 0.001)
     }
