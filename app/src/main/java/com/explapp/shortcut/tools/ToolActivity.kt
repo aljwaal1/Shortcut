@@ -26,6 +26,11 @@ import android.provider.MediaStore
 import android.provider.OpenableColumns
 import android.provider.Settings
 import android.widget.EditText
+import android.widget.Button
+import android.widget.ImageView
+import android.widget.LinearLayout
+import android.widget.ScrollView
+import android.widget.TextView
 import android.widget.Toast
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
@@ -286,7 +291,7 @@ class ToolActivity : AppCompatActivity() {
             .onSuccess { image ->
                 TextRecognition.getClient(TextRecognizerOptions.DEFAULT_OPTIONS)
                     .process(image)
-                    .addOnSuccessListener { showTextResult(it.text) }
+                    .addOnSuccessListener { showOcrResult(it.text, uri) }
                     .addOnFailureListener(::showError)
             }.onFailure(::showError)
     }
@@ -296,7 +301,7 @@ class ToolActivity : AppCompatActivity() {
             .process(InputImage.fromBitmap(bitmap, 0))
             .addOnSuccessListener {
                 bitmap.recycle()
-                showTextResult(it.text, allowSearch = true)
+                showOcrResult(it.text, allowSearch = true)
             }
             .addOnFailureListener {
                 bitmap.recycle()
@@ -859,6 +864,68 @@ class ToolActivity : AppCompatActivity() {
             }
         }
         builder.setOnCancelListener { finish() }.show()
+    }
+
+    /** OCR is editable work, not a transient message box that clips large documents. */
+    private fun showOcrResult(text: String, imageUri: Uri? = null, allowSearch: Boolean = false) {
+        val density = resources.displayMetrics.density
+        fun dp(value: Int) = (value * density).toInt()
+        val root = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(dp(18), dp(20), dp(18), dp(30))
+        }
+        root.addView(TextView(this).apply {
+            this.text = local("Extracted text", "النص المستخرج من الصورة")
+            textSize = 23f
+        })
+        root.addView(TextView(this).apply {
+            this.text = local("Review and correct the result before copying or sharing.",
+                "راجع النص وصحح الأخطاء قبل النسخ أو المشاركة.")
+            textSize = 14f
+            setPadding(0, dp(8), 0, dp(12))
+        })
+        if (imageUri != null) {
+            root.addView(ImageView(this).apply {
+                runCatching { loadScaledBitmap(imageUri, 640) }.onSuccess { setImageBitmap(it) }
+                adjustViewBounds = true
+                maxHeight = dp(190)
+                scaleType = ImageView.ScaleType.FIT_CENTER
+            })
+        }
+        val editor = EditText(this).apply {
+            setText(text)
+            hint = local("No text found. You can type corrections here.", "لم يُعثر على نص. يمكنك الكتابة أو التصحيح هنا.")
+            minLines = 8
+            maxLines = 18
+            textSize = 16f
+            gravity = android.view.Gravity.TOP or android.view.Gravity.START
+        }
+        root.addView(editor)
+        root.addView(Button(this).apply {
+            this.text = local("Copy text", "نسخ النص")
+            setOnClickListener {
+                getSystemService(ClipboardManager::class.java)
+                    .setPrimaryClip(ClipData.newPlainText("Shortcut OCR", editor.text.toString()))
+                toast(local("Text copied", "تم نسخ النص"))
+            }
+        })
+        root.addView(Button(this).apply {
+            this.text = local("Share text", "مشاركة النص")
+            setOnClickListener {
+                startActivity(Intent.createChooser(Intent(Intent.ACTION_SEND).apply {
+                    type = "text/plain"
+                    putExtra(Intent.EXTRA_TEXT, editor.text.toString())
+                }, local("Share", "مشاركة")))
+            }
+        })
+        if (allowSearch) root.addView(Button(this).apply {
+            this.text = local("Search selected text", "البحث عن النص")
+            setOnClickListener {
+                val url = "https://www.google.com/search?q=${Uri.encode(editor.text.toString().take(500))}"
+                startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url)))
+            }
+        })
+        setContentView(ScrollView(this).apply { addView(root) })
     }
 
     private fun queryNameAndSize(uri: Uri): Pair<String, Long> {
