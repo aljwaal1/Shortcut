@@ -13,6 +13,10 @@ import android.os.Bundle
 import android.widget.LinearLayout
 import android.widget.ProgressBar
 import android.widget.TextView
+import android.widget.Button
+import android.widget.RadioButton
+import android.widget.RadioGroup
+import android.widget.ScrollView
 import android.widget.Toast
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
@@ -29,13 +33,14 @@ class ImageBatchActivity : AppCompatActivity() {
     private lateinit var tool: ToolId
     private var mergeVertical = false
     private var gifQuality = GifRenderOptions.BALANCED
+    private var gifImages: List<Uri> = emptyList()
 
     // Use Android's document browser rather than a gallery-only picker:
     // users can search folders, select files from different providers, and
     // grant access for the complete asynchronous encoding operation.
     private val multiPicker = registerForActivityResult(ActivityResultContracts.OpenMultipleDocuments()) { uris ->
         if (uris.isEmpty()) {
-            finish()
+            if (tool != ToolId.GIF_CREATE) finish()
         } else {
             uris.forEach { uri ->
                 runCatching {
@@ -44,7 +49,10 @@ class ImageBatchActivity : AppCompatActivity() {
                     )
                 }
             }
-            confirmSelection(uris)
+            if (tool == ToolId.GIF_CREATE) {
+                gifImages = uris
+                showGifEditor()
+            } else confirmSelection(uris)
         }
     }
 
@@ -63,9 +71,70 @@ class ImageBatchActivity : AppCompatActivity() {
                 .setNegativeButton(local("Cancel", "إلغاء")) { _, _ -> finish() }
                 .setOnCancelListener { finish() }
                 .show()
-            ToolId.IMAGES_TO_PDF, ToolId.GIF_CREATE, ToolId.IMAGE_RESIZE_COMPRESS -> multiPicker.launch(arrayOf("image/*"))
+            ToolId.GIF_CREATE -> showGifEditor()
+            ToolId.IMAGES_TO_PDF, ToolId.IMAGE_RESIZE_COMPRESS -> multiPicker.launch(arrayOf("image/*"))
             else -> finish()
         }
+    }
+
+    /** One simple screen replaces three consecutive quality, speed and confirmation dialogs. */
+    private fun showGifEditor() {
+        val density = resources.displayMetrics.density
+        fun dp(value: Int) = (value * density).toInt()
+        val root = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(dp(20), dp(20), dp(20), dp(28))
+        }
+        root.addView(TextView(this).apply {
+            text = local("Create animated GIF", "إنشاء صورة GIF متحركة")
+            textSize = 24f
+            setPadding(0, 0, 0, dp(12))
+        })
+        root.addView(Button(this).apply {
+            text = local("Choose or change photos", "اختيار الصور أو تغييرها")
+            setOnClickListener { multiPicker.launch(arrayOf("image/*")) }
+        })
+        root.addView(TextView(this).apply {
+            text = local("${gifImages.size} photos selected (2–$MAX_GIF_FRAMES required)",
+                "تم اختيار ${gifImages.size} صورة (المطلوب ٢–$MAX_GIF_FRAMES)")
+            textSize = 15f
+            setPadding(0, dp(10), 0, dp(16))
+        })
+        root.addView(TextView(this).apply { text = local("Output quality", "جودة الصورة"); textSize = 18f })
+        val qualityGroup = RadioGroup(this).apply { orientation = RadioGroup.VERTICAL }
+        val qualities = arrayOf(
+            local("Compact • 480 pixels", "صغيرة • 480 بكسل"),
+            local("Balanced • 960 pixels", "متوازنة • 960 بكسل"),
+            local("High • 1440 pixels", "عالية • 1440 بكسل"),
+        )
+        qualities.forEachIndexed { i, title ->
+            qualityGroup.addView(RadioButton(this).apply {
+                id = android.view.View.generateViewId()
+                text = title
+                isChecked = i == gifQuality.ordinal
+                setOnClickListener { gifQuality = GifRenderOptions.entries[i] }
+            })
+        }
+        root.addView(qualityGroup)
+        root.addView(TextView(this).apply { text = local("Animation speed", "سرعة الحركة"); textSize = 18f })
+        val speedGroup = RadioGroup(this).apply { orientation = RadioGroup.VERTICAL }
+        val delays = longArrayOf(150L, 350L, 700L)
+        val speeds = arrayOf(local("Fast", "سريعة"), local("Normal", "متوسطة"), local("Slow", "بطيئة"))
+        speeds.forEachIndexed { i, title ->
+            speedGroup.addView(RadioButton(this).apply {
+                id = android.view.View.generateViewId()
+                text = title
+                isChecked = gifFrameDelayMillis == delays[i]
+                setOnClickListener { gifFrameDelayMillis = delays[i] }
+            })
+        }
+        root.addView(speedGroup)
+        root.addView(Button(this).apply {
+            text = local("Create GIF and save", "إنشاء GIF وحفظه")
+            isEnabled = gifImages.size in 2..MAX_GIF_FRAMES
+            setOnClickListener { startOperation(gifImages) }
+        })
+        setContentView(ScrollView(this).apply { addView(root) })
     }
 
     private fun confirmSelection(uris: List<Uri>) {
@@ -469,7 +538,7 @@ class ImageBatchActivity : AppCompatActivity() {
     private fun bitmapPixels(bitmap: Bitmap): Array<IntArray> {
         val pixels = IntArray(bitmap.width * bitmap.height)
         bitmap.getPixels(pixels, 0, bitmap.width, 0, 0, bitmap.width, bitmap.height)
-        return Array(bitmap.width) { x -> IntArray(bitmap.height) { y -> pixels[y * bitmap.width + x] } }
+        return GifPixelBuffer.rows(pixels, bitmap.width, bitmap.height)
     }
 
     private fun showError(t: Throwable) {
