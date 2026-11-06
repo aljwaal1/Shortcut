@@ -225,7 +225,6 @@ class ImageBatchActivity : AppCompatActivity() {
 
     private fun merge(uris: List<Uri>, vertical: Boolean, cancelled: AtomicBoolean, step: (Int) -> Unit): Uri {
         require(uris.isNotEmpty()) { "No images selected" }
-        val maxDimension = gifQuality.maxDimension
         val dimensions = uris.map { uri ->
             check(!cancelled.get()) { "Cancelled" }
             val bitmap = loadOrientedBitmap(uri, 1600)
@@ -280,6 +279,7 @@ class ImageBatchActivity : AppCompatActivity() {
     }
 
     private fun toGif(uris: List<Uri>, cancelled: AtomicBoolean, step: (Int) -> Unit): Uri {
+        val maxDimension = gifQuality.maxDimension
         require(uris.size >= 2) {
             local("Select at least two images for an animated GIF", "اختر صورتين على الأقل لصنع GIF متحرك")
         }
