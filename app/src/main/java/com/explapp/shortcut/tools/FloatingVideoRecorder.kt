@@ -135,7 +135,9 @@ class VideoRecordingPermissionActivity : AppCompatActivity() {
             try {
                 androidx.core.content.ContextCompat.startForegroundService(this, intent)
                 if (this.intent.getBooleanExtra(EXTRA_FROM_FLOATING_BUTTON, false)) {
-                    moveTaskToBack(true)
+                    // Return to the actual visible screen, even when it belongs
+                    // to Shortcut itself. Do not hide the entire app task.
+                    finish()
                 }
             } catch (error: Exception) {
                 restoreBubble()
