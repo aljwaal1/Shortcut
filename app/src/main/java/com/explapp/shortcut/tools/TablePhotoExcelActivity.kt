@@ -2,11 +2,13 @@ package com.explapp.shortcut.tools
 
 import android.app.AlertDialog
 import android.graphics.Rect
+import android.graphics.Bitmap
 import android.os.Bundle
 import android.widget.EditText
 import android.widget.LinearLayout
 import android.widget.TextView
 import android.widget.Toast
+import android.widget.Button
 import androidx.activity.ComponentActivity
 import androidx.activity.result.contract.ActivityResultContracts
 import com.google.mlkit.vision.common.InputImage
@@ -22,10 +24,17 @@ import java.util.Locale
 class TablePhotoExcelActivity : ComponentActivity() {
     private var editedCells: String = ""
     private val imagePicker = registerForActivityResult(ActivityResultContracts.GetContent()) { uri ->
-        if (uri == null) { finish(); return@registerForActivityResult }
+        if (uri == null) return@registerForActivityResult
         val image = runCatching { InputImage.fromFilePath(this, uri) }.getOrElse {
-            toast("Cannot open image / تعذر فتح الصورة"); finish(); return@registerForActivityResult
+            toast("Cannot open image / تعذر فتح الصورة"); return@registerForActivityResult
         }
+        recognize(image)
+    }
+    private val cameraPicker = registerForActivityResult(ActivityResultContracts.TakePicturePreview()) { photo: Bitmap? ->
+        if (photo != null) recognize(InputImage.fromBitmap(photo, 0))
+    }
+
+    private fun recognize(image: InputImage) {
         TextRecognition.getClient(TextRecognizerOptions.DEFAULT_OPTIONS)
             .process(image)
             .addOnSuccessListener { result ->
@@ -34,7 +43,6 @@ class TablePhotoExcelActivity : ComponentActivity() {
             }
             .addOnFailureListener {
                 toast("Text detection failed / تعذر قراءة الجدول: ${it.localizedMessage}")
-                finish()
             }
     }
     private val createWorkbook = registerForActivityResult(
@@ -55,7 +63,29 @@ class TablePhotoExcelActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        imagePicker.launch("image/*")
+        val root = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(36, 44, 36, 24)
+        }
+        root.addView(TextView(this).apply {
+            text = "تصوير جدول إلى Excel"
+            textSize = 24f
+            setPadding(0, 0, 0, 18)
+        })
+        root.addView(TextView(this).apply {
+            text = "ابدأ بتصوير الجدول أو اختر صورة محفوظة، ثم راجع الخلايا قبل حفظ ملف Excel."
+            textSize = 16f
+            setPadding(0, 0, 0, 24)
+        })
+        root.addView(Button(this).apply {
+            text = "تصوير جدول بالكاميرا"
+            setOnClickListener { cameraPicker.launch(null) }
+        })
+        root.addView(Button(this).apply {
+            text = "اختيار صورة من الهاتف"
+            setOnClickListener { imagePicker.launch("image/*") }
+        })
+        setContentView(root)
     }
 
     private fun showEditor() {
