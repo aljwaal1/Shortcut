@@ -21,18 +21,18 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           mkdir -p dist
-          gh run download 41329327694 --repo "${{ github.repository }}" --name shortcut-debug-apk --dir dist
+          gh run download 42242654379 --repo "${{ github.repository }}" --name shortcut-debug-apk --dir dist
           test -s dist/app-debug.apk
           unzip -t dist/app-debug.apk >/dev/null
-          mv dist/app-debug.apk dist/Shortcut-latest-2026-11-01.apk
+          mv dist/app-debug.apk dist/Shortcut-accounting-2026-11-06.apk
 
       - name: Publish direct-download prerelease
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          gh release create "shortcut-2026-11-01-preview" dist/Shortcut-latest-2026-11-01.apk \
+          gh release create "shortcut-2026-11-06-accounting-preview" dist/Shortcut-accounting-2026-11-06.apk \
             --repo "${{ github.repository }}" \
-            --title "Shortcut Android - November 1, 2026 preview" \
-            --notes "Built from verified successful Android CI run 41329327694 (commit f3306112422f0b13654bbf5a8131732e876068f5). Document scanner, table-photo Excel, accounting calculators, improved cards and navigation. Debug-signed Android preview; on-device testing pending." \
-            --target f3306112422f0b13654bbf5a8131732e876068f5 \
+            --title "Shortcut Android - November 6, 2026 accounting and media preview" \
+            --notes "Built from verified Android CI run 42242654379 (commit 9fe2e8df57873fd7a4cdeaf6dfc13745de19a0bd). Expanded guided accounting calculators, GIF quality presets, PDF splitting improvements, template review screen and redesigned tool cards. Debug-signed APK for on-device preview; further real-device testing is needed." \
+            --target 9fe2e8df57873fd7a4cdeaf6dfc13745de19a0bd \
             --prerelease
