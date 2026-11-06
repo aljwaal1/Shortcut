@@ -30,6 +30,7 @@ import com.google.mlkit.vision.common.InputImage
 import com.google.mlkit.vision.text.TextRecognition
 import com.google.mlkit.vision.text.latin.TextRecognizerOptions
 import java.util.Locale
+import java.io.File
 
 /** Native counterpart of Aidict's offline translation and PDF-reader's reading experience. */
 class TranslationReaderActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
@@ -47,6 +48,27 @@ class TranslationReaderActivity : AppCompatActivity(), TextToSpeech.OnInitListen
     private var speechReady = false
     private var modelsReady = false
     private var generation = 0
+    private var cachedPdfUri: Uri? = null
+    private var cachedPdfFile: File? = null
+
+    /** Copy once to disk; repeatedly loading a huge PDF from a stream inflates memory use. */
+    @Synchronized private fun cachedPdf(uri: Uri): File {
+        cachedPdfFile?.takeIf { cachedPdfUri == uri && it.isFile }?.let { return it }
+        val file = File.createTempFile("shortcut_reader_", ".pdf", cacheDir)
+        try {
+            requireNotNull(contentResolver.openInputStream(uri)) { "Cannot read PDF" }.use { input ->
+                file.outputStream().use { output -> input.copyTo(output, 64 * 1024) }
+            }
+            require(file.length() > 0) { "PDF file is empty" }
+            cachedPdfFile?.delete()
+            cachedPdfUri = uri
+            cachedPdfFile = file
+            return file
+        } catch (failure: Throwable) {
+            file.delete()
+            throw failure
+        }
+    }
 
     private val pdfPicker = registerForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
         if (uri != null) {
@@ -311,8 +333,7 @@ class TranslationReaderActivity : AppCompatActivity(), TextToSpeech.OnInitListen
         showStatus(label("Opening PDF page…", "جارٍ فتح صفحة PDF…"))
         Thread {
             val result = runCatching {
-                contentResolver.openInputStream(uri)?.use { stream ->
-                    PDDocument.load(stream).use { pdf ->
+                PDDocument.load(cachedPdf(uri)).use { pdf ->
                         val count = pdf.numberOfPages
                         require(count > 0) { "PDF has no pages" }
                         val actual = TranslationReading.pageIndex(requestedPage, count)
@@ -322,8 +343,7 @@ class TranslationReaderActivity : AppCompatActivity(), TextToSpeech.OnInitListen
                             sortByPosition = true
                         }.getText(pdf)
                         Triple(count, actual, text)
-                    }
-                } ?: error("Cannot open selected PDF")
+                }
             }
             runOnUiThread {
                 if (thisGeneration != generation || isDestroyed) return@runOnUiThread
@@ -350,11 +370,9 @@ class TranslationReaderActivity : AppCompatActivity(), TextToSpeech.OnInitListen
     private fun recognizeScannedPage(uri: Uri, pageIndex: Int, request: Int) {
         Thread {
             val rendered = runCatching {
-                contentResolver.openInputStream(uri)?.use { stream ->
-                    PDDocument.load(stream).use { pdf ->
+                PDDocument.load(cachedPdf(uri)).use { pdf ->
                         PDFRenderer(pdf).renderImageWithDPI(pageIndex, 120f)
-                    }
-                } ?: error("Cannot open scanned page")
+                }
             }
             rendered.onFailure { error ->
                 runOnUiThread {
@@ -436,6 +454,7 @@ class TranslationReaderActivity : AppCompatActivity(), TextToSpeech.OnInitListen
         translator?.close()
         tts?.stop()
         tts?.shutdown()
+        cachedPdfFile?.delete()
         super.onDestroy()
     }
 
