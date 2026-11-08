@@ -40,8 +40,12 @@ jobs:
       - name: Test lint compile and build debug APK
         run: gradle :app:testDebugUnitTest :app:lintDebug :app:compileDebugAndroidTestKotlin :app:assembleDebug --stacktrace
 
+      - name: Name the approved APK
+        run: cp app/build/outputs/apk/debug/app-debug.apk app/build/outputs/apk/debug/Shortcut-Approved-v0.9.13-b45.apk
+
       - name: Upload debug APK
         uses: actions/upload-artifact@v4
         with:
-          name: shortcut-debug-apk
-          path: app/build/outputs/apk/debug/app-debug.apk
+          name: Shortcut-Approved-v0.9.13-b45
+          path: app/build/outputs/apk/debug/Shortcut-Approved-v0.9.13-b45.apk
+          retention-days: 90
